@@ -1,0 +1,162 @@
+/* auth.css */
+
+/* Reset margin/padding */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Body full height */
+body, html {
+    height: 100%;
+    font-family: 'Poppins', sans-serif;
+    background-color: #f5f5f5;
+}
+
+/* Container kiri-kanan */
+.container {
+    display: flex;
+    height: 100vh;
+}
+
+/* LEFT SIDE */
+.left {
+    flex: 1;
+    background-color: #15406A;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 2rem;
+}
+
+.left img {
+    max-width: 150px;
+    margin-bottom: 2rem;
+}
+
+.left h1 {
+    font-size: 2.5rem;
+    margin-top: 1rem;
+}
+
+.left h2 {
+    font-size: 1.2rem;
+    font-weight: 400;
+}
+
+/* RIGHT SIDE */
+.right {
+    flex: 1;
+    background-color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 2rem;
+    min-width: 350px;
+}
+
+.right .title {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #143D66;
+    margin-bottom: 0.5rem;
+    text-align: center;
+}
+
+.right .subtitle {
+    font-size: 1rem;
+    color: #555;
+    margin-bottom: 2rem;
+    text-align: center;
+}
+
+/* Form inputs */
+.right form {
+    width: 100%;
+}
+
+.right form label {
+    font-weight: 500;
+    font-size: 0.9rem;
+    margin-bottom: 0.25rem;
+    display: block;
+}
+
+.right form input {
+    width: 100%;
+    padding: 0.65rem 1rem;
+    margin-bottom: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 0.95rem;
+}
+
+/* Buttons */
+.right form .btn {
+    width: 100%;
+    padding: 0.7rem;
+    background-color: #143D66;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.right form .btn:hover {
+    background-color: #0f2f52;
+}
+
+/* Error / alert */
+.alert.error {
+    background-color: #f8d7da;
+    color: #721c24;
+    padding: 0.75rem 1rem;
+    margin-bottom: 1rem;
+    border-radius: 6px;
+    border: 1px solid #f5c6cb;
+    font-size: 0.9rem;
+    text-align: center;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .container {
+        flex-direction: column;
+    }
+
+    .left, .right {
+        flex: unset;
+        width: 100%;
+        min-height: 250px;
+    }
+
+    .left h1 {
+        font-size: 2rem;
+    }
+
+    .left h2 {
+        font-size: 1rem;
+    }
+
+    .right .title {
+        font-size: 1.5rem;
+    }
+
+    .right .subtitle {
+        font-size: 0.9rem;
+    }
+}
+
+.form-control:focus,
+        .input-custom:focus {
+            border-color: #0f2f4d;
+            box-shadow: 0 0 0 0.1rem rgba(15, 47, 77, 0.2);
+        }

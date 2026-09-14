@@ -1,0 +1,143 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class SuketK3 extends Model
+{
+    use HasFactory;
+
+    protected $table = 'suket_k3s';
+
+    protected $fillable = [
+        'permohonan_id',
+        'nomor_order',
+        'status_tahap',
+        'perusahaan_nama',
+        'lokasi',
+        'catatan',
+        'catatan_evaluasi',
+        'draft_file_path',
+        'draft_file_name',
+        'signed_file_path',
+        'signed_file_name',
+        'signed_at',
+        'signed_by',
+        'published_at',
+        'published_by',
+        'sent_to_customer_at',
+        'sent_to_customer_by',
+        'resi_pengiriman',
+        'metode_pengiriman',
+        'created_by',
+        'updated_by',
+    ];
+
+    protected $casts = [
+        'status_tahap' => 'integer',
+        'signed_at' => 'datetime',
+        'published_at' => 'datetime',
+        'sent_to_customer_at' => 'datetime',
+    ];
+
+    public const STAGES = [
+        1 => [
+            'code' => 'permohonan',
+            'label' => 'Permohonan',
+            'desc' => 'Pengajuan suket didaftarkan berdasarkan nomor order.',
+            'roles' => ['admin', 'superadmin', 'pcu', 'penguji_k3'],
+            'badge' => 'primary',
+            'icon' => 'bi-file-earmark-plus',
+        ],
+        2 => [
+            'code' => 'evaluasi_dokumen',
+            'label' => 'Evaluasi Dokumen',
+            'desc' => 'Pemeriksaan dokumen hasil uji & kelayakan oleh Penguji K3.',
+            'roles' => ['pcu', 'penguji_k3', 'superadmin'],
+            'badge' => 'warning',
+            'icon' => 'bi-clipboard-check',
+        ],
+        3 => [
+            'code' => 'penyusunan_suket',
+            'label' => 'Penyusunan Laporan/Suket',
+            'desc' => 'Penyusunan draf Laporan dan Surat Keterangan K3.',
+            'roles' => ['pcu', 'penguji_k3', 'superadmin'],
+            'badge' => 'info',
+            'icon' => 'bi-pencil-square',
+        ],
+        4 => [
+            'code' => 'penandatanganan_suket',
+            'label' => 'Penandatanganan Surat Keterangan',
+            'desc' => 'Pengesahan dan penandatanganan oleh Kepala Balai.',
+            'roles' => ['mp', 'kepala_balai', 'superadmin'],
+            'badge' => 'dark',
+            'icon' => 'bi-pen',
+        ],
+        5 => [
+            'code' => 'penerbitan_suket',
+            'label' => 'Penerbitan Laporan/Suket',
+            'desc' => 'Penerbitan resmi dan penomoran suket oleh Administrator.',
+            'roles' => ['admin', 'superadmin'],
+            'badge' => 'success',
+            'icon' => 'bi-award',
+        ],
+        6 => [
+            'code' => 'kirim_pelanggan',
+            'label' => 'Kirim ke Pelanggan',
+            'desc' => 'Penyerahan/pengiriman suket ke pelanggan.',
+            'roles' => ['admin', 'superadmin'],
+            'badge' => 'secondary',
+            'icon' => 'bi-send-check',
+        ],
+    ];
+
+    public function getStageLabelAttribute(): string
+    {
+        return self::STAGES[$this->status_tahap]['label'] ?? 'Tidak Diketahui';
+    }
+
+    public function getStageBadgeAttribute(): string
+    {
+        return self::STAGES[$this->status_tahap]['badge'] ?? 'light';
+    }
+
+    public function getStageIconAttribute(): string
+    {
+        return self::STAGES[$this->status_tahap]['icon'] ?? 'bi-circle';
+    }
+
+    public function canRoleProcess(?string $role): bool
+    {
+        if (!$role) {
+            return false;
+        }
+        if ($role === 'superadmin') {
+            return true;
+        }
+        $allowed = self::STAGES[$this->status_tahap]['roles'] ?? [];
+        return in_array($role, $allowed, true);
+    }
+
+    public function permohonan(): BelongsTo
+    {
+        return $this->belongsTo(Permohonan::class, 'permohonan_id');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function signer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'signed_by');
+    }
+
+    public function publisher(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'published_by');
+    }
+}
