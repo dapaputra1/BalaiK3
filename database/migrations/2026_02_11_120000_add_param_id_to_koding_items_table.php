@@ -43,7 +43,7 @@ return new class extends Migration
             return;
         }
 
-        if (Schema::hasColumn('koding_items', 'pengujian_dokumen_id')) {
+        if (Schema::hasColumn('koding_items', 'pengujian_dokumen_id') && DB::getDriverName() === 'mysql') {
             $fkKoding = DB::selectOne("
                 SELECT CONSTRAINT_NAME as name
                 FROM information_schema.KEY_COLUMN_USAGE
@@ -94,16 +94,18 @@ return new class extends Migration
             }
         });
 
-        $hasUnique = DB::selectOne("
-            SELECT INDEX_NAME as name
-            FROM information_schema.STATISTICS
-            WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = 'koding_items'
-              AND INDEX_NAME = 'koding_items_unique_doc'
-            LIMIT 1
-        ");
-        if (!empty($hasUnique?->name)) {
-            DB::statement("ALTER TABLE `koding_items` DROP INDEX `koding_items_unique_doc`");
+        if (DB::getDriverName() === 'mysql') {
+            $hasUnique = DB::selectOne("
+                SELECT INDEX_NAME as name
+                FROM information_schema.STATISTICS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'koding_items'
+                  AND INDEX_NAME = 'koding_items_unique_doc'
+                LIMIT 1
+            ");
+            if (!empty($hasUnique?->name)) {
+                DB::statement("ALTER TABLE `koding_items` DROP INDEX `koding_items_unique_doc`");
+            }
         }
 
         Schema::table('koding_items', function (Blueprint $table) {
@@ -121,24 +123,26 @@ return new class extends Migration
             }
         });
 
-        $hasKodingFk = DB::selectOne("
-            SELECT CONSTRAINT_NAME as name
-            FROM information_schema.KEY_COLUMN_USAGE
-            WHERE TABLE_SCHEMA = DATABASE()
-              AND TABLE_NAME = 'koding_items'
-              AND COLUMN_NAME = 'koding_id'
-              AND REFERENCED_TABLE_NAME IS NOT NULL
-            LIMIT 1
-        ");
-        if (empty($hasKodingFk?->name)) {
-            Schema::table('koding_items', function (Blueprint $table) {
-                if (Schema::hasColumn('koding_items', 'koding_id')) {
-                    $table->foreign('koding_id')
-                        ->references('id')
-                        ->on('kodings')
-                        ->cascadeOnDelete();
-                }
-            });
+        if (DB::getDriverName() === 'mysql') {
+            $hasKodingFk = DB::selectOne("
+                SELECT CONSTRAINT_NAME as name
+                FROM information_schema.KEY_COLUMN_USAGE
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = 'koding_items'
+                  AND COLUMN_NAME = 'koding_id'
+                  AND REFERENCED_TABLE_NAME IS NOT NULL
+                LIMIT 1
+            ");
+            if (empty($hasKodingFk?->name)) {
+                Schema::table('koding_items', function (Blueprint $table) {
+                    if (Schema::hasColumn('koding_items', 'koding_id')) {
+                        $table->foreign('koding_id')
+                            ->references('id')
+                            ->on('kodings')
+                            ->cascadeOnDelete();
+                    }
+                });
+            }
         }
     }
 
@@ -148,7 +152,7 @@ return new class extends Migration
             return;
         }
 
-        if (Schema::hasColumn('koding_items', 'pengujian_dokumen_id')) {
+        if (Schema::hasColumn('koding_items', 'pengujian_dokumen_id') && DB::getDriverName() === 'mysql') {
             $fkRow = DB::selectOne("
                 SELECT CONSTRAINT_NAME as name
                 FROM information_schema.KEY_COLUMN_USAGE

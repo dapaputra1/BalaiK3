@@ -172,14 +172,16 @@ Route::middleware('auth')->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 });
 
-// Menu Mandiri: Penerbitan Suket K3 Lingkungan Kerja (Khusus Internal)
-Route::middleware(['auth', 'role:superadmin,admin,mp,pcu,kepala_balai,penguji_k3'])
+// Menu Mandiri: Penerbitan Suket K3 Lingkungan Kerja
+Route::middleware(['auth', 'role:superadmin,admin,mp,pcu,kepala_balai,penguji_k3,qc,user'])
     ->prefix('suket-k3')
     ->name('suket.')
     ->group(function () {
         Route::get('/', [PenerbitanSuketController::class, 'index'])->name('index');
         Route::post('/store-by-order', [PenerbitanSuketController::class, 'storeByOrder'])->name('store-order');
         Route::post('/{suket}/advance', [PenerbitanSuketController::class, 'advanceStage'])->name('advance');
+        Route::post('/{suket}/qc-review', [PenerbitanSuketController::class, 'qcReview'])->name('qc-review');
+        Route::get('/{suket}/generate-draft', [PenerbitanSuketController::class, 'generateDraft'])->name('generate-draft');
         Route::post('/{suket}/upload-doc', [PenerbitanSuketController::class, 'uploadDocument'])->name('upload-doc');
         Route::get('/{suket}/download/{type}', [PenerbitanSuketController::class, 'downloadDocument'])->name('download-doc');
     });

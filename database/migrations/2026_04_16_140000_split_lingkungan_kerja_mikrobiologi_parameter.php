@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        if (!Schema::hasTable('service_parameters')) {
+        if (!Schema::hasTable('service_parameters') || !DB::table('service_categories')->where('id', 1)->exists()) {
             return;
         }
 

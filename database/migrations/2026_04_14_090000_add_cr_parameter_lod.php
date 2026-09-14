@@ -9,6 +9,11 @@ return new class extends Migration
     {
         $now = now();
 
+        $hasParameter = DB::table('service_parameters')->where('id', 96)->exists();
+        if (!$hasParameter) {
+            return;
+        }
+
         DB::table('parameter_lods')->updateOrInsert(
             ['service_parameter_id' => 96],
             [

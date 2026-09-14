@@ -22,8 +22,9 @@ return new class extends Migration
         });
 
         if (Schema::hasColumn('baps', 'user_approved_by')) {
-            // Ensure column type matches users.id (INT signed) before adding FK
-            DB::statement('ALTER TABLE `baps` MODIFY `user_approved_by` INT NULL');
+            if (DB::getDriverName() === 'mysql') {
+                DB::statement('ALTER TABLE `baps` MODIFY `user_approved_by` INT NULL');
+            }
             Schema::table('baps', function (Blueprint $table) {
                 $table->foreign('user_approved_by')->references('id')->on('users')->nullOnDelete();
             });

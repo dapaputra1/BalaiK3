@@ -27,10 +27,15 @@ return new class extends Migration
                     ]);
                 });
 
+            $categoryId = ServicePackage::query()->where('short_code', 'EMS_GENSET_5')->value('service_category_id');
+            if (!$categoryId) {
+                return;
+            }
+
             $package = ServicePackage::query()->updateOrCreate(
                 ['short_code' => 'EMS_GENSET_9'],
                 [
-                    'service_category_id' => ServicePackage::query()->where('short_code', 'EMS_GENSET_5')->value('service_category_id'),
+                    'service_category_id' => $categoryId,
                     'name' => 'Paket Genset 9',
                     'badge' => 'Genset',
                     'subtitle' => 'Kapasitas 1001 - 3000 KW (Gas)',
@@ -40,10 +45,6 @@ return new class extends Migration
                     'is_active' => true,
                 ]
             );
-
-            if (!$package->service_category_id) {
-                return;
-            }
 
             $parameterIds = ServiceParameter::query()
                 ->whereIn('short_code', ['SO22', 'NO22', 'COSTB', 'O2'])

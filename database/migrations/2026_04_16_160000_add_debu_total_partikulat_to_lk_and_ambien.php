@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
-        if (!Schema::hasTable('service_parameters')) {
+        if (!Schema::hasTable('service_parameters') || !Schema::hasTable('service_categories')) {
             return;
         }
 
@@ -29,6 +29,10 @@ return new class extends Migration {
         ];
 
         foreach ($rows as $row) {
+            if (!DB::table('service_categories')->where('id', $row['service_category_id'])->exists()) {
+                continue;
+            }
+
             $existing = DB::table('service_parameters')
                 ->where('short_code', $row['short_code'])
                 ->first();

@@ -15,11 +15,12 @@ return new class extends Migration
             });
         }
 
+        $nowSql = DB::getDriverName() === 'sqlite' ? "datetime('now')" : 'NOW()';
         DB::table('permohonans')
             ->whereNotNull('spt_sent_at')
             ->whereNull('ma_approved_at')
             ->update([
-                'ma_approved_at' => DB::raw('COALESCE(spt_sent_at, penjadwalan_sent_at, NOW())'),
+                'ma_approved_at' => DB::raw("COALESCE(spt_sent_at, penjadwalan_sent_at, {$nowSql})"),
             ]);
     }
 

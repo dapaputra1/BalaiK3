@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('password');
             $table->boolean('is_active')->nullable()->default(true);
             $table->string('signature_path')->nullable();
-            $table->enum('role', ['user', 'admin', 'superadmin', 'qc'])->nullable()->default('user');
+            $table->enum('role', ['user', 'admin', 'superadmin', 'ma', 'mp', 'mt', 'penyelia', 'pcu', 'analis', 'qc'])->nullable()->default('user');
             $table->dateTime('created_at')->nullable()->useCurrent();
             $table->dateTime('updated_at')->useCurrentOnUpdate()->nullable()->useCurrent();
         });

@@ -19,7 +19,9 @@ return new class extends Migration
         });
 
         if (Schema::hasColumn('baps', 'admin_viewed_by')) {
-            DB::statement('ALTER TABLE `baps` MODIFY `admin_viewed_by` INT NULL');
+            if (DB::getDriverName() === 'mysql') {
+                DB::statement('ALTER TABLE `baps` MODIFY `admin_viewed_by` INT NULL');
+            }
             Schema::table('baps', function (Blueprint $table) {
                 $table->foreign('admin_viewed_by')->references('id')->on('users')->nullOnDelete();
             });

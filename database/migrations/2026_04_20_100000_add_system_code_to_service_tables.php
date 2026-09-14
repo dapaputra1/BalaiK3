@@ -25,8 +25,10 @@ return new class extends Migration
         $this->backfillCategorySystemCodes();
         $this->backfillParameterSystemCodes();
 
-        DB::statement("ALTER TABLE service_categories MODIFY system_code VARCHAR(40) NOT NULL");
-        DB::statement("ALTER TABLE service_parameters MODIFY system_code VARCHAR(80) NOT NULL");
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement("ALTER TABLE service_categories MODIFY system_code VARCHAR(40) NOT NULL");
+            DB::statement("ALTER TABLE service_parameters MODIFY system_code VARCHAR(80) NOT NULL");
+        }
 
         Schema::table('service_categories', function (Blueprint $table) {
             $table->unique('system_code', 'service_categories_system_code_unique');

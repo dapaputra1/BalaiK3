@@ -7,8 +7,10 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('ALTER TABLE absorbance_formulas MODIFY intercept DECIMAL(20,12) NOT NULL DEFAULT 0');
-        DB::statement('ALTER TABLE absorbance_formulas MODIFY slope DECIMAL(18,12) NOT NULL');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE absorbance_formulas MODIFY intercept DECIMAL(20,12) NOT NULL DEFAULT 0');
+            DB::statement('ALTER TABLE absorbance_formulas MODIFY slope DECIMAL(18,12) NOT NULL');
+        }
 
         $exists = DB::table('absorbance_formulas')
             ->where('parameter_key', 'BENZENE')
@@ -34,7 +36,9 @@ return new class extends Migration
             ->where('parameter_key', 'BENZENE')
             ->delete();
 
-        DB::statement('ALTER TABLE absorbance_formulas MODIFY intercept DECIMAL(12,6) NOT NULL DEFAULT 0');
-        DB::statement('ALTER TABLE absorbance_formulas MODIFY slope DECIMAL(12,6) NOT NULL');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE absorbance_formulas MODIFY intercept DECIMAL(12,6) NOT NULL DEFAULT 0');
+            DB::statement('ALTER TABLE absorbance_formulas MODIFY slope DECIMAL(12,6) NOT NULL');
+        }
     }
 };

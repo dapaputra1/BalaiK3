@@ -7,6 +7,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (!Schema::hasTable('service_parameters') || !DB::table('service_categories')->where('id', 1)->exists()) {
+            return;
+        }
+
         $timestamp = now();
 
         DB::table('service_parameters')->updateOrInsert(

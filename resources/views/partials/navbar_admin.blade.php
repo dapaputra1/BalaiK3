@@ -529,6 +529,13 @@
                     ['label' => 'QC LHU', 'icon' => 'bi bi-clipboard-check', 'route' => 'qc.qc-lhu.index', 'badge' => $badgeCounts['qc_lhu'] ?? 0],
                 ],
             ],
+            [
+                'type' => 'link',
+                'label' => 'Suket K3 Lingkungan Kerja',
+                'icon' => 'bi bi-file-earmark-medical-fill',
+                'route' => 'suket.index',
+                'badge' => $badgeCounts['suket_k3'] ?? 0,
+            ],
         ],
     ];
 

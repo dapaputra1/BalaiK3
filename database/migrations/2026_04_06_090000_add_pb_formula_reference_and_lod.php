@@ -26,11 +26,12 @@ return new class extends Migration
             ]);
         }
 
+        $hasParameter = DB::table('service_parameters')->where('id', 91)->exists();
         $hasLod = DB::table('parameter_lods')
             ->where('service_parameter_id', 91)
             ->exists();
 
-        if (!$hasLod) {
+        if ($hasParameter && !$hasLod) {
             DB::table('parameter_lods')->insert([
                 'service_parameter_id' => 91,
                 'kons' => 0.0095,

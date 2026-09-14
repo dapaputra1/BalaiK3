@@ -951,6 +951,10 @@
                     data-kode="{{ $row['kode'] ?? '-' }}"
                   >Ajukan Revisi</button>
                 @endif
+                <a
+                  href="{{ route('suket.index', ['nomor_order' => $row['kode'] ?? '']) }}"
+                  class="btn btn-outline-primary btn-sm fw-semibold"
+                ><i class="bi bi-file-earmark-medical me-1"></i>Suket K3</a>
               </div>
             </div>
           @endif
