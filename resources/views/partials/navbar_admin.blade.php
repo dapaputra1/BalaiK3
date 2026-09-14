@@ -344,6 +344,12 @@
         'billing' => $billingBadgeCount,
         'suket' => $suketBadgeCount,
         'suket_k3' => \Illuminate\Support\Facades\Schema::hasTable('suket_k3s') ? \App\Models\SuketK3::where('status_tahap', '<', 6)->count() : 0,
+        'suket_t2' => \Illuminate\Support\Facades\Schema::hasTable('suket_k3s') ? \App\Models\SuketK3::where('status_tahap', 2)->count() : 0,
+        'suket_t3' => \Illuminate\Support\Facades\Schema::hasTable('suket_k3s') ? \App\Models\SuketK3::where('status_tahap', 3)->count() : 0,
+        'suket_qc' => \Illuminate\Support\Facades\Schema::hasTable('suket_k3s') ? \App\Models\SuketK3::where('status_tahap', 3)->where('qc_status', 'pending')->count() : 0,
+        'suket_t4' => \Illuminate\Support\Facades\Schema::hasTable('suket_k3s') ? \App\Models\SuketK3::where('status_tahap', 4)->count() : 0,
+        'suket_t5' => \Illuminate\Support\Facades\Schema::hasTable('suket_k3s') ? \App\Models\SuketK3::where('status_tahap', 5)->count() : 0,
+        'suket_t6' => \Illuminate\Support\Facades\Schema::hasTable('suket_k3s') ? \App\Models\SuketK3::where('status_tahap', 6)->count() : 0,
         'penyerahan_lhu' => $penyerahanLhuBadgeCount,
     ];
     $menus = [
@@ -391,11 +397,19 @@
                 ],
             ],
             [
-                'type' => 'link',
-                'label' => 'Suket K3 Lingkungan Kerja',
-                'icon' => 'bi bi-file-earmark-medical-fill',
-                'route' => 'suket.index',
-                'badge' => $badgeCounts['suket_k3'] ?? 0,
+                'type' => 'section',
+                'label' => 'Penerbitan Suket',
+                'id' => 'suketSuperadmin',
+                'collapsible' => true,
+                'children' => [
+                    ['label' => 'Semua Permohonan', 'icon' => 'bi bi-grid-fill', 'href' => route('suket.index'), 'badge' => $badgeCounts['suket_k3'] ?? 0],
+                    ['label' => 'Tahap 2: Evaluasi Dokumen', 'icon' => 'bi bi-file-earmark-check', 'href' => route('suket.index', ['stage' => 2]), 'badge' => $badgeCounts['suket_t2'] ?? 0],
+                    ['label' => 'Tahap 3: Penyusunan Suket', 'icon' => 'bi bi-file-earmark-word', 'href' => route('suket.index', ['stage' => 3]), 'badge' => $badgeCounts['suket_t3'] ?? 0],
+                    ['label' => 'Review QC Suket', 'icon' => 'bi bi-shield-check', 'href' => route('suket.index', ['stage' => 'qc']), 'badge' => $badgeCounts['suket_qc'] ?? 0],
+                    ['label' => 'Tahap 4: TTD Suket', 'icon' => 'bi bi-pen', 'href' => route('suket.index', ['stage' => 4]), 'badge' => $badgeCounts['suket_t4'] ?? 0],
+                    ['label' => 'Tahap 5: Penerbitan Suket', 'icon' => 'bi bi-award', 'href' => route('suket.index', ['stage' => 5]), 'badge' => $badgeCounts['suket_t5'] ?? 0],
+                    ['label' => 'Tahap 6: Kirim ke Pelanggan', 'icon' => 'bi bi-send-check', 'href' => route('suket.index', ['stage' => 6]), 'badge' => $badgeCounts['suket_t6'] ?? 0],
+                ],
             ],
         ],
         'admin' => [
@@ -424,11 +438,17 @@
                 ],
             ],
             [
-                'type' => 'link',
-                'label' => 'Suket K3 Lingkungan Kerja',
-                'icon' => 'bi bi-file-earmark-medical-fill',
-                'route' => 'suket.index',
-                'badge' => $badgeCounts['suket_k3'] ?? 0,
+                'type' => 'section',
+                'label' => 'Penerbitan Suket',
+                'id' => 'suketAdmin',
+                'collapsible' => true,
+                'children' => [
+                    ['label' => 'Semua Permohonan', 'icon' => 'bi bi-grid-fill', 'href' => route('suket.index'), 'badge' => $badgeCounts['suket_k3'] ?? 0],
+                    ['label' => 'Tahap 2: Evaluasi Dokumen', 'icon' => 'bi bi-file-earmark-check', 'href' => route('suket.index', ['stage' => 2]), 'badge' => $badgeCounts['suket_t2'] ?? 0],
+                    ['label' => 'Tahap 4: Upload TTD Suket', 'icon' => 'bi bi-pen', 'href' => route('suket.index', ['stage' => 4]), 'badge' => $badgeCounts['suket_t4'] ?? 0],
+                    ['label' => 'Tahap 5: Penomoran Suket', 'icon' => 'bi bi-award', 'href' => route('suket.index', ['stage' => 5]), 'badge' => $badgeCounts['suket_t5'] ?? 0],
+                    ['label' => 'Tahap 6: Kirim ke Pelanggan', 'icon' => 'bi bi-send-check', 'href' => route('suket.index', ['stage' => 6]), 'badge' => $badgeCounts['suket_t6'] ?? 0],
+                ],
             ],
         ],
         'ma' => [
@@ -453,11 +473,13 @@
                 ],
             ],
             [
-                'type' => 'link',
-                'label' => 'Suket K3 Lingkungan Kerja',
-                'icon' => 'bi bi-file-earmark-medical-fill',
-                'route' => 'suket.index',
-                'badge' => $badgeCounts['suket_k3'] ?? 0,
+                'type' => 'section',
+                'label' => 'Penerbitan Suket',
+                'id' => 'suketMp',
+                'collapsible' => true,
+                'children' => [
+                    ['label' => 'Tahap 4: TTD Suket K3', 'icon' => 'bi bi-pen', 'href' => route('suket.index', ['stage' => 4]), 'badge' => $badgeCounts['suket_t4'] ?? 0],
+                ],
             ],
         ],
         'mt' => [
@@ -500,11 +522,14 @@
                 ],
             ],
             [
-                'type' => 'link',
-                'label' => 'Suket K3 Lingkungan Kerja',
-                'icon' => 'bi bi-file-earmark-medical-fill',
-                'route' => 'suket.index',
-                'badge' => $badgeCounts['suket_k3'] ?? 0,
+                'type' => 'section',
+                'label' => 'Penerbitan Suket',
+                'id' => 'suketPcu',
+                'collapsible' => true,
+                'children' => [
+                    ['label' => 'Tahap 2: Evaluasi Dokumen', 'icon' => 'bi bi-file-earmark-check', 'href' => route('suket.index', ['stage' => 2]), 'badge' => $badgeCounts['suket_t2'] ?? 0],
+                    ['label' => 'Tahap 3: Penyusunan Suket', 'icon' => 'bi bi-file-earmark-word', 'href' => route('suket.index', ['stage' => 3]), 'badge' => $badgeCounts['suket_t3'] ?? 0],
+                ],
             ],
         ],
         'analis' => [
@@ -530,11 +555,13 @@
                 ],
             ],
             [
-                'type' => 'link',
-                'label' => 'Suket K3 Lingkungan Kerja',
-                'icon' => 'bi bi-file-earmark-medical-fill',
-                'route' => 'suket.index',
-                'badge' => $badgeCounts['suket_k3'] ?? 0,
+                'type' => 'section',
+                'label' => 'Penerbitan Suket',
+                'id' => 'suketQc',
+                'collapsible' => true,
+                'children' => [
+                    ['label' => 'Review QC Suket K3', 'icon' => 'bi bi-shield-check', 'href' => route('suket.index', ['stage' => 'qc']), 'badge' => $badgeCounts['suket_qc'] ?? 0],
+                ],
             ],
         ],
     ];

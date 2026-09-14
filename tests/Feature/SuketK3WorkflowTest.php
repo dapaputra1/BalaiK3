@@ -8,6 +8,7 @@ use App\Models\SuketK3;
 use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Tests\TestCase;
 
 class SuketK3WorkflowTest extends TestCase
@@ -48,117 +49,150 @@ class SuketK3WorkflowTest extends TestCase
             'password' => bcrypt('password'),
             'role' => 'user',
         ]);
+        $otherUser = User::create([
+            'name' => 'Pemohon Lain',
+            'email' => 'other@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
 
-        // 1. User pemohon can access suket index and see form Tahap 1
-        $userResponse = $this->actingAs($regularUser)->get('/suket-k3');
-        $userResponse->assertStatus(200);
-        $userResponse->assertSee('Tahap 1: Form Permohonan Suket K3 Lingkungan Kerja');
+        // 1. Regular user accessing internal /suket-k3 gets redirected to /permohonan-suket
+        $redirectResponse = $this->actingAs($regularUser)->get('/suket-k3');
+        $redirectResponse->assertRedirect(route('user.suket.index'));
 
-        // 2. Admin can access and see the standalone Suket K3 menu
-        $response = $this->actingAs($admin)->get('/suket-k3');
-        $response->assertStatus(200);
-        $response->assertSee('Penerbitan Surat Keterangan (Suket) K3 Lingkungan Kerja');
-        $response->assertSee('Alur Penerbitan Suket K3 Lingkungan Kerja (6 Tahap)');
+        // 2. User pemohon accesses /permohonan-suket directly and sees their Tahap 1 form
+        $userPortalResponse = $this->actingAs($regularUser)->get('/permohonan-suket');
+        $userPortalResponse->assertStatus(200);
+        $userPortalResponse->assertSee('Permohonan Surat Keterangan (Suket) K3 Lingkungan Kerja');
 
-        // 3. User pemohon submits permohonan dengan opsi faktor K3 & LHU auto
-        $permohonan = Permohonan::query()->create([
-            'kode' => 'PMH-TEST-001',
+        // 3. Admin accesses /suket-k3: starts from Tahap 2, NO Tahap 1 form
+        $adminResponse = $this->actingAs($admin)->get('/suket-k3');
+        $adminResponse->assertStatus(200);
+        $adminResponse->assertSee('Penerbitan Surat Keterangan (Suket) K3 Lingkungan Kerja');
+        $adminResponse->assertSee('Tahap 2');
+        $adminResponse->assertDontSee('Tahap 1: Form Permohonan Suket K3 Lingkungan Kerja');
+
+        // 4. Create orders: one for regularUser, one for otherUser
+        $orderUser = Permohonan::query()->create([
+            'kode' => 'PMH-USER-001',
             'user_id' => $regularUser->id,
             'status_global' => 'selesai',
             'status_lab' => 'selesai',
         ]);
         DraftLhu::query()->create([
-            'permohonan_id' => $permohonan->id,
+            'permohonan_id' => $orderUser->id,
             'signed_file_path' => 'draft_lhus/test_signed.pdf',
-            'signed_file_name' => 'LHU_TTD_PMH-TEST-001.pdf',
+            'signed_file_name' => 'LHU_TTD_PMH-USER-001.pdf',
             'created_by' => $admin->id,
         ]);
 
-        $submitResponse = $this->actingAs($regularUser)->post('/suket-k3/store-by-order', [
-            'nomor_order' => $permohonan->kode,
+        $orderOther = Permohonan::query()->create([
+            'kode' => 'PMH-OTHER-002',
+            'user_id' => $otherUser->id,
+            'status_global' => 'selesai',
+            'status_lab' => 'selesai',
+        ]);
+
+        // 5. User cannot submit order belonging to someone else
+        $failOtherResponse = $this->actingAs($regularUser)->post('/permohonan-suket/store', [
+            'nomor_order' => $orderOther->kode,
+            'faktor_k3' => ['fisika'],
+            'lhu_source' => 'auto',
+        ]);
+        $failOtherResponse->assertSessionHas('error');
+
+        // 6. User submits their own order
+        $submitResponse = $this->actingAs($regularUser)->post('/permohonan-suket/store', [
+            'nomor_order' => $orderUser->kode,
             'faktor_k3' => ['fisika', 'kimia'],
             'lhu_source' => 'auto',
-            'catatan' => 'Uji test otomatis submit order dengan faktor K3',
+            'catatan' => 'Permohonan Suket K3 rutin unit pabrik',
         ]);
-        $submitResponse->assertRedirect(route('suket.index'));
+        $submitResponse->assertRedirect(route('user.suket.index'));
 
-        $suket = SuketK3::where('nomor_order', $permohonan->kode)->latest('id')->first();
+        $suket = SuketK3::where('nomor_order', $orderUser->kode)->latest('id')->first();
         $this->assertNotNull($suket);
-        $this->assertEquals(1, $suket->status_tahap);
+        $this->assertEquals(2, $suket->status_tahap); // Auto-advanced to Tahap 2 for internal processing
         $this->assertEquals(['fisika', 'kimia'], $suket->faktor_k3);
         $this->assertEquals('auto', $suket->lhu_source);
         $this->assertEquals('draft_lhus/test_signed.pdf', $suket->lhu_file_path);
 
-        // 4. Penguji K3 (pcu) advances from Tahap 1 to Tahap 2 (Evaluasi Dokumen)
+        // 7. Penguji K3 (pcu) completes Tahap 2 (Evaluasi Dokumen) -> advances to Tahap 3 (Penyusunan Suket)
         $this->actingAs($pcu)->post("/suket-k3/{$suket->id}/advance", [
             'action' => 'next',
-            'catatan' => 'Pemeriksaan kelengkapan dokumen LHU, foto, dan denah K3',
-        ])->assertRedirect(route('suket.index'));
-
-        $suket->refresh();
-        $this->assertEquals(2, $suket->status_tahap);
-
-        // 5. Penguji K3 completes Tahap 2 (Evaluasi) to Tahap 3 (Penyusunan Suket)
-        $this->actingAs($pcu)->post("/suket-k3/{$suket->id}/advance", [
-            'action' => 'next',
-            'catatan' => 'Dokumen evaluasi valid dan memenuhi standar Permenaker No. 5/2018',
-        ])->assertRedirect(route('suket.index'));
+            'catatan' => 'Hasil evaluasi NAB fisika dan kimia memenuhi standar Permenaker No. 5/2018',
+        ])->assertRedirect(route('suket.index', ['stage' => 3]));
 
         $suket->refresh();
         $this->assertEquals(3, $suket->status_tahap);
 
-        // 6. Test Auto-generate draft Suket template Permenaker 05/2018
-        $draftResponse = $this->actingAs($pcu)->get("/suket-k3/{$suket->id}/generate-draft");
-        $draftResponse->assertStatus(200);
-        $draftResponse->assertHeader('Content-Type', 'application/msword; charset=UTF-8');
+        // 8. Test Document Preview without forcing download
+        $previewResponse = $this->actingAs($pcu)->get("/suket-k3/{$suket->id}/preview/draft");
+        $previewResponse->assertStatus(200);
+        $previewResponse->assertSee('SURAT KETERANGAN');
+
+        // 9. Tahap 3: Penguji K3 uploads revised draft
+        $revisedFile = UploadedFile::fake()->create('revisi_draf_suket.docx', 100, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        $this->actingAs($pcu)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'upload_draft',
+            'revised_draft' => $revisedFile,
+            'catatan' => 'Draf diperbaiki klausul rekomendasi K3',
+        ])->assertRedirect(route('suket.index', ['stage' => 3]));
 
         $suket->refresh();
         $this->assertNotNull($suket->draft_file_path);
 
-        // 7. Gerbang QC Review: QC approves draf suket (Tahap 3 -> Tahap 4)
+        // 10. Gerbang QC Review: QC approves draf suket (Tahap 3 -> Tahap 4)
         $qcResponse = $this->actingAs($qc)->post("/suket-k3/{$suket->id}/qc-review", [
             'action' => 'approve',
             'catatan' => 'Draf dokumen Suket telah diverifikasi QC dan disetujui.',
         ]);
-        $qcResponse->assertRedirect(route('suket.index'));
+        $qcResponse->assertRedirect(route('suket.index', ['stage' => 4]));
 
         $suket->refresh();
         $this->assertEquals('approved', $suket->qc_status);
         $this->assertEquals(4, $suket->status_tahap);
 
-        // 8. Kepala Balai (mp) & Admin menandatangani / TTE di Tahap 4
+        // 11. Tahap 4: Kepala Balai (mp) / Admin mengesahkan TTD dengan mengunggah berkas scan TTD/TTE
+        $signedFile = UploadedFile::fake()->create('suket_sah_ttd.pdf', 150, 'application/pdf');
         $this->actingAs($mp)->post("/suket-k3/{$suket->id}/advance", [
             'action' => 'next',
-            'catatan' => 'Tanda tangan elektronik Kepala Balai disetujui',
-        ])->assertRedirect(route('suket.index'));
+            'signed_document' => $signedFile,
+            'catatan' => 'Surat Keterangan K3 telah ditandatangani Kepala Balai',
+        ])->assertRedirect(route('suket.index', ['stage' => 5]));
 
         $suket->refresh();
         $this->assertEquals(5, $suket->status_tahap);
+        $this->assertNotNull($suket->signed_file_path);
         $this->assertNotNull($suket->signed_at);
 
-        // 9. Admin menerbitkan suket dengan nomor surat resmi di Tahap 5
+        // 12. Tahap 5: Admin meng-input nomor surat resmi (Auto-replace di draf dokumen)
         $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
             'action' => 'next',
             'nomor_surat' => '566/SK-LK/BK3-SBY/IX/2026',
             'catatan' => 'Surat keterangan K3 resmi diterbitkan',
-        ])->assertRedirect(route('suket.index'));
+        ])->assertRedirect(route('suket.index', ['stage' => 6]));
 
         $suket->refresh();
         $this->assertEquals(6, $suket->status_tahap);
         $this->assertEquals('566/SK-LK/BK3-SBY/IX/2026', $suket->nomor_surat);
         $this->assertNotNull($suket->published_at);
 
-        // 10. Admin mengonfirmasi pengiriman ke pelanggan (Tahap 6)
+        // 13. Tahap 6: Admin menyerahkan langsung ke portal web pelanggan (tanpa resi fisik)
         $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
             'action' => 'next',
-            'resi_pengiriman' => 'JNE-K3-99887766',
-            'metode_pengiriman' => 'Kurir Ekspedisi',
-            'catatan' => 'Dokumen fisik dikirimkan ke alamat perusahaan pemohon',
-        ])->assertRedirect(route('suket.index'));
+            'catatan' => 'Suket resmi telah tersedia di portal web Balai K3',
+        ])->assertRedirect(route('suket.index', ['stage' => 6]));
 
         $suket->refresh();
         $this->assertNotNull($suket->sent_to_customer_at);
-        $this->assertEquals('JNE-K3-99887766', $suket->resi_pengiriman);
+        $this->assertEquals('Portal Digital Web Balai K3', $suket->metode_pengiriman);
+
+        // 14. Pemohon mengecek portal dan dapat melihat & preview suket yang sudah terbit
+        $userCheckResponse = $this->actingAs($regularUser)->get('/permohonan-suket');
+        $userCheckResponse->assertStatus(200);
+        $userCheckResponse->assertSee('566/SK-LK/BK3-SBY/IX/2026');
+        $userCheckResponse->assertSee('Lihat Suket');
     }
 
     public function test_qc_rejection_and_stage_validations()
@@ -210,9 +244,9 @@ class SuketK3WorkflowTest extends TestCase
 
         // C. QC rejects draft with note
         $this->actingAs($qc)->post("/suket-k3/{$suket->id}/qc-review", [
-            'action' => 'reject',
+            'action' => 'revision',
             'catatan' => 'Perbaiki klausul evaluasi ergonomi pada paragraf 2',
-        ])->assertRedirect(route('suket.index'));
+        ])->assertRedirect(route('suket.index', ['stage' => 3]));
 
         $suket->refresh();
         $this->assertEquals('revision', $suket->qc_status);
@@ -223,7 +257,7 @@ class SuketK3WorkflowTest extends TestCase
         $this->actingAs($qc)->post("/suket-k3/{$suket->id}/qc-review", [
             'action' => 'approve',
             'catatan' => 'Sudah direvisi dan sesuai',
-        ])->assertRedirect(route('suket.index'));
+        ])->assertRedirect(route('suket.index', ['stage' => 4]));
 
         $suket->refresh();
         $this->assertEquals('approved', $suket->qc_status);
@@ -235,5 +269,45 @@ class SuketK3WorkflowTest extends TestCase
             'action' => 'next',
             'nomor_surat' => '',
         ])->assertSessionHas('error');
+    }
+
+    public function test_tahap_4_upload_signed_doc_file_advances_to_stage_5(): void
+    {
+        \Illuminate\Support\Facades\Storage::fake('private');
+
+        $admin = User::create([
+            'name' => 'Admin Test TTD',
+            'email' => 'admin.ttd.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
+        ]);
+        $suket = SuketK3::create([
+            'nomor_order' => 'PMH-TEST-TTD-01',
+            'status_tahap' => 4,
+            'faktor_k3' => ['fisika'],
+            'qc_status' => 'approved',
+            'perusahaan_nama' => 'PT Uji TTD',
+            'lokasi' => 'Surabaya',
+        ]);
+
+        // Upload a .doc file whose content is HTML (exactly like Word HTML draft)
+        $docContent = '<html><body><h1>Dokumen Suket Disahkan</h1></body></html>';
+        $signedDoc = UploadedFile::fake()->createWithContent('Draft_Suket_Signed.doc', $docContent);
+
+        $response = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'next',
+            'signed_document' => $signedDoc,
+            'catatan' => 'Suket telah ditandatangani basah oleh Kepala Balai',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect(route('suket.index', ['stage' => 5]));
+
+        $suket->refresh();
+        $this->assertEquals(5, $suket->status_tahap);
+        $this->assertNotNull($suket->signed_file_path);
+        $this->assertEquals('Draft_Suket_Signed.doc', $suket->signed_file_name);
+        $this->assertNotNull($suket->signed_at);
+        $this->assertEquals($admin->id, $suket->signed_by);
     }
 }
