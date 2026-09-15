@@ -2,59 +2,258 @@
 
 @section('content')
 <div class="container py-4 mt-5 history-shell" style="font-family: 'Poppins', sans-serif;">
+    <style>
+        .history-shell {
+            font-family: 'Poppins', sans-serif;
+        }
+        .btn-primary {
+            background-color: #15406A !important;
+            border-color: #15406A !important;
+        }
+        .btn-primary:hover,
+        .btn-primary:focus {
+            background-color: #0f2f53 !important;
+            border-color: #0f2f53 !important;
+        }
+        .btn-outline-primary {
+            color: #15406A !important;
+            border-color: #15406A !important;
+        }
+        .btn-outline-primary:hover,
+        .btn-outline-primary:focus,
+        .btn-outline-primary.active {
+            background-color: #15406A !important;
+            color: #fff !important;
+            border-color: #15406A !important;
+        }
+        .text-navy {
+            color: #15406A !important;
+        }
+        .bg-navy {
+            background-color: #15406A !important;
+            color: #ffffff !important;
+        }
+        /* Pastikan modal selalu berada di atas navbar (#mainNavbar memiliki z-index: 9999) */
+        .modal {
+            z-index: 100050 !important;
+        }
+        .modal-backdrop {
+            z-index: 100040 !important;
+        }
+        body.modal-open #mainNavbar {
+            z-index: 1000 !important;
+            opacity: 0.1 !important;
+            pointer-events: none !important;
+        }
+
+        /* Modal Ajukan Suket: Dialog & Scrollable Rules */
+        #modalAjukanSuket .modal-dialog {
+            max-width: 760px;
+            margin: 24px auto !important;
+            max-height: calc(100vh - 48px);
+        }
+        #modalAjukanSuket .modal-content {
+            max-height: calc(100vh - 48px);
+            display: flex;
+            flex-direction: column;
+            border-radius: 20px !important;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25) !important;
+        }
+        #modalAjukanSuket .modal-header {
+            flex-shrink: 0;
+            padding: 16px 24px;
+        }
+        #modalAjukanSuket .modal-body {
+            flex: 1 1 auto;
+            overflow-y: auto !important;
+            min-height: 0 !important;
+            max-height: calc(100vh - 190px) !important;
+            padding: 20px 24px !important;
+        }
+        #modalAjukanSuket .modal-footer {
+            flex-shrink: 0;
+            padding: 14px 24px;
+            background: #ffffff;
+            border-top: 1px solid #e9ecef;
+        }
+
+        /* Custom smooth scrollbar for modal body */
+        #modalAjukanSuket .modal-body::-webkit-scrollbar {
+            width: 8px;
+        }
+        #modalAjukanSuket .modal-body::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        #modalAjukanSuket .modal-body::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        #modalAjukanSuket .modal-body::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* Modal Preview Dokumen */
+        #previewDocModal .modal-dialog {
+            margin: 20px auto !important;
+        }
+        #previewDocModal .modal-content {
+            max-height: calc(100vh - 40px);
+            border-radius: 20px !important;
+        }
+
+        /* Stepper Tracking timeline like riwayat_pelayanan */
+        .track-wrap {
+            position: relative;
+            padding-top: 10px;
+            padding-bottom: 8px;
+        }
+        .track-steps {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            position: relative;
+            gap: 6px;
+        }
+        .track-step {
+            position: relative;
+            text-align: center;
+            flex: 1;
+            min-width: 80px;
+        }
+        .track-step .line {
+            height: 6px;
+            border-radius: 4px;
+            background: #e9ecef;
+            margin: 0 auto 8px auto;
+            width: 100%;
+        }
+        .track-step .circle {
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            background: #e9ecef;
+            margin: 0 auto 6px auto;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 2px #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            color: #6c757d;
+            transition: all 0.2s ease;
+        }
+        .track-step.is-active .line {
+            background: #15406A;
+        }
+        .track-step.is-active .circle {
+            background: #15406A;
+            color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(21, 64, 106, 0.25);
+        }
+        .track-step.is-complete .line {
+            background: #198754;
+        }
+        .track-step.is-complete .circle {
+            background: #198754;
+            color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(25, 135, 84, 0.25);
+        }
+        .track-step .step-label {
+            font-size: 11px;
+            line-height: 1.25;
+            color: #6c757d;
+            font-weight: 500;
+        }
+        .track-step.is-active .step-label {
+            color: #15406A;
+            font-weight: 700;
+        }
+        .track-step.is-complete .step-label {
+            color: #198754;
+            font-weight: 600;
+        }
+
+        /* History Card */
+        .history-card {
+            border: 1px solid #e9ecef;
+            border-radius: 20px !important;
+            background: #ffffff;
+            transition: all 0.25s ease;
+        }
+        .history-card:hover {
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08) !important;
+            border-color: #cbd5e1;
+        }
+        .filter-card {
+            border-radius: 18px !important;
+        }
+
+        @media (max-width: 767.98px) {
+            .track-steps {
+                overflow-x: auto;
+                padding-bottom: 8px;
+            }
+            .track-step {
+                min-width: 100px;
+            }
+        }
+    </style>
+
+    {{-- Breadcrumb & Header --}}
     <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
         <div>
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-1 small text-muted">
-                    <li class="breadcrumb-item"><a href="{{ route('home') }}" class="text-decoration-none">Beranda</a></li>
-                    <li class="breadcrumb-item"><a href="/riwayat_pelayanan" class="text-decoration-none">Pelayanan</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Permohonan Suket K3</li>
+                    <li class="breadcrumb-item"><a href="{{ route('home') }}" class="text-decoration-none text-muted">Beranda</a></li>
+                    <li class="breadcrumb-item"><a href="/riwayat_pelayanan" class="text-decoration-none text-muted">Pelayanan</a></li>
+                    <li class="breadcrumb-item active text-navy fw-semibold" aria-current="page">Permohonan Suket K3</li>
                 </ol>
             </nav>
-            <h3 class="fw-bold text-dark mb-1">
-                <i class="bi bi-file-earmark-medical text-primary me-2"></i>Permohonan Surat Keterangan (Suket) K3 Lingkungan Kerja
-            </h3>
+            <h4 class="fw-bold text-dark mb-1">
+                <i class="bi bi-file-earmark-medical text-navy me-2"></i>Permohonan Surat Keterangan (Suket) K3 Lingkungan Kerja
+            </h4>
             <p class="text-muted small mb-0">
-                Layanan pengajuan Surat Keterangan K3 Lingkungan Kerja berdasarkan evaluasi hasil pengujian laboratorium (LHU) sesuai standar <strong>Permenaker No. 5 Tahun 2018</strong>.
+                Layanan pengajuan dan monitoring penerbitan Surat Keterangan K3 Lingkungan Kerja resmi berstandar <strong>Permenaker No. 5 Tahun 2018</strong>.
             </p>
         </div>
-        <div class="d-flex align-items-center gap-2">
-            <a href="/riwayat_pelayanan" class="btn btn-outline-secondary rounded-pill px-3 py-2 btn-sm">
-                <i class="bi bi-arrow-left me-1"></i> Kembali ke Riwayat Pelayanan
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <button type="button" class="btn btn-primary rounded-pill px-3 py-2 btn-sm fw-semibold shadow-sm d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalAjukanSuket">
+                <i class="bi bi-plus-circle-fill"></i> Ajukan Suket Baru
+            </button>
+            <a href="/riwayat_pelayanan" class="btn btn-outline-secondary rounded-pill px-3 py-2 btn-sm d-flex align-items-center gap-2">
+                <i class="bi bi-arrow-left"></i> Riwayat Pelayanan
             </a>
         </div>
     </div>
 
+    {{-- Alert Notifications --}}
     @if(session('success'))
         <div class="alert alert-success alert-dismissible fade show rounded-4 shadow-sm border-0 mb-4" role="alert">
             <div class="d-flex align-items-center">
                 <i class="bi bi-check-circle-fill fs-4 text-success me-3"></i>
-                <div>
-                    <strong>Berhasil!</strong> {{ session('success') }}
-                </div>
+                <div><strong>Berhasil!</strong> {{ session('success') }}</div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     @endif
-
     @if(session('error'))
         <div class="alert alert-danger alert-dismissible fade show rounded-4 shadow-sm border-0 mb-4" role="alert">
             <div class="d-flex align-items-center">
                 <i class="bi bi-exclamation-triangle-fill fs-4 text-danger me-3"></i>
-                <div>
-                    <strong>Perhatian:</strong> {{ session('error') }}
-                </div>
+                <div><strong>Perhatian:</strong> {{ session('error') }}</div>
             </div>
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     @endif
-
     @if($errors->any())
         <div class="alert alert-danger alert-dismissible fade show rounded-4 shadow-sm border-0 mb-4" role="alert">
             <div class="d-flex align-items-start gap-2">
                 <i class="bi bi-exclamation-octagon-fill fs-5 text-danger mt-1"></i>
                 <div>
-                    <strong>Perhatian - Terjadi Kesalahan Input:</strong>
+                    <strong>Perhatian - Terjadi Kesalahan Input Formulir:</strong>
                     <ul class="mb-0 ps-3 mt-1 small">
                         @foreach($errors->all() as $error)
                             <li>{{ $error }}</li>
@@ -66,429 +265,562 @@
         </div>
     @endif
 
-    <div class="row g-4 mb-5">
-        {{-- FORM PENGAJUAN (TAHAP 1 PEMOHON) --}}
-        <div class="col-lg-7">
-            <div class="card border-0 shadow-sm rounded-4 h-100 bg-white">
-                <div class="card-header bg-white border-bottom p-4">
-                    <div class="d-flex align-items-center gap-3">
-                        <div class="p-3 bg-primary bg-opacity-10 text-primary rounded-4">
-                            <i class="bi bi-file-earmark-plus-fill fs-3"></i>
-                        </div>
-                        <div>
-                            <h5 class="fw-bold text-dark mb-1">Form Pengajuan Suket K3 Baru</h5>
-                            <p class="text-muted small mb-0">
-                                Isi formulir berikut dengan memilih nomor order pengujian Anda, ruang lingkup faktor K3, dan lampiran pendukung.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body p-4">
-                    <form action="{{ route('user.suket.store') }}" method="POST" enctype="multipart/form-data">
-                        @csrf
-                        
-                        {{-- 1. PILIH NOMOR ORDER PEMOHON --}}
-                        <div class="mb-4">
-                            <label class="form-label small fw-bold text-dark mb-1">
-                                1. Nomor Order / Kode Permohonan Anda <span class="text-danger">*</span>
-                            </label>
-                            <p class="text-muted small mb-2">Pilih dari pesanan pengujian yang terdaftar di akun Anda.</p>
-                            <select 
-                                name="nomor_order" 
-                                id="user_nomor_order" 
-                                class="form-select rounded-3 @error('nomor_order') is-invalid @enderror" 
-                                required
-                            >
-                                <option value="" disabled {{ !old('nomor_order', request('nomor_order')) ? 'selected' : '' }}>-- Pilih Nomor Order Pengujian Anda --</option>
-                                @forelse($userOrders as $ord)
-                                    <option 
-                                        value="{{ $ord['kode'] }}" 
-                                        {{ old('nomor_order', request('nomor_order')) === $ord['kode'] ? 'selected' : '' }}
-                                    >
-                                        {{ $ord['kode'] }} &mdash; {{ $ord['perusahaan'] }} ({{ $ord['lokasi'] }}) {{ $ord['has_lhu'] ? '[LHU Siap]' : '' }}
-                                    </option>
-                                @empty
-                                    <option value="" disabled>Belum ada nomor order pada akun Anda.</option>
-                                @endforelse
-                            </select>
-                            @error('nomor_order')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                            <div class="form-text small text-muted">
-                                Dokumen LHU yang telah diterbitkan pada nomor order tersebut dapat ditarik secara otomatis.
-                            </div>
-                        </div>
-
-                        {{-- 2. RUANG LINGKUP FAKTOR K3 --}}
-                        <div class="mb-4">
-                            <label class="form-label small fw-bold text-dark mb-1">
-                                2. Ruang Lingkup Faktor K3 yang Diuji <span class="text-danger">*</span>
-                            </label>
-                            <p class="text-muted small mb-2">Pilih minimal 1 faktor lingkungan kerja yang telah diuji di lokasi perusahaan Anda:</p>
-                            <div class="row g-2">
-                                @foreach($faktorOptions as $fKey => $fDesc)
-                                    <div class="col-md-6">
-                                        <div class="form-check p-3 border rounded-3 bg-light bg-opacity-50 h-100">
-                                            <input 
-                                                class="form-check-input" 
-                                                type="checkbox" 
-                                                name="faktor_k3[]" 
-                                                value="{{ $fKey }}" 
-                                                id="user_f_{{ $fKey }}"
-                                                @checked(is_array(old('faktor_k3')) && in_array($fKey, old('faktor_k3')))
-                                            >
-                                            <label class="form-check-label small fw-semibold text-dark" for="user_f_{{ $fKey }}">
-                                                {{ $fDesc }}
-                                            </label>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                            @error('faktor_k3')
-                                <div class="text-danger small mt-2">{{ $message }}</div>
-                            @enderror
-                        </div>
-
-                        {{-- 3. SUMBER DOKUMEN LHU --}}
-                        <div class="mb-4">
-                            <label class="form-label small fw-bold text-dark mb-1">
-                                3. Sumber Dokumen Laporan Hasil Uji (LHU) <span class="text-danger">*</span>
-                            </label>
-                            <div class="d-flex flex-column flex-sm-row gap-3 mt-1">
-                                <div class="form-check p-3 border rounded-3 bg-light bg-opacity-50 flex-fill">
-                                    <input 
-                                        class="form-check-input" 
-                                        type="radio" 
-                                        name="lhu_source" 
-                                        id="user_source_auto" 
-                                        value="auto" 
-                                        checked
-                                        onchange="toggleUserLhu(this.value)"
-                                    >
-                                    <label class="form-check-label small fw-semibold text-dark" for="user_source_auto">
-                                        Tarik Otomatis dari Nomor Order Balai K3
-                                    </label>
-                                </div>
-                                <div class="form-check p-3 border rounded-3 bg-light bg-opacity-50 flex-fill">
-                                    <input 
-                                        class="form-check-input" 
-                                        type="radio" 
-                                        name="lhu_source" 
-                                        id="user_source_manual" 
-                                        value="manual"
-                                        onchange="toggleUserLhu(this.value)"
-                                    >
-                                    <label class="form-check-label small fw-semibold text-dark" for="user_source_manual">
-                                        Upload Manual File LHU (PDF)
-                                    </label>
-                                </div>
-                            </div>
-                            
-                            <div id="user_manual_lhu_box" class="mt-3 p-3 border border-dashed rounded-3 bg-light" style="display: none;">
-                                <label class="form-label small fw-bold text-dark mb-1">Unggah Berkas LHU (PDF, maks 20MB)</label>
-                                <input type="file" name="lhu_file" class="form-control" accept=".pdf">
-                                <div class="form-text small text-muted">Lampirkan file PDF LHU resmi yang telah bertanda tangan.</div>
-                            </div>
-                        </div>
-
-                        {{-- 4. LAMPIRAN FOTO & DENAH --}}
-                        <div class="mb-4">
-                            <label class="form-label small fw-bold text-dark mb-1">
-                                4. Dokumen Pendukung Pengujian
-                            </label>
-                            <div class="row g-3 mt-1">
-                                <div class="col-md-6">
-                                    <div class="p-3 border rounded-3 bg-light bg-opacity-50 h-100">
-                                        <label class="form-label small fw-semibold text-dark mb-1">
-                                            <i class="bi bi-camera me-1"></i> Foto Pengujian Lapangan
-                                        </label>
-                                        <input type="file" name="foto_pengujian" class="form-control form-control-sm" accept="image/*,.pdf">
-                                        <div class="form-text small text-muted">Format: JPG, PNG, atau PDF (maks 20MB).</div>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="p-3 border rounded-3 bg-light bg-opacity-50 h-100">
-                                        <label class="form-label small fw-semibold text-dark mb-1">
-                                            <i class="bi bi-map me-1"></i> Denah Lokasi Pengujian
-                                        </label>
-                                        <input type="file" name="denah_lokasi" class="form-control form-control-sm" accept="image/*,.pdf">
-                                        <div class="form-text small text-muted">Format: JPG, PNG, atau PDF (maks 20MB).</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {{-- 5. CATATAN TAMBAHAN --}}
-                        <div class="mb-4">
-                            <label class="form-label small fw-bold text-dark mb-1">5. Catatan Pemohon (Opsional)</label>
-                            <textarea 
-                                name="catatan" 
-                                class="form-control rounded-3" 
-                                rows="2" 
-                                placeholder="Tuliskan keterangan atau catatan tambahan bila diperlukan..."
-                            >{{ old('catatan') }}</textarea>
-                        </div>
-
-                        <div class="d-flex justify-content-end gap-2">
-                            <button type="submit" class="btn btn-primary px-4 py-2 rounded-pill fw-semibold shadow-sm">
-                                <i class="bi bi-send-fill me-2"></i>Kirim Permohonan Suket
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        {{-- INFO ALUR 6 TAHAP --}}
-        <div class="col-lg-5">
-            <div class="card border-0 shadow-sm rounded-4 h-100 bg-white">
-                <div class="card-header bg-white border-bottom p-4">
-                    <h5 class="fw-bold text-dark mb-1">Alur Proses Penerbitan Suket K3</h5>
-                    <p class="text-muted small mb-0">Tahapan resmi penerbitan Surat Keterangan K3 Lingkungan Kerja Balai K3 Surabaya.</p>
-                </div>
-                <div class="card-body p-4">
-                    <div class="d-flex flex-column gap-3">
-                        <div class="d-flex gap-3 align-items-start">
-                            <div class="badge rounded-circle bg-primary p-2 fs-6">1</div>
-                            <div>
-                                <div class="fw-bold text-dark small">Tahap 1: Permohonan</div>
-                                <div class="text-muted small">Pemohon mengajukan permohonan melalui form di samping dengan melampirkan LHU, foto, dan denah.</div>
-                            </div>
-                        </div>
-                        <div class="d-flex gap-3 align-items-start">
-                            <div class="badge rounded-circle bg-secondary p-2 fs-6">2</div>
-                            <div>
-                                <div class="fw-bold text-dark small">Tahap 2: Evaluasi Dokumen</div>
-                                <div class="text-muted small">Tim Penguji K3 mengevaluasi kesesuaian dokumen LHU, denah lokasi, dan foto pengujian lapangan.</div>
-                            </div>
-                        </div>
-                        <div class="d-flex gap-3 align-items-start">
-                            <div class="badge rounded-circle bg-secondary p-2 fs-6">3</div>
-                            <div>
-                                <div class="fw-bold text-dark small">Tahap 3: Penyusunan Laporan / Suket</div>
-                                <div class="text-muted small">Penguji K3 menyusun draf Surat Keterangan berbasis format resmi <strong>Permenaker No. 5 Tahun 2018</strong>.</div>
-                            </div>
-                        </div>
-                        <div class="d-flex gap-3 align-items-start">
-                            <div class="badge rounded-circle bg-info text-white p-2 fs-6"><i class="bi bi-shield-check"></i></div>
-                            <div>
-                                <div class="fw-bold text-dark small">Gerbang QC Review</div>
-                                <div class="text-muted small">Tim QC memverifikasi keabsahan draf sebelum diteruskan ke Kepala Balai.</div>
-                            </div>
-                        </div>
-                        <div class="d-flex gap-3 align-items-start">
-                            <div class="badge rounded-circle bg-secondary p-2 fs-6">4</div>
-                            <div>
-                                <div class="fw-bold text-dark small">Tahap 4: Penandatanganan Suket</div>
-                                <div class="text-muted small">Kepala Balai K3 membubuhkan tanda tangan elektronik / pengesahan dokumen resmi.</div>
-                            </div>
-                        </div>
-                        <div class="d-flex gap-3 align-items-start">
-                            <div class="badge rounded-circle bg-secondary p-2 fs-6">5</div>
-                            <div>
-                                <div class="fw-bold text-dark small">Tahap 5: Penerbitan Suket</div>
-                                <div class="text-muted small">Admin memberikan Nomor Surat Keterangan resmi Balai K3 Surabaya.</div>
-                            </div>
-                        </div>
-                        <div class="d-flex gap-3 align-items-start">
-                            <div class="badge rounded-circle bg-success p-2 fs-6">6</div>
-                            <div>
-                                <div class="fw-bold text-dark small">Tahap 6: Diteruskan ke Pelanggan</div>
-                                <div class="text-muted small">Dokumen resmi langsung tersedia dan dapat diunduh oleh pemohon di portal ini.</div>
-                            </div>
-                        </div>
+    {{-- Filter Toolbar (Seperti riwayat_pelayanan.blade.php) --}}
+    <div class="card border-0 shadow-sm rounded-4 mb-4 filter-card bg-white">
+        <div class="card-body p-3">
+            <div class="d-flex flex-wrap gap-2 align-items-center filter-toolbar">
+                <button type="button" class="btn btn-outline-primary btn-sm active px-3 rounded-pill" data-user-filter="all">
+                    Semua Permohonan
+                    <span class="badge bg-secondary-subtle text-secondary ms-1">{{ $sukets->total() }}</span>
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm px-3 rounded-pill" data-user-filter="process">
+                    Sedang Diproses
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm px-3 rounded-pill" data-user-filter="done">
+                    Tuntas Diserahkan
+                </button>
+                <div class="ms-auto filter-search" style="min-width: 250px;">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                        <input type="text" class="form-control border-start-0 bg-light" placeholder="Cari nomor order / surat..." id="userSearchInput">
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    {{-- TABEL RIWAYAT PERMOHONAN SUKET SAYA --}}
-    <div class="card border-0 shadow-sm rounded-4 bg-white mb-5">
-        <div class="card-header bg-white border-bottom p-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <div>
-                <h5 class="fw-bold text-dark mb-1">Riwayat Pengajuan Suket K3 Saya</h5>
-                <p class="text-muted small mb-0">Pantau proses evaluasi dan unduh dokumen Surat Keterangan yang telah terbit.</p>
-            </div>
-            <form action="{{ route('user.suket.index') }}" method="GET" class="d-flex gap-2">
-                <input 
-                    type="text" 
-                    name="search" 
-                    class="form-control form-control-sm rounded-pill px-3" 
-                    placeholder="Cari nomor order / surat..." 
-                    value="{{ $search }}"
-                >
-                <button type="submit" class="btn btn-outline-primary btn-sm rounded-pill px-3">
-                    <i class="bi bi-search"></i>
-                </button>
-            </form>
-        </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light table-light">
-                        <tr class="small text-secondary fw-semibold">
-                            <th class="ps-4">No</th>
-                            <th>Nomor Order</th>
-                            <th>Faktor K3</th>
-                            <th>Tanggal Pengajuan</th>
-                            <th>Status Tahapan</th>
-                            <th>Nomor Surat Resmi</th>
-                            <th class="text-end pe-4">Aksi / Dokumen</th>
-                        </tr>
-                    </thead>
-                    <tbody class="small">
-                        @forelse($sukets as $idx => $suket)
-                            <tr>
-                                <td class="ps-4 text-muted">{{ $sukets->firstItem() + $idx }}</td>
-                                <td>
-                                    <div class="fw-bold text-dark">{{ $suket->nomor_order }}</div>
-                                    <div class="text-muted small">{{ $suket->perusahaan_nama }}</div>
-                                </td>
-                                <td>
-                                    @if(is_array($suket->faktor_k3))
-                                        <div class="d-flex flex-wrap gap-1">
-                                            @foreach($suket->faktor_k3 as $fak)
-                                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle text-capitalize px-2 py-1">
-                                                    {{ $fak }}
-                                                </span>
-                                            @endforeach
-                                        </div>
-                                    @else
-                                        <span class="text-muted">-</span>
-                                    @endif
-                                </td>
-                                <td class="text-muted">
-                                    {{ $suket->created_at ? $suket->created_at->locale('id')->isoFormat('D MMMM Y, HH:mm') : '-' }}
-                                </td>
-                                <td>
-                                    @php
-                                        $badgeColor = match($suket->status_tahap) {
-                                            1 => 'secondary',
-                                            2 => 'info',
-                                            3 => 'warning',
-                                            4 => 'primary',
-                                            5 => 'indigo',
-                                            6 => 'success',
-                                            default => 'secondary'
-                                        };
-                                        $labelTahap = \App\Models\SuketK3::STAGES[$suket->status_tahap]['label'] ?? "Tahap {$suket->status_tahap}";
-                                    @endphp
-                                    <span class="badge bg-{{ $badgeColor }} px-2 py-1 rounded-pill">
-                                        Tahap {{ $suket->status_tahap }}: {{ $labelTahap }}
-                                    </span>
-                                </td>
-                                <td>
-                                    @if(!empty($suket->nomor_surat))
-                                        <span class="fw-semibold text-dark">{{ $suket->nomor_surat }}</span>
-                                    @else
-                                        <span class="text-muted fst-italic">Menunggu Penerbitan</span>
-                                    @endif
-                                </td>
-                                <td class="text-end pe-4">
-                                    <div class="d-inline-flex gap-1">
-                                        @if($suket->status_tahap >= 6 && ($suket->signed_file_path || $suket->draft_file_path))
-                                            <button 
-                                                type="button" 
-                                                class="btn btn-sm btn-success fw-semibold"
-                                                onclick="openDocumentPreview('{{ route('user.suket.preview-doc', [$suket->id, 'signed']) }}', 'Surat Keterangan K3 Resmi - {{ $suket->nomor_order }}')"
-                                            >
-                                                <i class="bi bi-eye-fill me-1"></i> Lihat Suket
-                                            </button>
-                                            <a 
-                                                href="{{ route('user.suket.download-doc', [$suket->id, 'signed']) }}" 
-                                                class="btn btn-sm btn-outline-success"
-                                                title="Unduh Berkas Resmi"
-                                            >
-                                                <i class="bi bi-download"></i>
-                                            </a>
-                                        @else
-                                            <button 
-                                                type="button" 
-                                                class="btn btn-sm btn-outline-secondary"
-                                                disabled
-                                                title="Suket sedang diproses oleh Tim Balai K3"
-                                            >
-                                                <i class="bi bi-hourglass-split me-1"></i> Sedang Diproses
-                                            </button>
-                                        @endif
+    {{-- Daftar Riwayat Permohonan Suket (Cards Layout seperti riwayat_pelayanan) --}}
+    <div class="row g-3" id="userSuketList">
+        @forelse($sukets as $suket)
+            @php
+                $isDelivered = !empty($suket->sent_to_customer_at);
+                $filterCategory = $isDelivered ? 'done' : 'process';
+                $stageNumber = (int) $suket->status_tahap;
+                $labelTahap = \App\Models\SuketK3::STAGES[$stageNumber]['label'] ?? "Tahap {$stageNumber}";
+                $fList = is_array($suket->faktor_k3) ? $suket->faktor_k3 : [];
 
-                                        @if($suket->lhu_file_path)
-                                            <button 
-                                                type="button" 
-                                                class="btn btn-sm btn-outline-primary"
-                                                onclick="openDocumentPreview('{{ route('user.suket.preview-doc', [$suket->id, 'lhu']) }}', 'Dokumen LHU - {{ $suket->nomor_order }}')"
-                                                title="Lihat Berkas LHU"
-                                            >
-                                                <i class="bi bi-file-earmark-pdf"></i>
-                                            </button>
-                                        @endif
+                // Tentukan status stepper untuk 6 tahapan
+                // 1: Permohonan, 2: Evaluasi Dokumen, 3: Penyusunan Suket, 4: Penandatanganan Suket, 5: Penerbitan Suket, 6: Penyerahan Suket
+                $steps = [
+                    1 => 'Permohonan',
+                    2 => 'Evaluasi Dokumen',
+                    3 => 'Penyusunan Suket',
+                    4 => 'Penandatanganan Suket',
+                    5 => 'Penerbitan Suket',
+                    6 => 'Penyerahan Suket',
+                ];
+            @endphp
+            <div class="col-12 user-suket-card-item" 
+                 data-category="{{ $filterCategory }}" 
+                 data-order="{{ strtolower($suket->nomor_order ?? '') }}"
+                 data-surat="{{ strtolower($suket->nomor_surat ?? '') }}"
+                 data-company="{{ strtolower($suket->perusahaan_nama ?? '') }}">
+                
+                <div class="history-card p-4 shadow-sm">
+                    {{-- Head Row: Info Utama & Status Badge --}}
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3 pb-3 border-bottom">
+                        <div>
+                            <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                                <h5 class="fw-bold text-dark mb-0 fs-6">{{ $suket->nomor_order }}</h5>
+                                <span class="badge bg-light text-secondary border px-2 py-1 rounded-pill small">
+                                    <i class="bi bi-calendar3 me-1"></i>{{ $suket->created_at ? $suket->created_at->format('d M Y, H:i') : '-' }}
+                                </span>
+                            </div>
+                            <div class="fw-semibold text-navy small mb-1">{{ $suket->perusahaan_nama ?: '-' }}</div>
+                            <div class="text-muted small" style="font-size: 11px;">
+                                <i class="bi bi-geo-alt me-1"></i>{{ $suket->lokasi ?: 'Lokasi Pengujian' }}
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            @if($isDelivered)
+                                <span class="badge bg-success text-white px-3 py-2 rounded-pill fw-semibold shadow-sm mb-1 d-inline-block">
+                                    <i class="bi bi-patch-check-fill me-1"></i>Tuntas Diserahkan
+                                </span>
+                                @if(!empty($suket->nomor_surat))
+                                    <div class="small fw-bold text-success" style="font-size: 11.5px;">
+                                        No: {{ $suket->nomor_surat }}
                                     </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="text-center py-5 text-muted">
-                                    <i class="bi bi-file-earmark-x fs-1 text-secondary mb-2 d-block"></i>
-                                    Belum ada pengajuan Surat Keterangan K3. Silakan ajukan melalui formulir di atas.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-            @if($sukets->hasPages())
-                <div class="p-3 border-top d-flex justify-content-end">
-                    {{ $sukets->links() }}
+                                @endif
+                            @else
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill fw-semibold mb-1 d-inline-block">
+                                    <i class="bi bi-clock-history me-1"></i>Tahap {{ $stageNumber }}: {{ $labelTahap }}
+                                </span>
+                                <div class="small text-muted" style="font-size: 11px;">
+                                    Sedang Diproses Balai K3
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+
+                    {{-- Horizontal Stepper Tracking (6 Tahap) --}}
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="small fw-bold text-dark">
+                                <i class="bi bi-diagram-3 text-navy me-1"></i>Progress Penerbitan Suket
+                            </div>
+                            <div class="small text-muted" style="font-size: 11px;">
+                                @if($isDelivered)
+                                    <span class="text-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i>Tuntas 100%</span>
+                                @else
+                                    <span>Tahap {{ $stageNumber }} dari 6</span>
+                                @endif
+                            </div>
+                        </div>
+
+                        <div class="track-wrap">
+                            <div class="track-steps">
+                                @foreach($steps as $sNum => $sName)
+                                    @php
+                                        // Status per step:
+                                        if ($isDelivered) {
+                                            $stepClass = 'is-complete';
+                                        } else {
+                                            if ($sNum < $stageNumber) {
+                                                $stepClass = 'is-complete';
+                                            } elseif ($sNum == $stageNumber) {
+                                                $stepClass = 'is-active';
+                                            } else {
+                                                $stepClass = '';
+                                            }
+                                        }
+                                    @endphp
+                                    <div class="track-step {{ $stepClass }}">
+                                        <div class="line"></div>
+                                        <div class="circle">
+                                            @if($stepClass === 'is-complete')
+                                                <i class="bi bi-check-lg"></i>
+                                            @else
+                                                {{ $sNum }}
+                                            @endif
+                                        </div>
+                                        <div class="step-label">{{ $sName }}</div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Ruang Lingkup & Dokumen Terlampir --}}
+                    <div class="row g-3 align-items-center pt-2 border-top">
+                        <div class="col-md-7">
+                            <div class="small text-muted mb-1" style="font-size: 11px;">Ruang Lingkup Faktor K3 Diuji:</div>
+                            <div class="d-flex flex-wrap gap-1">
+                                @forelse($fList as $fItem)
+                                    <span class="badge bg-light text-navy border px-2 py-1 rounded" style="font-size: 11px;">
+                                        <i class="bi bi-check2 text-primary me-1"></i>{{ ucfirst($fItem) }}
+                                    </span>
+                                @empty
+                                    <span class="text-muted small">-</span>
+                                @endforelse
+                            </div>
+                        </div>
+
+                        {{-- Action Buttons & Document Gate --}}
+                        <div class="col-md-5">
+                            <div class="d-flex justify-content-md-end align-items-center gap-2 flex-wrap">
+                                {{-- Jika LHU Terlampir, User boleh preview berkas LHU yang mereka ajukan --}}
+                                @if($suket->lhu_file_path)
+                                    <button 
+                                        type="button" 
+                                        class="btn btn-outline-secondary btn-sm rounded-pill px-3"
+                                        onclick="openUserPreview('{{ route('user.suket.preview-doc', [$suket->id, 'lhu']) }}', 'Dokumen LHU - {{ $suket->nomor_order }}')"
+                                        title="Preview Berkas LHU"
+                                    >
+                                        <i class="bi bi-file-earmark-pdf me-1 text-danger"></i>Lihat LHU
+                                    </button>
+                                @endif
+
+                                {{-- GATE KEAMANAN TAHAP 6: HANYA TAMPIL JIKA SUKET SUDAH DISERAHKAN (sent_to_customer_at) --}}
+                                @if($isDelivered && ($suket->signed_file_path || $suket->draft_file_path))
+                                    <button 
+                                        type="button" 
+                                        class="btn btn-success btn-sm rounded-pill px-3 fw-semibold shadow-sm"
+                                        onclick="openUserPreview('{{ route('user.suket.preview-doc', [$suket->id, 'signed']) }}', 'Surat Keterangan K3 Resmi - {{ $suket->nomor_order }}')"
+                                    >
+                                        <i class="bi bi-eye-fill me-1"></i>Lihat Suket Resmi
+                                    </button>
+                                    <a 
+                                        href="{{ route('user.suket.download-doc', [$suket->id, 'signed']) }}" 
+                                        class="btn btn-outline-success btn-sm rounded-pill px-3 fw-semibold"
+                                        title="Unduh Berkas Suket Resmi"
+                                    >
+                                        <i class="bi bi-download me-1"></i>Unduh
+                                    </a>
+                                @else
+                                    {{-- JIKA BELUM DISERAHKAN: TOMBOL TERKUNCI DENGAN INDIKATOR DALAM PROSES --}}
+                                    <button 
+                                        type="button" 
+                                        class="btn btn-outline-secondary btn-sm rounded-pill px-3" 
+                                        disabled
+                                        title="Dokumen Suket resmi hanya dapat dibuka setelah proses penyerahan tuntas."
+                                    >
+                                        <i class="bi bi-hourglass-split me-1 text-primary"></i>Sedang Diproses
+                                    </button>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Alert Box Informasi Tambahan --}}
+                    @if($isDelivered)
+                        <div class="alert alert-success border-0 rounded-3 p-2 px-3 mt-3 mb-0 small d-flex align-items-center justify-content-between">
+                            <div>
+                                <i class="bi bi-check-circle-fill text-success me-1"></i>
+                                Dokumen Surat Keterangan K3 resmi telah diterbitkan dan diserahkan pada <strong>{{ \Carbon\Carbon::parse($suket->sent_to_customer_at)->locale('id')->isoFormat('D MMMM Y') }}</strong>.
+                            </div>
+                        </div>
+                    @else
+                        <div class="alert alert-light border rounded-3 p-2 px-3 mt-3 mb-0 small text-muted d-flex align-items-center">
+                            <i class="bi bi-info-circle text-navy me-2 fs-6"></i>
+                            <div>
+                                Permohonan Anda saat ini berada pada <strong>Tahap {{ $stageNumber }}: {{ $labelTahap }}</strong>. Berkas resmi Suket akan otomatis dapat dilihat dan diunduh di sini setelah tuntas diserahkan oleh tim Balai K3.
+                            </div>
+                        </div>
+                    @endif
                 </div>
-            @endif
+            </div>
+        @empty
+            <div class="col-12">
+                <div class="card border-0 shadow-sm rounded-4 p-5 text-center bg-white">
+                    <div class="mb-3">
+                        <i class="bi bi-file-earmark-medical text-navy fs-1"></i>
+                    </div>
+                    <h5 class="fw-bold text-dark mb-1">Belum Ada Permohonan Suket K3</h5>
+                    <p class="text-muted small mx-auto mb-4" style="max-width: 480px;">
+                        Anda belum memiliki riwayat pengajuan Surat Keterangan K3. Klik tombol di bawah ini untuk memulai pengajuan berdasarkan hasil pengujian nomor order Anda.
+                    </p>
+                    <div>
+                        <button type="button" class="btn btn-primary rounded-pill px-4 py-2 fw-semibold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalAjukanSuket">
+                            <i class="bi bi-plus-circle me-1"></i> Ajukan Permohonan Suket Pertama
+                        </button>
+                    </div>
+                </div>
+            </div>
+        @endforelse
+    </div>
+
+    @if($sukets->hasPages())
+        <div class="mt-4 d-flex justify-content-end">
+            {{ $sukets->links() }}
         </div>
+    @endif
+</div>
+
+{{-- ========================================================================= --}}
+{{-- MODAL AJUKAN PERMOHONAN SUKET BARU --}}
+{{-- ========================================================================= --}}
+<div class="modal fade" id="modalAjukanSuket" tabindex="-1" aria-labelledby="modalAjukanSuketLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <form action="{{ route('user.suket.store') }}" method="POST" enctype="multipart/form-data" class="modal-content border-0 shadow-lg">
+            @csrf
+            <div class="modal-header bg-navy text-white p-3 px-4 flex-shrink-0">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-file-earmark-plus-fill fs-4 text-warning"></i>
+                    <div>
+                        <h6 class="modal-title fw-bold mb-0 text-white" id="modalAjukanSuketLabel">Form Pengajuan Suket K3 Baru</h6>
+                        <small class="text-white-50" style="font-size: 11px;">Permenaker No. 5 Tahun 2018 &bull; Balai K3 Surabaya</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body p-3 px-4">
+                {{-- 1. PILIH NOMOR ORDER PEMOHON --}}
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-dark mb-1">
+                        1. Nomor Order / Kode Permohonan Anda <span class="text-danger">*</span>
+                    </label>
+                    <select 
+                        name="nomor_order" 
+                        id="user_nomor_order" 
+                        class="form-select form-select-sm rounded-3 @error('nomor_order') is-invalid @enderror" 
+                        required
+                    >
+                        <option value="" disabled {{ !old('nomor_order', request('nomor_order')) ? 'selected' : '' }}>-- Pilih Nomor Order Pengujian Anda --</option>
+                        @forelse($userOrders as $ord)
+                            <option 
+                                value="{{ $ord['kode'] }}" 
+                                {{ old('nomor_order', request('nomor_order')) === $ord['kode'] ? 'selected' : '' }}
+                            >
+                                {{ $ord['kode'] }} &mdash; {{ $ord['perusahaan'] }} ({{ $ord['lokasi'] }}) {{ $ord['has_lhu'] ? '[LHU Siap]' : '' }}
+                            </option>
+                        @empty
+                            <option value="" disabled>Belum ada nomor order pada akun Anda.</option>
+                        @endforelse
+                    </select>
+                    @error('nomor_order')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                    <div class="form-text" style="font-size: 11px;">
+                        Laporan Hasil Uji (LHU) resmi pada nomor order tersebut dapat ditarik secara otomatis ke dalam berkas suket.
+                    </div>
+                </div>
+
+                {{-- 2. RUANG LINGKUP FAKTOR K3 --}}
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-dark mb-1">
+                        2. Ruang Lingkup Faktor K3 yang Diuji <span class="text-danger">*</span>
+                    </label>
+                    <div class="row g-2">
+                        @foreach($faktorOptions as $fKey => $fDesc)
+                            <div class="col-md-6">
+                                <label class="d-flex align-items-center gap-2 p-2 px-3 border rounded-3 bg-light w-100 mb-0" style="cursor: pointer;">
+                                    <input 
+                                        class="form-check-input mt-0 flex-shrink-0" 
+                                        type="checkbox" 
+                                        name="faktor_k3[]" 
+                                        value="{{ $fKey }}" 
+                                        id="modal_f_{{ $fKey }}"
+                                        @checked(is_array(old('faktor_k3')) && in_array($fKey, old('faktor_k3')))
+                                    >
+                                    <span class="small fw-semibold text-dark" style="font-size: 12px;">{{ $fDesc }}</span>
+                                </label>
+                            </div>
+                        @endforeach
+                    </div>
+                    @error('faktor_k3')
+                        <div class="text-danger small mt-1" style="font-size: 11px;">{{ $message }}</div>
+                    @enderror
+                </div>
+
+                {{-- 3. SUMBER DOKUMEN LHU --}}
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-dark mb-1">
+                        3. Sumber Dokumen Laporan Hasil Uji (LHU) <span class="text-danger">*</span>
+                    </label>
+                    <div class="d-flex flex-column flex-sm-row gap-2">
+                        <label class="d-flex align-items-center gap-2 p-2 px-3 border rounded-3 bg-light flex-fill mb-0" style="cursor: pointer;">
+                            <input 
+                                class="form-check-input mt-0" 
+                                type="radio" 
+                                name="lhu_source" 
+                                id="modal_source_auto" 
+                                value="auto" 
+                                checked 
+                                onchange="toggleModalLhu(this.value)"
+                            >
+                            <span class="small fw-semibold text-dark" style="font-size: 12px;">
+                                <i class="bi bi-cloud-arrow-down text-primary me-1"></i>Tarik Otomatis dari Nomor Order
+                            </span>
+                        </label>
+                        <label class="d-flex align-items-center gap-2 p-2 px-3 border rounded-3 bg-light flex-fill mb-0" style="cursor: pointer;">
+                            <input 
+                                class="form-check-input mt-0" 
+                                type="radio" 
+                                name="lhu_source" 
+                                id="modal_source_manual" 
+                                value="manual" 
+                                onchange="toggleModalLhu(this.value)"
+                            >
+                            <span class="small fw-semibold text-dark" style="font-size: 12px;">
+                                <i class="bi bi-upload text-secondary me-1"></i>Upload Berkas LHU Manual (PDF)
+                            </span>
+                        </label>
+                    </div>
+                    
+                    <div id="modal_manual_lhu_box" class="mt-2 p-2 px-3 border border-dashed rounded-3 bg-light" style="display: none;">
+                        <label class="form-label small fw-semibold text-dark mb-1" style="font-size: 11px;">Unggah Berkas LHU (PDF, maks 20MB)</label>
+                        <input type="file" name="lhu_file" class="form-control form-control-sm" accept=".pdf">
+                    </div>
+                </div>
+
+                {{-- 4. LAMPIRAN FOTO & DENAH --}}
+                <div class="mb-3">
+                    <label class="form-label small fw-bold text-dark mb-1">
+                        4. Dokumen Pendukung Pengujian Lapangan (Opsional)
+                    </label>
+                    <div class="row g-2">
+                        <div class="col-md-6">
+                            <div class="p-2 px-3 border rounded-3 bg-light">
+                                <label class="form-label small fw-semibold text-dark mb-1" style="font-size: 12px;">
+                                    <i class="bi bi-camera me-1 text-primary"></i> Foto Pengujian Lapangan
+                                </label>
+                                <input type="file" name="foto_pengujian" class="form-control form-control-sm" accept="image/*,.pdf">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="p-2 px-3 border rounded-3 bg-light">
+                                <label class="form-label small fw-semibold text-dark mb-1" style="font-size: 12px;">
+                                    <i class="bi bi-map me-1 text-warning"></i> Denah Lokasi Pengujian
+                                </label>
+                                <input type="file" name="denah_lokasi" class="form-control form-control-sm" accept="image/*,.pdf">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- 5. CATATAN TAMBAHAN --}}
+                <div class="mb-1">
+                    <label class="form-label small fw-bold text-dark mb-1">5. Catatan Tambahan (Opsional)</label>
+                    <textarea 
+                        name="catatan" 
+                        class="form-control form-control-sm rounded-3" 
+                        rows="2" 
+                        placeholder="Tuliskan catatan atau pesan tambahan bila diperlukan..."
+                    >{{ old('catatan') }}</textarea>
+                </div>
+            </div>
+
+            {{-- STICKY FOOTER: BUTTON SELALU TERLIHAT DAN TIDAK TERPOTONG --}}
+            <div class="modal-footer border-top p-3 px-4 bg-white d-flex justify-content-between align-items-center flex-shrink-0">
+                <span class="small text-muted" style="font-size: 11px;">
+                    <span class="text-danger">*</span> Wajib diisi &bull; Otomatis diproses
+                </span>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-light rounded-pill px-4" data-bs-dismiss="modal">Batal</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold shadow-sm">
+                        <i class="bi bi-send-fill me-2"></i>Kirim Permohonan Suket
+                    </button>
+                </div>
+            </div>
+        </form>
     </div>
 </div>
 
 {{-- MODAL DOCUMENT PREVIEW TANPA DOWNLOAD --}}
 <div class="modal fade" id="previewDocModal" tabindex="-1" aria-labelledby="previewDocModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content rounded-4 border-0 shadow">
-            <div class="modal-header bg-light border-bottom py-3">
-                <h5 class="modal-title fw-bold text-dark" id="previewDocModalLabel">Preview Dokumen</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 94vw; margin: 24px auto;">
+        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="height: 86vh; max-height: calc(100vh - 48px);">
+            <div class="modal-header bg-navy text-white p-3 px-4 d-flex justify-content-between align-items-center flex-shrink-0">
+                <div class="d-flex align-items-center gap-2 overflow-hidden me-3">
+                    <i class="bi bi-file-earmark-text-fill fs-4 text-warning flex-shrink-0"></i>
+                    <h6 class="modal-title fw-bold mb-0 text-white text-truncate" id="previewDocModalLabel">Pratinjau Dokumen</h6>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                    <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-3 fw-semibold" onclick="printUserPreview()" title="Cetak Dokumen">
+                        <i class="bi bi-printer me-1"></i>Cetak
+                    </button>
+                    <a href="#" id="previewUserDirectLink" target="_blank" class="btn btn-sm btn-outline-light rounded-pill px-3 fw-semibold" title="Buka di Tab Baru">
+                        <i class="bi bi-box-arrow-up-right me-1"></i>Tab Baru
+                    </a>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
             </div>
-            <div class="modal-body p-0" style="min-height: 520px; background-color: #f8f9fa;">
-                <iframe id="previewDocIframe" src="" style="width: 100%; height: 75vh; border: none;"></iframe>
+            <div class="modal-body p-0 position-relative d-flex align-items-center justify-content-center" style="flex: 1 1 auto; background: #525659; overflow: hidden;">
+                <div id="previewSpinner" class="position-absolute text-center text-white">
+                    <div class="spinner-border text-light mb-2" role="status"></div>
+                    <div class="small fw-semibold text-white-50">Menyiapkan pratinjau dokumen resmi...</div>
+                </div>
+                <iframe id="previewIframe" src="about:blank" class="w-100 h-100 border-0" style="display: none; background: #525659;" onload="onDocLoaded()"></iframe>
             </div>
-            <div class="modal-footer border-top bg-light py-2">
-                <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Tutup</button>
-                <a id="previewDocDownloadBtn" href="#" class="btn btn-primary btn-sm rounded-pill px-3">
-                    <i class="bi bi-download me-1"></i> Unduh File
-                </a>
+            <div class="modal-footer border-top p-2 px-3 bg-light d-flex justify-content-between align-items-center flex-shrink-0">
+                <span class="small text-muted" style="font-size: 11px;">
+                    <i class="bi bi-shield-check me-1 text-success"></i>Pratinjau resmi portal Balai K3 Surabaya &bull; Standar Permenaker RI No. 5 Tahun 2018
+                </span>
+                <button type="button" class="btn btn-sm btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Tutup</button>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-    function toggleUserLhu(source) {
-        const box = document.getElementById('user_manual_lhu_box');
-        if (box) {
-            box.style.display = source === 'manual' ? 'block' : 'none';
-        }
+    function toggleModalLhu(val) {
+        const box = document.getElementById('modal_manual_lhu_box');
+        if (!box) return;
+        box.style.display = (val === 'manual') ? 'block' : 'none';
     }
 
-    function openDocumentPreview(url, title) {
+    function openUserPreview(url, title) {
         const modalEl = document.getElementById('previewDocModal');
-        const modalTitle = document.getElementById('previewDocModalLabel');
-        const iframe = document.getElementById('previewDocIframe');
-        const downloadBtn = document.getElementById('previewDocDownloadBtn');
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        const iframe = document.getElementById('previewIframe');
+        const spinner = document.getElementById('previewSpinner');
+        const label = document.getElementById('previewDocModalLabel');
+        const directLink = document.getElementById('previewUserDirectLink');
 
-        if (modalTitle) modalTitle.innerText = title || 'Preview Dokumen';
-        if (iframe) iframe.src = url;
-        if (downloadBtn) {
-            downloadBtn.href = url.replace('/preview/', '/download/');
+        if (label) label.textContent = title || 'Pratinjau Dokumen';
+        if (directLink) directLink.href = url;
+        if (spinner) spinner.style.display = 'block';
+        if (iframe) {
+            iframe.style.display = 'none';
+            iframe.src = url;
         }
-
-        const modal = new bootstrap.Modal(modalEl);
         modal.show();
     }
+
+    function onDocLoaded() {
+        const spinner = document.getElementById('previewSpinner');
+        const iframe = document.getElementById('previewIframe');
+        if (iframe && iframe.src && !iframe.src.endsWith('about:blank')) {
+            if (spinner) spinner.style.display = 'none';
+            iframe.style.display = 'block';
+        }
+    }
+
+    function printUserPreview() {
+        const iframe = document.getElementById('previewIframe');
+        if (iframe && iframe.contentWindow) {
+            try {
+                iframe.contentWindow.focus();
+                iframe.contentWindow.print();
+            } catch (e) {
+                // Jika cross-origin atau terhalang browser, buka url langsung untuk print
+                if (iframe.src && !iframe.src.endsWith('about:blank')) {
+                    window.open(iframe.src, '_blank');
+                }
+            }
+        }
+    }
+
+    // Interactive filter tab and search
+    document.addEventListener('DOMContentLoaded', function() {
+        // Pindahkan modals ke document.body agar tidak terpotong navbar dan tidak terkungkung stacking context .user-page-shell
+        const modalAjukan = document.getElementById('modalAjukanSuket');
+        const modalPreview = document.getElementById('previewDocModal');
+        if (modalAjukan && modalAjukan.parentElement !== document.body) {
+            document.body.appendChild(modalAjukan);
+        }
+        if (modalPreview && modalPreview.parentElement !== document.body) {
+            document.body.appendChild(modalPreview);
+        }
+
+        const filterBtns = document.querySelectorAll('[data-user-filter]');
+        const searchInput = document.getElementById('userSearchInput');
+        const cards = document.querySelectorAll('.user-suket-card-item');
+
+        let activeFilter = 'all';
+        let searchQuery = '';
+
+        function applyFilters() {
+            cards.forEach(card => {
+                const cat = card.getAttribute('data-category');
+                const ord = card.getAttribute('data-order') || '';
+                const srt = card.getAttribute('data-surat') || '';
+                const cmp = card.getAttribute('data-company') || '';
+
+                const matchesFilter = (activeFilter === 'all') || (cat === activeFilter);
+                const matchesSearch = !searchQuery || ord.includes(searchQuery) || srt.includes(searchQuery) || cmp.includes(searchQuery);
+
+                if (matchesFilter && matchesSearch) {
+                    card.style.display = '';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        filterBtns.forEach(btn => {
+            btn.addEventListener('click', function() {
+                filterBtns.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                activeFilter = this.getAttribute('data-user-filter');
+                applyFilters();
+            });
+        });
+
+        if (searchInput) {
+            searchInput.addEventListener('input', function() {
+                searchQuery = this.value.trim().toLowerCase();
+                applyFilters();
+            });
+        }
+
+        @if($errors->any())
+            const modalEl = document.getElementById('modalAjukanSuket');
+            if (modalEl) {
+                new bootstrap.Modal(modalEl).show();
+            }
+        @endif
+    });
 </script>
 @endsection

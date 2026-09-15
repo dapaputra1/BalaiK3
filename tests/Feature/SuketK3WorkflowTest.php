@@ -310,4 +310,87 @@ class SuketK3WorkflowTest extends TestCase
         $this->assertNotNull($suket->signed_at);
         $this->assertEquals($admin->id, $suket->signed_by);
     }
+
+    public function test_user_cannot_view_or_download_unreleased_stage_6_suket()
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $user = User::create([
+            'name' => 'User Pemohon Gate',
+            'email' => 'user.gate@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+        $admin = User::create([
+            'name' => 'Admin Gate',
+            'email' => 'admin.gate@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
+        ]);
+
+        $signedDoc = UploadedFile::fake()->create('Suket_Resmi_TTD.pdf', 200, 'application/pdf');
+        $signedPath = $signedDoc->storeAs('suket_docs/test', 'Suket_Resmi_TTD.pdf', 'local');
+
+        $suket = SuketK3::create([
+            'user_id' => $user->id,
+            'nomor_order' => 'ORD-STAGE6-TEST',
+            'status_tahap' => 6, // Di tahap 6
+            'nomor_surat' => '566/SK-LK/BK3-SBY/09/2026',
+            'signed_file_path' => $signedPath,
+            'signed_file_name' => 'Suket_Resmi_TTD.pdf',
+            'sent_to_customer_at' => null, // BELUM DISERAHKAN
+            'perusahaan_nama' => 'PT Uji Gate',
+            'lokasi' => 'Surabaya',
+        ]);
+
+        // 1. User melihat halaman portal: berstatus Sedang Diproses dan TIDAK ada tombol Lihat Suket Resmi
+        $pageResponse = $this->actingAs($user)->get('/permohonan-suket');
+        $pageResponse->assertStatus(200);
+        $pageResponse->assertSee('Sedang Diproses');
+        $pageResponse->assertDontSee('Lihat Suket Resmi');
+
+        // 2. User mencoba preview langsung via URL: 403 Forbidden
+        $previewBlocked = $this->actingAs($user)->get("/permohonan-suket/{$suket->id}/preview/signed");
+        $previewBlocked->assertStatus(403);
+
+        // 3. User mencoba download langsung via URL: 403 Forbidden
+        $downloadBlocked = $this->actingAs($user)->get("/permohonan-suket/{$suket->id}/download/signed");
+        $downloadBlocked->assertStatus(403);
+
+        // 4. Admin melakukan Penyerahan Suket
+        $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'next',
+            'catatan' => 'Suket diserahkan ke akun pemohon',
+        ]);
+
+        $suket->refresh();
+        $this->assertNotNull($suket->sent_to_customer_at);
+
+        // 5. Setelah tuntas diserahkan, user dapat melihat tombol dan mengakses dokumen
+        $pageResponseAfter = $this->actingAs($user)->get('/permohonan-suket');
+        $pageResponseAfter->assertStatus(200);
+        $pageResponseAfter->assertSee('Tuntas Diserahkan');
+        $pageResponseAfter->assertSee('Lihat Suket Resmi');
+
+        // Test preview berkas PDF
+        $previewAllowed = $this->actingAs($user)->get("/permohonan-suket/{$suket->id}/preview/signed");
+        $previewAllowed->assertStatus(200);
+        $this->assertStringContainsString('application/pdf', (string) $previewAllowed->headers->get('Content-Type'));
+
+        // Test preview berkas Word (.doc/HTML template)
+        \Illuminate\Support\Facades\Storage::disk('local')->put('suket_docs/test/Suket_Word.doc', 'Sample Word Content');
+        $suket->signed_file_path = 'suket_docs/test/Suket_Word.doc';
+        $suket->signed_at = now();
+        $suket->save();
+        $previewWord = $this->actingAs($user)->get("/permohonan-suket/{$suket->id}/preview/signed");
+        $previewWord->assertStatus(200);
+        $this->assertStringContainsString('text/html', (string) $previewWord->headers->get('Content-Type'));
+        $previewWord->assertSee('SURAT KETERANGAN');
+        $previewWord->assertSee('TERTANDATANGANI SECARA ELEKTRONIK (TTE)');
+        $previewWord->assertSee('WordSection1');
+
+        $downloadAllowed = $this->actingAs($user)->get("/permohonan-suket/{$suket->id}/download/signed");
+        $downloadAllowed->assertStatus(200);
+    }
 }
+

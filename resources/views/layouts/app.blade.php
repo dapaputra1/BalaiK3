@@ -210,6 +210,19 @@
             color: #fff !important;
         }
 
+        /* Pastikan Modal selalu berada di atas navbar (#mainNavbar memiliki z-index: 9999) */
+        .modal {
+            z-index: 100050 !important;
+        }
+        .modal-backdrop {
+            z-index: 100040 !important;
+        }
+        body.modal-open #mainNavbar {
+            z-index: 1000 !important;
+            opacity: 0.1 !important;
+            pointer-events: none !important;
+        }
+
         .site-popup {
             position: fixed;
             inset: 0;

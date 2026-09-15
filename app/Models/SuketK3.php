@@ -88,7 +88,7 @@ class SuketK3 extends Model
         ],
         3 => [
             'code' => 'penyusunan_suket',
-            'label' => 'Penyusunan Laporan/Suket',
+            'label' => 'Penyusunan Suket',
             'desc' => 'Auto generate draft Suket standar Permenaker 05/2018 & review internal.',
             'roles' => ['pcu', 'penguji_k3', 'superadmin'],
             'badge' => 'info',
@@ -96,7 +96,7 @@ class SuketK3 extends Model
         ],
         4 => [
             'code' => 'penandatanganan_suket',
-            'label' => 'Penandatanganan Surat Keterangan',
+            'label' => 'Penandatanganan Suket',
             'desc' => 'Pengesahan dan penandatanganan (TTE / tanda tangan basah) oleh Kepala Balai & Admin.',
             'roles' => ['mp', 'kepala_balai', 'admin', 'superadmin'],
             'badge' => 'dark',
@@ -104,18 +104,18 @@ class SuketK3 extends Model
         ],
         5 => [
             'code' => 'penerbitan_suket',
-            'label' => 'Penerbitan Laporan/Suket',
+            'label' => 'Penerbitan Suket',
             'desc' => 'Input nomor surat resmi dan penerbitan sah oleh Administrator.',
             'roles' => ['admin', 'superadmin'],
             'badge' => 'success',
             'icon' => 'bi-award',
         ],
         6 => [
-            'code' => 'kirim_pelanggan',
-            'label' => 'Kirim ke Pelanggan',
-            'desc' => 'Penyerahan digital ke akun pemohon & pencatatan nomor resi fisik.',
+            'code' => 'penyerahan_suket',
+            'label' => 'Penyerahan Suket',
+            'desc' => 'Penyerahan digital ke akun pemohon melalui portal web Balai K3.',
             'roles' => ['admin', 'superadmin'],
-            'badge' => 'secondary',
+            'badge' => 'success',
             'icon' => 'bi-send-check',
         ],
     ];
