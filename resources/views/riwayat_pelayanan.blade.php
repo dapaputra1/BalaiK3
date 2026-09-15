@@ -4,6 +4,10 @@
 
 <div class="container py-4 mt-5 history-shell" style="font-family: 'Poppins', sans-serif;">
   <style>
+    /* checkbox border hitam */
+    .form-check-input {
+      border: 1px solid #000;
+    }
     .history-shell {
       font-family: 'Poppins', sans-serif;
     }

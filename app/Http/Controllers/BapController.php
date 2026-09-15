@@ -306,9 +306,12 @@ class BapController extends Controller
             }
 
             if (!empty($draft?->billing_verified_at) && !empty($draft?->invoice_generated_at)) {
+                $invoiceUrl = !empty($draft?->invoice_file_path)
+                    ? $this->routeIfExists($rolePrefix . '.invoice.signed.show', $permohonan)
+                    : $this->routeIfExists($rolePrefix . '.invoice.show', $permohonan);
                 $dokumenArsip->push([
                     'nama' => 'Kuitansi',
-                    'url' => $this->routeIfExists($rolePrefix . '.invoice.show', $permohonan),
+                    'url' => $invoiceUrl,
                 ]);
             }
 

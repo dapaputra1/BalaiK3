@@ -678,6 +678,8 @@
   .prepanalisa-grid-table .form-check-input {
     transform: scale(0.92);
     margin-top: 0;
+    /* checkbox border hitam */
+    border: 1px solid #000;
   }
   .prepanalisa-grid-table .badge {
     font-size: 10px;

@@ -626,6 +626,25 @@ class RiwayatPelayananController extends Controller
             abort(403);
         }
 
+        // [PERCOBAAN KUITANSI TTD BASAH] - Alirkan file PDF bertanda tangan basah jika sudah diupload admin
+        $signedPath = $permohonan->draftLhu?->invoice_file_path;
+        if ($signedPath && $this->fileExists($signedPath)) {
+            $disk = $this->resolveDisk($signedPath);
+            if ($disk !== null) {
+                $fullPath = Storage::disk($disk)->path($signedPath);
+                $name = $permohonan->draftLhu?->invoice_file_name ?: ('kuitansi-ttd-' . ($permohonan->kode ?: $permohonan->id) . '.pdf');
+                $ext = strtolower(pathinfo($signedPath, PATHINFO_EXTENSION));
+                if ($ext === 'pdf') {
+                    return response()->file($fullPath, [
+                        'Content-Type' => 'application/pdf',
+                        'Content-Disposition' => 'inline; filename="' . $name . '"',
+                    ]);
+                }
+                return response()->download($fullPath, $name);
+            }
+        }
+        // [/PERCOBAAN KUITANSI TTD BASAH]
+
         $penawaran = $this->aggregatePenawaran($permohonan);
         $pengujian = $this->aggregatePengujian($permohonan, $penawaran);
         $company = $permohonan->company;

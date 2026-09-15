@@ -1248,7 +1248,8 @@
       const id = Number(item[key]);
       const checked = selectedIds.includes(id) ? 'checked' : '';
       const text = typeof labelFormatter === 'function' ? labelFormatter(item) : (item[label] || '-');
-      listEl.innerHTML += `<label class="d-block small"><input type="checkbox" data-check-id="${id}" data-doc-index="${docIndex}" ${checked}> ${text}</label>`;
+      /* checkbox border hitam */
+      listEl.innerHTML += `<label class="d-block small"><input type="checkbox" class="form-check-input me-1" style="border:1px solid #000;" data-check-id="${id}" data-doc-index="${docIndex}" ${checked}> ${text}</label>`;
     });
   };
   const renderEditor = (root, state) => {

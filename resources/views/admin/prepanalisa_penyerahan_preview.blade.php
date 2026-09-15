@@ -36,6 +36,8 @@
       height: 14px;
       pointer-events: none;
       accent-color: #198754;
+      /* checkbox border hitam */
+      border: 1px solid #000;
     }
     .note { margin-top:12px; font-size:12px; }
     .sign { margin-top:26px; display:flex; justify-content:space-between; font-size:12px; }

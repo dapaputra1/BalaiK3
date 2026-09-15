@@ -661,6 +661,8 @@
   }
   #pengujianAccordion .form-check-input {
     margin-top: 0;
+    /* checkbox border hitam */
+    border: 1px solid #000;
   }
   #pengujianAccordion [data-table-wrap="indirect"] [data-row-index],
   #pengujianAccordion [data-direct-doc-index] {

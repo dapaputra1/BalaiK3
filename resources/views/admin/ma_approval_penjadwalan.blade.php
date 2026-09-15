@@ -195,6 +195,8 @@
     }
     .ma-approve-check .form-check-input {
       margin-top: .2rem;
+      /* checkbox border hitam */
+      border: 1px solid #000;
     }
     .ma-approve-check .form-check-label {
       font-size: .74rem;

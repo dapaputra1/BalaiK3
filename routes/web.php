@@ -244,7 +244,11 @@ Route::middleware(['auth', 'role:admin'])
         Route::post('/surat-tagihan/{permohonan}/submit', [SuratTagihanController::class, 'submitToInvoice'])->name('surat-tagihan.submit');
         Route::get('/invoice', [InvoiceController::class, 'index'])->name('invoice.index');
         Route::get('/invoice/{permohonan}/show', [InvoiceController::class, 'show'])->name('invoice.show');
+        // [PERCOBAAN KUITANSI TTD BASAH] - Route upload dan preview PDF bertanda tangan
+        Route::post('/invoice/{permohonan}/upload', [InvoiceController::class, 'uploadSigned'])->name('invoice.upload');
+        Route::get('/invoice/{permohonan}/signed', [InvoiceController::class, 'showSigned'])->name('invoice.signed.show');
         Route::post('/invoice/{permohonan}/submit', [InvoiceController::class, 'submitToBilling'])->name('invoice.submit');
+        // [/PERCOBAAN KUITANSI TTD BASAH]
         Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
         Route::post('/billing/{permohonan}/upload', [BillingController::class, 'upload'])->name('billing.upload');
         Route::post('/billing/{permohonan}/send', [BillingController::class, 'sendToUser'])->name('billing.send');
@@ -423,6 +427,11 @@ Route::middleware('auth')
             Route::post('/surat-tagihan/{permohonan}/submit', [SuratTagihanController::class, 'submitToInvoice'])->name('surat-tagihan.submit');
             Route::get('/invoice', [InvoiceController::class, 'index'])->name('invoice.index');
             Route::get('/invoice/{permohonan}/show', [InvoiceController::class, 'show'])->name('invoice.show');
+            // [PERCOBAAN KUITANSI TTD BASAH] - Route upload dan preview PDF bertanda tangan
+            Route::post('/invoice/{permohonan}/upload', [InvoiceController::class, 'uploadSigned'])->name('invoice.upload');
+            Route::get('/invoice/{permohonan}/signed', [InvoiceController::class, 'showSigned'])->name('invoice.signed.show');
+            Route::post('/invoice/{permohonan}/submit', [InvoiceController::class, 'submitToBilling'])->name('invoice.submit');
+            // [/PERCOBAAN KUITANSI TTD BASAH]
             Route::post('/invoice/{permohonan}/submit', [InvoiceController::class, 'submitToBilling'])->name('invoice.submit');
             Route::get('/penyerahan_lhu', [PenyerahanLhuController::class, 'index'])->name('penyerahan-lhu.index');
             Route::post('/penyerahan_lhu/{permohonan}/upload', [PenyerahanLhuController::class, 'uploadRevised'])->name('penyerahan-lhu.upload');

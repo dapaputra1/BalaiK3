@@ -171,6 +171,14 @@
         textarea.form-control {
             border-color: var(--brand-blue-dark) !important;
         }
+        /* Checkbox & radio border lebih tegas dan jelas */
+        .form-check-input {
+            border: 1px solid #000 !important;
+        }
+        .form-check-input:checked {
+            background-color: var(--brand-blue-dark) !important;
+            border-color: #000 !important;
+        }
 
         .btn-primary,
         .btn-primary:hover,

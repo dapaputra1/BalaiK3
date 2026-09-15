@@ -293,11 +293,18 @@
         align-items: center;
         gap: 8px;
     }
+    /* checkbox border hitam */
+
+    .form-check-input {
+        border: 1px solid #000;
+    }
 
     .request-card .form-check-input {
         width: 16px;
         height: 16px;
         margin-top: 0;
+        /* checkbox border hitam */
+        border: 1px solid #000;
     }
 
     .request-card .form-check-label {

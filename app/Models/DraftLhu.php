@@ -23,6 +23,10 @@ class DraftLhu extends Model
         'surat_tagihan_generated_at',
         'invoice_file_path',
         'invoice_file_name',
+        // [PERCOBAAN KUITANSI TTD BASAH] - Field audit upload scan kuitansi basah
+        'invoice_uploaded_by',
+        'invoice_uploaded_at',
+        // [/PERCOBAAN KUITANSI TTD BASAH]
         'invoice_generated_by',
         'invoice_generated_at',
         'invoice_verified_by_user_id',
@@ -65,6 +69,9 @@ class DraftLhu extends Model
         'final_uploaded_at' => 'datetime',
         'signed_uploaded_at' => 'datetime',
         'surat_tagihan_generated_at' => 'datetime',
+        // [PERCOBAAN KUITANSI TTD BASAH]
+        'invoice_uploaded_at' => 'datetime',
+        // [/PERCOBAAN KUITANSI TTD BASAH]
         'invoice_generated_at' => 'datetime',
         'invoice_verified_by_user_at' => 'datetime',
         'billing_uploaded_at' => 'datetime',

@@ -64,6 +64,14 @@
             border-color: var(--brand-blue-dark);
             box-shadow: 0 0 0 0.2rem rgba(21, 64, 106, 0.2);
         }
+        /* Checkbox & radio border lebih tegas dan jelas */
+        .form-check-input {
+            border: 1px solid #000 !important;
+        }
+        .form-check-input:checked {
+            background-color: var(--brand-blue-dark) !important;
+            border-color: #000 !important;
+        }
 
         .btn-primary,
         .btn-primary:hover,

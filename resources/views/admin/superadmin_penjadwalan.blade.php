@@ -1776,7 +1776,8 @@
                     Alur berikutnya: <strong>Approval MA</strong> lalu <strong>Dokumen SPT (Admin)</strong>.
                   </div>
                   <label style="display:flex; align-items:flex-start; gap:8px; cursor:pointer; margin:0;">
-                    <input type="checkbox" id="confirmDataCheck" style="margin-top:3px;">
+                  <!-- checkbox border hitam -->  
+                  <input type="checkbox" class="form-check-input" id="confirmDataCheck" style="margin-top:3px; border: 1px solid #000;">
                     <span style="font-size:13px;">Saya memastikan user sudah menyetujui jadwal dan data siap diteruskan ke Approval MA.</span>
                   </label>
                 </div>
