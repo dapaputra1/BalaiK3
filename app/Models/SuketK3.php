@@ -222,4 +222,29 @@ class SuketK3 extends Model
     {
         return $this->belongsTo(User::class, 'published_by');
     }
+
+    public function histories(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SuketK3History::class, 'suket_id')->latest('id');
+    }
+
+    public function recordHistory(
+        string $action,
+        ?int $stageBefore,
+        ?int $stageAfter,
+        ?string $catatan = null,
+        ?string $nomorSurat = null,
+        ?array $metadata = null,
+        ?int $userId = null
+    ): SuketK3History {
+        return $this->histories()->create([
+            'user_id' => $userId ?? auth()->id(),
+            'action' => $action,
+            'stage_before' => $stageBefore,
+            'stage_after' => $stageAfter,
+            'nomor_surat' => $nomorSurat ?? $this->nomor_surat,
+            'catatan' => $catatan,
+            'metadata' => $metadata,
+        ]);
+    }
 }

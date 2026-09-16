@@ -142,9 +142,21 @@ class SuketK3WorkflowTest extends TestCase
         $suket->refresh();
         $this->assertNotNull($suket->draft_file_path);
 
-        // 10. Gerbang QC Review: QC approves draf suket (Tahap 3 -> Tahap 4)
+        // 10. Tahap 3: Penguji K3 mengirim draf ke Tim QC (bukan langsung ke penandatanganan)
+        $sendQcRes = $this->actingAs($pcu)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_to_qc',
+            'catatan' => 'Draf dokumen diajukan ke Tim QC untuk peninjauan.',
+        ]);
+        $sendQcRes->assertRedirect(route('suket.index', ['stage' => 3]));
+        $suket->refresh();
+        $this->assertEquals(3, $suket->status_tahap);
+        $this->assertEquals('pending', $suket->qc_status);
+
+        // 11. Gerbang QC Review: QC mengisikan nomor surat & menyetujui draf (Tahap 3 -> Tahap 4)
         $qcResponse = $this->actingAs($qc)->post("/suket-k3/{$suket->id}/qc-review", [
             'action' => 'approve',
+            'nomor_surat' => '566/SK-LK/BK3-SBY/IX/2026',
+            'tanggal_surat' => '2026-09-16',
             'catatan' => 'Draf dokumen Suket telah diverifikasi QC dan disetujui.',
         ]);
         $qcResponse->assertRedirect(route('suket.index', ['stage' => 4]));
@@ -152,8 +164,20 @@ class SuketK3WorkflowTest extends TestCase
         $suket->refresh();
         $this->assertEquals('approved', $suket->qc_status);
         $this->assertEquals(4, $suket->status_tahap);
+        $this->assertEquals('566/SK-LK/BK3-SBY/IX/2026', $suket->nomor_surat);
 
-        // 11. Tahap 4: Kepala Balai (mp) / Admin mengesahkan TTD dengan mengunggah berkas scan TTD/TTE
+        // Pastikan histori tercatat di suket_k3_histories
+        $this->assertDatabaseHas('suket_k3_histories', [
+            'suket_id' => $suket->id,
+            'action' => 'send_to_qc',
+        ]);
+        $this->assertDatabaseHas('suket_k3_histories', [
+            'suket_id' => $suket->id,
+            'action' => 'qc_approved',
+            'nomor_surat' => '566/SK-LK/BK3-SBY/IX/2026',
+        ]);
+
+        // 12. Tahap 4: Kepala Balai (mp) / Admin mengesahkan TTD dengan mengunggah berkas scan TTD/TTE
         $signedFile = UploadedFile::fake()->create('suket_sah_ttd.pdf', 150, 'application/pdf');
         $this->actingAs($mp)->post("/suket-k3/{$suket->id}/advance", [
             'action' => 'next',
@@ -237,10 +261,13 @@ class SuketK3WorkflowTest extends TestCase
             'action' => 'next',
         ])->assertSessionHas('error');
 
-        // B. Cannot advance to Tahap 4 without QC approval
+        // B. Di Tahap 3, aksi pengiriman mengarahkan ke QC
         $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
-            'action' => 'next',
-        ])->assertSessionHas('error');
+            'action' => 'send_to_qc',
+            'catatan' => 'Kirim draf ke QC',
+        ])->assertRedirect(route('suket.index', ['stage' => 3]));
+        $this->assertEquals(3, $suket->fresh()->status_tahap);
+        $this->assertEquals('pending', $suket->fresh()->qc_status);
 
         // C. QC rejects draft with note
         $this->actingAs($qc)->post("/suket-k3/{$suket->id}/qc-review", [
@@ -378,15 +405,22 @@ class SuketK3WorkflowTest extends TestCase
         $this->assertEquals(3, $suket->status_tahap);
         $this->assertEquals('approved', $suket->evaluasi_status);
 
-        // 5. Di Tahap 3, Penguji K3 menginput nomor_surat sebelum penandatanganan
-        $suket->update(['qc_status' => 'approved']); // QC sudah approved
+        // 5. Di Tahap 3, Penguji K3 mengajukan draf ke QC, lalu QC menetapkan nomor surat saat approve
         $advanceT3 = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
-            'action' => 'next',
-            'nomor_surat' => '566/SK-LK/BK3-SBY/09/2026',
-            'tanggal_surat' => '2026-09-16',
-            'catatan' => 'Diajukan ke penandatanganan Kepala Balai',
+            'action' => 'send_to_qc',
+            'catatan' => 'Draf diajukan ke QC',
         ]);
         $advanceT3->assertSessionHas('success');
+        $this->assertEquals(3, $suket->fresh()->status_tahap);
+
+        // QC mereview, menetapkan nomor surat, dan menyetujui ke Tahap 4
+        $qcApproveRes = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/qc-review", [
+            'action' => 'approve',
+            'nomor_surat' => '566/SK-LK/BK3-SBY/09/2026',
+            'tanggal_surat' => '2026-09-16',
+            'catatan' => 'Disetujui QC dan nomor surat resmi ditetapkan.',
+        ]);
+        $qcApproveRes->assertSessionHas('success');
 
         $suket->refresh();
         $this->assertEquals(4, $suket->status_tahap);
@@ -520,6 +554,159 @@ class SuketK3WorkflowTest extends TestCase
 
         $downloadAllowed = $this->actingAs($user)->get("/permohonan-suket/{$suket->id}/download/signed");
         $downloadAllowed->assertStatus(200);
+    }
+
+    public function test_qc_return_to_penyusunan_and_history_logging_in_ui(): void
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $admin = User::create([
+            'name' => 'Admin History Test',
+            'email' => 'admin.hist@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
+        ]);
+        $qc = User::create([
+            'name' => 'QC Reviewer Test',
+            'email' => 'qc.hist@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'qc',
+        ]);
+
+        $suket = SuketK3::create([
+            'nomor_order' => 'ORD-HIST-001',
+            'status_tahap' => 3,
+            'qc_status' => 'pending',
+            'faktor_k3' => ['fisika'],
+            'perusahaan_nama' => 'PT Riwayat Berkah',
+            'lokasi' => 'Surabaya',
+        ]);
+
+        // 1. Penguji mengirim draf ke QC
+        $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_to_qc',
+            'catatan' => 'Mohon ditinjau draf suket kami.',
+        ])->assertRedirect(route('suket.index', ['stage' => 3]));
+
+        // 2. QC mengembalikan ke penyusunan dengan revisi
+        $this->actingAs($qc)->post("/suket-k3/{$suket->id}/qc-review", [
+            'action' => 'revision',
+            'catatan' => 'Perbaiki penulisan parameter kebisingan pada lampiran 1.',
+        ])->assertRedirect(route('suket.index', ['stage' => 3]));
+
+        $suket->refresh();
+        $this->assertEquals(3, $suket->status_tahap);
+        $this->assertEquals('revision', $suket->qc_status);
+        $this->assertEquals('Perbaiki penulisan parameter kebisingan pada lampiran 1.', $suket->qc_note);
+
+        // 3. Verifikasi tabel log history
+        $this->assertDatabaseHas('suket_k3_histories', [
+            'suket_id' => $suket->id,
+            'action' => 'send_to_qc',
+            'catatan' => 'Mohon ditinjau draf suket kami.',
+        ]);
+        $this->assertDatabaseHas('suket_k3_histories', [
+            'suket_id' => $suket->id,
+            'action' => 'qc_returned',
+            'catatan' => 'Perbaiki penulisan parameter kebisingan pada lampiran 1.',
+        ]);
+
+        // 4. Admin melihat halaman index: tombol Log Riwayat dan modal history tampil
+        $response = $this->actingAs($admin)->get('/suket-k3?stage=3');
+        $response->assertStatus(200);
+        $response->assertSee('Log Riwayat');
+        $response->assertSee("modalHistory{$suket->id}");
+        $response->assertSee('Perbaiki penulisan parameter kebisingan pada lampiran 1.');
+        $response->assertSee('QC Mengembalikan Berkas ke Penyusunan');
+    }
+
+    public function test_strict_separation_between_penyusunan_and_review_qc_tabs_and_buttons(): void
+    {
+        $admin = User::create([
+            'name' => 'Admin Tab Test',
+            'email' => 'admin.tab.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
+        ]);
+        $qc = User::create([
+            'name' => 'QC Tab Test',
+            'email' => 'qc.tab.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'qc',
+        ]);
+
+        $suket = SuketK3::create([
+            'nomor_order' => 'ORD-SEPARATION-01',
+            'status_tahap' => 3,
+            'qc_status' => null, // Masih proses penyusunan
+            'draft_file_path' => 'suket_docs/test/draf.docx',
+            'perusahaan_nama' => 'PT Pemisahan Tab',
+            'lokasi' => 'Surabaya',
+        ]);
+
+        // 1. Di Penyusunan Suket (stage=3):
+        // - Suket harus ada di tab stage=3
+        // - Suket TIDAK boleh ada di tab stage=qc
+        $stage3View = $this->actingAs($admin)->get('/suket-k3?stage=3');
+        $stage3View->assertStatus(200);
+        $stage3View->assertSee('ORD-SEPARATION-01');
+        $stage3View->assertSee("modalAdvance{$suket->id}");
+        $stage3View->assertSee('Kirim ke QC');
+        $stage3View->assertDontSee("modalQc{$suket->id}"); // BUG 2 FIXED: Tidak boleh ada tombol Review QC di stage 3
+
+        $stageQcView = $this->actingAs($qc)->get('/suket-k3?stage=qc');
+        $stageQcView->assertStatus(200);
+        $stageQcView->assertDontSee('ORD-SEPARATION-01'); // Belum dikirim ke QC
+
+        // 2. Kirim ke QC:
+        $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_to_qc',
+            'catatan' => 'Draf dikirim ke Tim QC',
+        ])->assertSessionHas('success');
+
+        $suket->refresh();
+        $this->assertEquals('pending', $suket->qc_status);
+
+        // 3. Setelah dikirim ke QC:
+        // - Suket HARUS HILANG dari tab stage=3
+        // - Suket HARUS MUNCUL di tab stage=qc
+        $stage3ViewAfter = $this->actingAs($admin)->get('/suket-k3?stage=3');
+        $stage3ViewAfter->assertStatus(200);
+        $stage3ViewAfter->assertDontSee('<div class="fw-bold text-dark fs-6">ORD-SEPARATION-01</div>', false); // BUG 1 FIXED: Hilang dari tabel stage 3
+        $stage3ViewAfter->assertDontSee("modalAdvance{$suket->id}");
+        $stage3ViewAfter->assertDontSee("modalQc{$suket->id}");
+        $stage3ViewAfter->assertDontSee("modalUploadDraft{$suket->id}");
+
+        $stageQcViewAfter = $this->actingAs($qc)->get('/suket-k3?stage=qc');
+        $stageQcViewAfter->assertStatus(200);
+        $stageQcViewAfter->assertSee('<div class="fw-bold text-dark fs-6">ORD-SEPARATION-01</div>', false); // MUNCUL di tabel stage QC
+        $stageQcViewAfter->assertSee("modalQc{$suket->id}"); // BUG 2 FIXED: Ada tombol Review QC di stage QC
+        $stageQcViewAfter->assertDontSee("modalAdvance{$suket->id}"); // BUG 3 FIXED: Tidak ada tombol Kirim ke QC di stage QC
+        $stageQcViewAfter->assertDontSee("modalUploadDraft{$suket->id}");
+
+        // 4. QC Mengembalikan ke Penyusunan:
+        $this->actingAs($qc)->post("/suket-k3/{$suket->id}/qc-review", [
+            'action' => 'revision',
+            'catatan' => 'Mohon perbaiki klausul baku mutu lingkungan kerja.',
+        ])->assertSessionHas('warning');
+
+        $suket->refresh();
+        $this->assertEquals('revision', $suket->qc_status);
+
+        // 5. Setelah dikembalikan ke penyusunan:
+        // - Suket KEMBALI MUNCUL di tab stage=3 dengan tombol "Kirim ke QC", tanpa "Review QC"
+        // - Suket HILANG dari tab stage=qc
+        $stage3ViewRevisi = $this->actingAs($admin)->get('/suket-k3?stage=3');
+        $stage3ViewRevisi->assertStatus(200);
+        $stage3ViewRevisi->assertSee('<div class="fw-bold text-dark fs-6">ORD-SEPARATION-01</div>', false);
+        $stage3ViewRevisi->assertSee("modalAdvance{$suket->id}");
+        $stage3ViewRevisi->assertSee('Kirim ke QC');
+        $stage3ViewRevisi->assertDontSee("modalQc{$suket->id}");
+
+        $stageQcViewRevisi = $this->actingAs($qc)->get('/suket-k3?stage=qc');
+        $stageQcViewRevisi->assertStatus(200);
+        $stageQcViewRevisi->assertDontSee('<div class="fw-bold text-dark fs-6">ORD-SEPARATION-01</div>', false); // Hilang dari tabel QC
+        $stageQcViewRevisi->assertDontSee("modalQc{$suket->id}");
     }
 }
 

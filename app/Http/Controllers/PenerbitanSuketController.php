@@ -8,6 +8,7 @@ use App\Models\Permohonan;
 use App\Models\PermohonanStep;
 use App\Models\SuketK3;
 use App\Models\SuketK3Comment;
+use App\Models\SuketK3History;
 use App\Models\User;
 use App\Models\WorkflowStep;
 use App\Support\SafeDocumentUpload;
@@ -15,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class PenerbitanSuketController extends Controller
 {
@@ -32,7 +34,7 @@ class PenerbitanSuketController extends Controller
         $search = $request->query('search');
 
         // Ambil riwayat permohonan Suket milik user yang sedang login
-        $suketQuery = SuketK3::with(['permohonan.company', 'qcUser', 'comments.user', 'evaluator'])
+        $suketQuery = SuketK3::with(['permohonan.company', 'qcUser', 'comments.user', 'evaluator', 'histories.user'])
             ->where('user_id', $user->id)
             ->latest('updated_at');
 
@@ -165,10 +167,18 @@ class PenerbitanSuketController extends Controller
             'catatan' => $request->filled('catatan') 
                 ? trim((string) $request->input('catatan')) 
                 : ('Pengajuan suket didaftarkan melalui Nomor Order ' . $permohonan->kode),
-            'qc_status' => 'pending',
+            'qc_status' => null,
             'created_by' => $user->id,
             'updated_by' => $user->id,
         ]);
+
+        $suket->recordHistory(
+            action: 'created',
+            stageBefore: 1,
+            stageAfter: 2,
+            catatan: 'Permohonan Suket K3 diajukan oleh pemohon dan diteruskan ke Tim Penguji K3 (Evaluasi Dokumen).',
+            userId: $user->id
+        );
 
         return redirect()->route('user.suket.index')->with('success', "Permohonan Suket K3 untuk Order {$suket->nomor_order} berhasil diajukan dan sedang diteruskan ke Tim Penguji K3 (Tahap 2: Evaluasi Dokumen).");
     }
@@ -207,7 +217,7 @@ class PenerbitanSuketController extends Controller
         $search = $request->query('search');
 
         // Query Suket K3 untuk Internal
-        $suketQuery = SuketK3::with(['permohonan.company', 'user', 'creator', 'signer', 'publisher', 'qcUser', 'comments.user', 'evaluator'])
+        $suketQuery = SuketK3::with(['permohonan.company', 'user', 'creator', 'signer', 'publisher', 'qcUser', 'comments.user', 'evaluator', 'histories.user'])
             ->latest('updated_at');
 
         // Filter berdasarkan Stage aktif
@@ -215,10 +225,10 @@ class PenerbitanSuketController extends Controller
             $suketQuery->whereIn('status_tahap', [1, 2]);
         } elseif ($activeStage === '3') {
             $suketQuery->where('status_tahap', 3)->where(function ($q) {
-                $q->whereNull('qc_status')->orWhere('qc_status', '!=', 'approved');
+                $q->whereNull('qc_status')->orWhere('qc_status', 'revision');
             });
         } elseif ($activeStage === 'qc') {
-            $suketQuery->where('status_tahap', 3)->whereNotNull('draft_file_path');
+            $suketQuery->where('status_tahap', 3)->where('qc_status', 'pending');
         } elseif ($activeStage === '4') {
             $suketQuery->where('status_tahap', 4);
         } elseif ($activeStage === '5') {
@@ -242,9 +252,9 @@ class PenerbitanSuketController extends Controller
         $stageCounts = [
             2 => SuketK3::whereIn('status_tahap', [1, 2])->count(),
             3 => SuketK3::where('status_tahap', 3)->where(function ($q) {
-                $q->whereNull('qc_status')->orWhere('qc_status', '!=', 'approved');
+                $q->whereNull('qc_status')->orWhere('qc_status', 'revision');
             })->count(),
-            'qc' => SuketK3::where('status_tahap', 3)->whereNotNull('draft_file_path')->count(),
+            'qc' => SuketK3::where('status_tahap', 3)->where('qc_status', 'pending')->count(),
             4 => SuketK3::where('status_tahap', 4)->count(),
             5 => SuketK3::where('status_tahap', 5)->count(),
             6 => SuketK3::where('status_tahap', 6)->count(),
@@ -352,10 +362,18 @@ class PenerbitanSuketController extends Controller
             'catatan' => $request->filled('catatan') 
                 ? trim((string) $request->input('catatan')) 
                 : ('Pengajuan suket didaftarkan melalui Nomor Order ' . ($permohonan?->kode ?? $orderCode)),
-            'qc_status' => 'pending',
+            'qc_status' => null,
             'created_by' => auth()->id(),
             'updated_by' => auth()->id(),
         ]);
+
+        $suket->recordHistory(
+            action: 'created',
+            stageBefore: 1,
+            stageAfter: 1,
+            catatan: 'Pengajuan suket K3 didaftarkan secara manual oleh petugas.',
+            userId: auth()->id()
+        );
 
         return redirect()->route('suket.index')->with('success', "Pengajuan Suket untuk Nomor Order {$suket->nomor_order} berhasil didaftarkan.");
     }
@@ -479,6 +497,14 @@ class PenerbitanSuketController extends Controller
             'comment' => trim((string) $request->input('comment')),
         ]);
 
+        $suket->recordHistory(
+            action: 'comment_added',
+            stageBefore: $suket->status_tahap,
+            stageAfter: $suket->status_tahap,
+            catatan: 'Catatan / sorotan evaluasi ditambahkan: ' . Str::limit($commentModel->comment, 80),
+            userId: $user?->id
+        );
+
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
@@ -535,7 +561,7 @@ class PenerbitanSuketController extends Controller
         $this->ensureAccess();
 
         $request->validate([
-            'action' => ['required', 'in:next,revision,upload_draft,reject_evaluasi'],
+            'action' => ['required', 'in:next,revision,upload_draft,reject_evaluasi,send_to_qc'],
             'catatan' => ['nullable', 'string', 'max:1000'],
             'nomor_surat' => ['nullable', 'string', 'max:100'],
             'tanggal_surat' => ['nullable', 'date'],
@@ -578,17 +604,58 @@ class PenerbitanSuketController extends Controller
                     'target' => 'pemohon',
                     'comment' => "[Ditolak / Minta Revisi LHU]: {$catatanTolak}",
                 ]);
+
+                $suket->recordHistory(
+                    action: 'evaluasi_rejected',
+                    stageBefore: 2,
+                    stageAfter: 2,
+                    catatan: $catatanTolak,
+                    userId: $user->id
+                );
             });
 
             return redirect()->route('suket.index', ['stage' => 2])
                 ->with('warning', "Evaluasi Dokumen Suket {$suket->nomor_order} DITOLAK / Diminta Revisi ke Pemohon.");
         }
 
-        // Validasi khusus saat mau lanjut dari Tahap 3 ke Tahap 4
-        if ($request->action === 'next' && $currentStage === 3) {
-            if ($suket->qc_status !== 'approved' && $userRole !== 'superadmin') {
-                return redirect()->back()->with('error', 'Dokumen draf Suket wajib melalui review dan disetujui (Approved) oleh Tim QC terlebih dahulu sebelum diajukan ke Penandatanganan Kepala Balai.');
-            }
+        // AKSI KHUSUS TAHAP 3: Kirim draf ke Tim QC (bukan langsung ke Penandatanganan Kepala Balai)
+        if (($request->action === 'send_to_qc' || $request->action === 'next') && $currentStage === 3) {
+            $catatanPengantar = $request->filled('catatan')
+                ? trim((string) $request->input('catatan'))
+                : 'Draf dokumen Suket K3 telah disusun dan diajukan ke Tim QC untuk peninjauan kelayakan.';
+
+            DB::transaction(function () use ($suket, $catatanPengantar, $user, $request) {
+                // Pastikan draf file sudah tersimpan
+                if (!$suket->draft_file_path) {
+                    $this->saveAutoGeneratedDraft($suket);
+                }
+
+                // Cek jika penguji mengunggah revisi draf sekaligus
+                if ($request->hasFile('revised_draft')) {
+                    $file = $request->file('revised_draft');
+                    $ext = strtolower($file->getClientOriginalExtension());
+                    $path = $file->storeAs('suket_docs/' . $suket->id, 'Draft_Revisi_' . time() . '.' . $ext, self::PRIVATE_DISK);
+                    $suket->draft_file_path = $path;
+                    $suket->draft_file_name = $file->getClientOriginalName();
+                }
+
+                $suket->qc_status = 'pending';
+                $suket->qc_note = null;
+                $suket->catatan = $catatanPengantar;
+                $suket->updated_by = $user->id;
+                $suket->save();
+
+                $suket->recordHistory(
+                    action: 'send_to_qc',
+                    stageBefore: 3,
+                    stageAfter: 3,
+                    catatan: $catatanPengantar,
+                    userId: $user->id
+                );
+            });
+
+            return redirect()->route('suket.index', ['stage' => 3])
+                ->with('success', "Draf Suket {$suket->nomor_order} berhasil diajukan ke Tim QC untuk review kelayakan.");
         }
 
         // Validasi khusus saat mau lanjut dari Tahap 4 ke Tahap 5
@@ -611,34 +678,18 @@ class PenerbitanSuketController extends Controller
                 } elseif ($currentStage === 2) {
                     // Evaluasi Disetujui -> Lanjut ke Tahap 3
                     $suket->evaluasi_status = 'approved';
+                    $suket->qc_status = null;
                     $suket->evaluasi_by = $user->id;
                     $suket->evaluasi_at = now();
                     $suket->catatan_evaluasi = $request->input('catatan', 'Dokumen evaluasi disetujui oleh Penguji K3.');
-                } elseif ($currentStage === 3) {
-                    // REVISI: Input Nomor Surat & Tanggal Surat ditaruh di Tahap 3 (SEBELUM Penandatanganan)
-                    if ($request->filled('nomor_surat')) {
-                        $suket->nomor_surat = trim((string) $request->input('nomor_surat'));
-                    } elseif (empty($suket->nomor_surat)) {
-                        $suket->nomor_surat = '566/SK-LK/BK3-SBY/' . now()->format('m/Y');
-                    }
 
-                    if ($request->filled('tanggal_surat')) {
-                        $suket->tanggal_surat = $request->input('tanggal_surat');
-                    } elseif (!$suket->tanggal_surat) {
-                        $suket->tanggal_surat = now()->toDateString();
-                    }
-
-                    // Cek jika petugas mengunggah dokumen revisi manual
-                    if ($request->hasFile('revised_draft')) {
-                        $file = $request->file('revised_draft');
-                        $ext = strtolower($file->getClientOriginalExtension());
-                        $path = $file->storeAs('suket_docs/' . $suket->id, 'Draft_Revisi_' . time() . '.' . $ext, self::PRIVATE_DISK);
-                        $suket->draft_file_path = $path;
-                        $suket->draft_file_name = $file->getClientOriginalName();
-                    } else {
-                        // Refresh auto-generated draft dengan nomor surat resmi
-                        $this->saveAutoGeneratedDraft($suket);
-                    }
+                    $suket->recordHistory(
+                        action: 'evaluasi_approved',
+                        stageBefore: 2,
+                        stageAfter: 3,
+                        catatan: $suket->catatan_evaluasi,
+                        userId: $user->id
+                    );
                 } elseif ($currentStage === 4) {
                     // Cek jika admin / Kepala Balai mengunggah file hasil scan TTD / TTE
                     if ($request->hasFile('signed_document')) {
@@ -650,6 +701,15 @@ class PenerbitanSuketController extends Controller
                     }
                     $suket->signed_at = now();
                     $suket->signed_by = $user->id;
+
+                    $suket->recordHistory(
+                        action: 'signed',
+                        stageBefore: 4,
+                        stageAfter: 5,
+                        catatan: $request->input('catatan', 'Surat Keterangan K3 telah ditandatangani dan disahkan oleh Kepala Balai.'),
+                        nomorSurat: $suket->nomor_surat,
+                        userId: $user->id
+                    );
                 } elseif ($currentStage === 5) {
                     // Finalisasi Penerbitan Suket Resmi
                     if ($request->filled('nomor_surat')) {
@@ -662,6 +722,15 @@ class PenerbitanSuketController extends Controller
                     $suket->published_by = $user->id;
 
                     $this->saveAutoGeneratedDraft($suket);
+
+                    $suket->recordHistory(
+                        action: 'published',
+                        stageBefore: 5,
+                        stageAfter: 6,
+                        catatan: $request->input('catatan', 'Surat Keterangan K3 resmi diterbitkan.'),
+                        nomorSurat: $suket->nomor_surat,
+                        userId: $user->id
+                    );
                 }
             } elseif ($request->action === 'upload_draft') {
                 if ($request->hasFile('revised_draft')) {
@@ -670,12 +739,29 @@ class PenerbitanSuketController extends Controller
                     $path = $file->storeAs('suket_docs/' . $suket->id, 'Draft_Revisi_' . time() . '.' . $ext, self::PRIVATE_DISK);
                     $suket->draft_file_path = $path;
                     $suket->draft_file_name = $file->getClientOriginalName();
+
+                    $suket->recordHistory(
+                        action: 'upload_draft',
+                        stageBefore: $currentStage,
+                        stageAfter: $currentStage,
+                        catatan: 'Mengunggah draf revisi: ' . $file->getClientOriginalName(),
+                        userId: $user->id
+                    );
                 }
             } elseif ($request->action === 'revision' && $currentStage > 1) {
+                $stageBefore = $suket->status_tahap;
                 $suket->status_tahap = $currentStage - 1;
                 if ($currentStage === 4) {
                     $suket->qc_status = 'pending';
                 }
+
+                $suket->recordHistory(
+                    action: 'qc_returned',
+                    stageBefore: $stageBefore,
+                    stageAfter: $suket->status_tahap,
+                    catatan: $request->input('catatan', 'Status berkas dikembalikan ke tahap sebelumnya.'),
+                    userId: $user->id
+                );
             }
 
             if ($currentStage === 6 && $request->action === 'next') {
@@ -683,6 +769,15 @@ class PenerbitanSuketController extends Controller
                 $suket->sent_to_customer_at = now();
                 $suket->sent_to_customer_by = $user->id;
                 $suket->metode_pengiriman = 'Portal Digital Web Balai K3';
+
+                $suket->recordHistory(
+                    action: 'sent_to_customer',
+                    stageBefore: 6,
+                    stageAfter: 6,
+                    catatan: $request->input('catatan', 'Surat Keterangan K3 resmi diserahkan ke akun pemohon via Portal Web Balai K3.'),
+                    nomorSurat: $suket->nomor_surat,
+                    userId: $user->id
+                );
             }
 
             if ($request->filled('catatan')) {
@@ -715,29 +810,86 @@ class PenerbitanSuketController extends Controller
 
         $request->validate([
             'action' => ['required', 'in:approve,revision,reject'],
+            'nomor_surat' => ['nullable', 'string', 'max:100'],
+            'tanggal_surat' => ['nullable', 'date'],
             'catatan' => ['nullable', 'string', 'max:1000'],
         ]);
 
         if ($request->action === 'approve') {
-            $suket->qc_status = 'approved';
-            $suket->qc_note = $request->input('catatan', 'Disetujui oleh QC. Dokumen draf suket sesuai dengan standar Permenaker No. 5/2018.');
-            $suket->qc_by = $user->id;
-            $suket->qc_at = now();
-            // Lanjut ke tahap 4: Penandatanganan
-            $suket->status_tahap = 4;
-            $suket->save();
+            DB::transaction(function () use ($request, $suket, $user) {
+                // QC mengisi/menetapkan Nomor Surat dan Tanggal Surat resmi
+                if ($request->filled('nomor_surat')) {
+                    $suket->nomor_surat = trim((string) $request->input('nomor_surat'));
+                } elseif (empty($suket->nomor_surat)) {
+                    $suket->nomor_surat = '566/SK-LK/BK3-SBY/' . now()->format('m/Y');
+                }
 
-            return redirect()->route('suket.index', ['stage' => 4])->with('success', "QC Suket {$suket->nomor_order} DISETUJUI. Lanjut ke Tahap 4 (Penandatanganan Surat Keterangan).");
+                if ($request->filled('tanggal_surat')) {
+                    $suket->tanggal_surat = $request->input('tanggal_surat');
+                } elseif (!$suket->tanggal_surat) {
+                    $suket->tanggal_surat = now()->toDateString();
+                }
+
+                // Perbarui dokumen draf dengan nomor surat resmi yang ditetapkan QC
+                $this->saveAutoGeneratedDraft($suket);
+
+                $qcNote = $request->filled('catatan')
+                    ? trim((string) $request->input('catatan'))
+                    : "Disetujui oleh QC. Nomor surat resmi [{$suket->nomor_surat}] telah ditetapkan dan diteruskan ke Penandatanganan Kepala Balai.";
+
+                $suket->qc_status = 'approved';
+                $suket->qc_note = $qcNote;
+                $suket->qc_by = $user->id;
+                $suket->qc_at = now();
+                $suket->status_tahap = 4; // Lanjut ke Tahap 4: Penandatanganan
+                $suket->updated_by = $user->id;
+                $suket->save();
+
+                $suket->recordHistory(
+                    action: 'qc_approved',
+                    stageBefore: 3,
+                    stageAfter: 4,
+                    catatan: $qcNote,
+                    nomorSurat: $suket->nomor_surat,
+                    userId: $user->id
+                );
+            });
+
+            return redirect()->route('suket.index', ['stage' => 4])
+                ->with('success', "QC Suket {$suket->nomor_order} DISETUJUI dengan Nomor Surat [{$suket->nomor_surat}]. Lanjut ke Tahap 4 (Penandatanganan Kepala Balai).");
         } else {
-            $suket->qc_status = 'revision';
-            $suket->qc_note = $request->input('catatan', 'Perlu perbaikan draf dokumen.');
-            $suket->qc_by = $user->id;
-            $suket->qc_at = now();
-            // Kembalikan ke tahap 3: Penyusunan
-            $suket->status_tahap = 3;
-            $suket->save();
+            $catatanRevisi = $request->filled('catatan')
+                ? trim((string) $request->input('catatan'))
+                : 'Perlu perbaikan redaksional/klausul draf dokumen oleh Penguji K3.';
 
-            return redirect()->route('suket.index', ['stage' => 3])->with('warning', "QC Suket {$suket->nomor_order} meminta REVISI. Dokumen dikembalikan ke Penguji K3 (Tahap 3).");
+            DB::transaction(function () use ($suket, $catatanRevisi, $user) {
+                $suket->qc_status = 'revision';
+                $suket->qc_note = $catatanRevisi;
+                $suket->qc_by = $user->id;
+                $suket->qc_at = now();
+                $suket->status_tahap = 3; // Kembalikan ke tahap 3: Penyusunan
+                $suket->updated_by = $user->id;
+                $suket->save();
+
+                // Simpan juga ke komentar internal
+                $suket->comments()->create([
+                    'user_id' => $user->id,
+                    'target' => 'internal',
+                    'comment' => "[QC Mengembalikan Berkas ke Penyusunan]: {$catatanRevisi}",
+                ]);
+
+                $suket->recordHistory(
+                    action: 'qc_returned',
+                    stageBefore: 3,
+                    stageAfter: 3,
+                    catatan: $catatanRevisi,
+                    nomorSurat: $suket->nomor_surat,
+                    userId: $user->id
+                );
+            });
+
+            return redirect()->route('suket.index', ['stage' => 3])
+                ->with('warning', "QC Suket {$suket->nomor_order} meminta REVISI. Dokumen dikembalikan ke Penguji K3 (Tahap 3) untuk diperbaiki.");
         }
     }
 

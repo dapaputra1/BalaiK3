@@ -239,7 +239,7 @@
             @php
                 $isQc = $activeStage == 'qc';
                 $canQcRole = in_array($currentRole, ['qc', 'superadmin'], true);
-                $qcPendingCount = \App\Models\SuketK3::where('status_tahap', 3)->where('qc_status', 'pending')->count();
+                $qcPendingCount = $stageCounts['qc'] ?? \App\Models\SuketK3::where('status_tahap', 3)->where('qc_status', 'pending')->count();
             @endphp
             <div class="col-6 col-md-4 col-xl">
                 <a href="{{ route('suket.index', ['stage' => $isQc ? null : 'qc']) }}" class="stage-card p-3 h-100 shadow-sm {{ $isQc ? 'is-active' : '' }}">
@@ -612,8 +612,8 @@
                             <td class="text-end pe-4">
                                 <div class="d-flex justify-content-end align-items-center gap-1 flex-wrap">
 
-                                    {{-- TAHAP 3: Upload Lampiran Revisi Draf Word --}}
-                                    @if($suket->status_tahap === 3 && in_array($currentRole, ['pcu', 'penguji_k3', 'admin', 'superadmin']))
+                                    {{-- TAHAP 3: Upload Lampiran Revisi Draf Word (Hanya di Penyusunan, bukan saat QC Pending) --}}
+                                    @if($suket->status_tahap === 3 && $suket->qc_status !== 'pending' && in_array($currentRole, ['pcu', 'penguji_k3', 'admin', 'superadmin']))
                                         <button
                                             type="button"
                                             class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1"
@@ -626,17 +626,23 @@
                                         </button>
                                     @endif
 
-                                    {{-- GERBANG REVIEW QC (Tahap 3 & Role QC / Superadmin) --}}
-                                    @if($suket->status_tahap === 3 && $canQc)
-                                        <button
-                                            type="button"
-                                            class="btn btn-sm btn-warning text-dark rounded-pill px-3 py-1 fw-semibold"
-                                            style="font-size: 11px;"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#modalQc{{ $suket->id }}"
-                                        >
-                                            <i class="bi bi-shield-check me-1"></i>Review QC
-                                        </button>
+                                    {{-- GERBANG REVIEW QC (Hanya jika Tahap 3 & Sedang Menunggu Review QC) --}}
+                                    @if($suket->status_tahap === 3 && $suket->qc_status === 'pending')
+                                        @if($canQc)
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-warning text-dark rounded-pill px-3 py-1 fw-semibold"
+                                                style="font-size: 11px;"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalQc{{ $suket->id }}"
+                                            >
+                                                <i class="bi bi-shield-check me-1"></i>Review QC
+                                            </button>
+                                        @else
+                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1 rounded-pill" style="font-size: 10px;">
+                                                <i class="bi bi-clock me-1"></i>Menunggu Review QC
+                                            </span>
+                                        @endif
                                     @endif
 
                                     {{-- TOMBOL PROSES TAHAP (Advance Stage) --}}
@@ -651,7 +657,20 @@
                                             >
                                                 <i class="bi bi-layout-split me-1"></i> Evaluasi Dokumen
                                             </button>
-                                        @else
+                                        @elseif($suket->status_tahap === 3)
+                                            {{-- Tombol Kirim ke QC hanya muncul saat belum diajukan ke QC (Penyusunan Suket) --}}
+                                            @if($suket->qc_status !== 'pending')
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-primary rounded-pill px-3 py-1"
+                                                    style="background-color: #15406A; border-color: #15406A; font-size: 11px;"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalAdvance{{ $suket->id }}"
+                                                >
+                                                    <i class="bi bi-send me-1"></i> Kirim ke QC
+                                                </button>
+                                            @endif
+                                        @elseif($suket->status_tahap === 4)
                                             <button
                                                 type="button"
                                                 class="btn btn-sm btn-primary rounded-pill px-3 py-1"
@@ -659,13 +678,17 @@
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#modalAdvance{{ $suket->id }}"
                                             >
-                                                @if($suket->status_tahap === 3)
-                                                    <i class="bi bi-send-check me-1"></i> Ajukan ke TTD
-                                                @elseif($suket->status_tahap === 4)
-                                                    <i class="bi bi-pen me-1"></i> Pengesahan TTD
-                                                @elseif($suket->status_tahap === 5)
-                                                    <i class="bi bi-award me-1"></i> Terbitkan Suket
-                                                @endif
+                                                <i class="bi bi-pen me-1"></i> Pengesahan TTD
+                                            </button>
+                                        @elseif($suket->status_tahap === 5)
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-primary rounded-pill px-3 py-1"
+                                                style="background-color: #15406A; border-color: #15406A; font-size: 11px;"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalAdvance{{ $suket->id }}"
+                                            >
+                                                <i class="bi bi-award me-1"></i> Terbitkan Suket
                                             </button>
                                         @endif
                                     @elseif($suket->status_tahap === 6)
@@ -684,11 +707,23 @@
                                                 <i class="bi bi-check-all me-1"></i>Tuntas Diserahkan
                                             </span>
                                         @endif
-                                    @else
+                                    @elseif(!($suket->status_tahap === 3 && $suket->qc_status === 'pending'))
                                         <span class="badge bg-light text-muted border px-2 py-1 rounded-pill" style="font-size: 10px;" title="Kewenangan: {{ implode(', ', $stgInfo['roles']) }}">
                                             Menunggu {{ implode('/', array_map('strtoupper', $stgInfo['roles'])) }}
                                         </span>
                                     @endif
+
+                                    {{-- TOMBOL RIWAYAT & LOG PERUBAHAN --}}
+                                    <button
+                                        type="button"
+                                        class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1"
+                                        style="font-size: 11px;"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modalHistory{{ $suket->id }}"
+                                        title="Lihat Log Riwayat Perubahan Suket"
+                                    >
+                                        <i class="bi bi-clock-history me-1"></i>Log Riwayat
+                                    </button>
                                 </div>
 
                                 {{-- MODAL EVALUASI DOKUMEN SIDE-BY-SIDE (TAHAP 2) --}}
@@ -926,6 +961,7 @@
 @endif
 
                                 {{-- MODAL ADVANCE STAGE --}}
+                                @if(!($suket->status_tahap === 3 && $suket->qc_status === 'pending'))
                                 <div class="modal fade text-start" id="modalAdvance{{ $suket->id }}" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog modal-dialog-centered modal-lg">
                                         <div class="modal-content border-0 shadow rounded-4">
@@ -974,7 +1010,7 @@
                                                         </div>
                                                     @endif
 
-                                                    {{-- FORM KHUSUS TAHAP 3: PENYUSUNAN DRAF SUKET & PENOMORAN RESMI --}}
+                                                    {{-- FORM KHUSUS TAHAP 3: PENGAJUAN DRAF KE TIM QC --}}
                                                     @if($suket->status_tahap === 3)
                                                         <div class="p-3 bg-light rounded-3 mb-3 border">
                                                             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -995,51 +1031,24 @@
                                                                 </div>
                                                             </div>
                                                             <p class="small text-muted mb-0">
-                                                                Draf telah disusun otomatis sesuai template resmi. Cantumkan nomor surat resmi di bawah ini sebelum diajukan ke Kepala Balai untuk penandatanganan di Tahap 4.
-                                                                @if($suket->qc_status !== 'approved')
-                                                                    <br><span class="text-danger fw-bold"><i class="bi bi-info-circle me-1"></i>Perhatian: Sebelum diajukan ke TTD Kepala Balai, draf ini harus disetujui (Approved) oleh Tim QC terlebih dahulu.</span>
-                                                                @endif
+                                                                Draf telah disusun otomatis sesuai template Permenaker No. 5/2018. Silakan ajukan draf ini ke <strong>Tim QC</strong> untuk peninjauan kelayakan dan tata naskah.
+                                                                Nomor Surat resmi akan ditetapkan saat proses verifikasi QC sebelum pengesahan Kepala Balai di Tahap 4.
                                                             </p>
                                                         </div>
 
-                                                        {{-- INPUT NOMOR SURAT RESMI PADA TAHAP 3 (SEBELUM TTD TAHAP 4) --}}
-                                                        <div class="p-3 bg-white rounded-3 mb-3 border">
-                                                            <div class="row g-2">
-                                                                <div class="col-md-8">
-                                                                    <label class="form-label small fw-bold text-dark">
-                                                                        Nomor Surat Keterangan Resmi <span class="text-danger">*</span>
-                                                                    </label>
-                                                                    <input 
-                                                                        type="text" 
-                                                                        name="nomor_surat" 
-                                                                        class="form-control fw-bold text-primary" 
-                                                                        placeholder="Contoh: 566/SK-LK/BK3-SBY/IX/2026"
-                                                                        value="{{ $suket->nomor_surat ?: ('566/SK-LK/BK3-SBY/' . \Carbon\Carbon::now()->format('m/Y')) }}"
-                                                                        required
-                                                                    >
-                                                                    <div class="form-text small text-muted" style="font-size: 11px;">
-                                                                        <i class="bi bi-info-circle text-primary me-1"></i>
-                                                                        Nomor surat resmi akan langsung otomatis tercantum pada draf dokumen Word & PDF yang diajukan ke Kepala Balai.
-                                                                    </div>
-                                                                </div>
-                                                                <div class="col-md-4">
-                                                                    <label class="form-label small fw-bold text-dark">
-                                                                        Tanggal Surat <span class="text-danger">*</span>
-                                                                    </label>
-                                                                    <input 
-                                                                        type="date" 
-                                                                        name="tanggal_surat" 
-                                                                        class="form-control" 
-                                                                        value="{{ $suket->tanggal_surat ? \Carbon\Carbon::parse($suket->tanggal_surat)->format('Y-m-d') : \Carbon\Carbon::now()->format('Y-m-d') }}"
-                                                                        required
-                                                                    >
+                                                        @if($suket->qc_status === 'revision')
+                                                            <div class="alert alert-warning d-flex align-items-start gap-2 p-2 mb-3 rounded-3 small">
+                                                                <i class="bi bi-exclamation-triangle-fill text-warning fs-6 mt-1"></i>
+                                                                <div>
+                                                                    <strong>Catatan Arahan Revisi QC Sebelumnya:</strong><br>
+                                                                    {{ $suket->qc_note ?: 'Mohon lakukan perbaikan draf dokumen sesuai klausul rekomendasi sebelum diajukan kembali ke QC.' }}
                                                                 </div>
                                                             </div>
-                                                        </div>
+                                                        @endif
 
                                                         <div class="mb-3">
-                                                            <label class="form-label small fw-semibold">Catatan Pengantar ke Kepala Balai (Opsional)</label>
-                                                            <textarea name="catatan" rows="2" class="form-control" placeholder="Catatan pengantar draf suket...">{{ $suket->catatan }}</textarea>
+                                                            <label class="form-label small fw-semibold">Catatan Pengantar ke Tim QC (Opsional)</label>
+                                                            <textarea name="catatan" rows="2" class="form-control" placeholder="Tuliskan catatan pengantar draf suket untuk Tim QC...">{{ $suket->catatan }}</textarea>
                                                         </div>
                                                     @endif
 
@@ -1145,7 +1154,7 @@
                                                     <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">Batal</button>
                                                     <button type="submit" class="btn btn-primary rounded-pill px-4" style="background-color: #15406A; border-color: #15406A;">
                                                         @if($suket->status_tahap === 3)
-                                                            <i class="bi bi-send-check me-1"></i> Simpan Nomor & Ajukan ke TTD
+                                                            <i class="bi bi-send me-1"></i> Kirim ke Tim QC
                                                         @elseif($suket->status_tahap === 5)
                                                             <i class="bi bi-award me-1"></i> Terbitkan Suket Resmi
                                                         @elseif($suket->status_tahap === 6)
@@ -1159,9 +1168,10 @@
                                         </div>
                                     </div>
                                 </div>
+                                @endif
 
-                                {{-- MODAL UPLOAD REVISI DRAF WORD (Tahap 3) --}}
-                                @if($suket->status_tahap === 3)
+                                {{-- MODAL UPLOAD REVISI DRAF WORD (Tahap 3 - Penyusunan Suket) --}}
+                                @if($suket->status_tahap === 3 && $suket->qc_status !== 'pending')
                                 <div class="modal fade text-start" id="modalUploadDraft{{ $suket->id }}" tabindex="-1" aria-hidden="true">
                                     <div class="modal-dialog modal-dialog-centered">
                                         <div class="modal-content border-0 shadow rounded-4">
@@ -1199,10 +1209,10 @@
                                 </div>
                                 @endif
 
-                                {{-- MODAL GERBANG QC (KHUSUS ROLE QC / SUPERADMIN) --}}
-                                @if($canQc)
+                                {{-- MODAL GERBANG QC (KHUSUS ROLE QC / SUPERADMIN - Tahap 3 Pending QC) --}}
+                                @if($canQc && $suket->status_tahap === 3 && $suket->qc_status === 'pending')
                                 <div class="modal fade text-start" id="modalQc{{ $suket->id }}" tabindex="-1" aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-dialog modal-dialog-centered modal-lg">
                                         <div class="modal-content border-0 shadow rounded-4">
                                             <form action="{{ route('suket.qc-review', $suket->id) }}" method="POST">
                                                 @csrf
@@ -1214,7 +1224,7 @@
                                                 </div>
                                                 <div class="modal-body py-3">
                                                     <p class="small text-muted mb-3">
-                                                        Periksa kelayakan draf surat keterangan nomor order <strong>{{ $suket->nomor_order }}</strong> sebelum diajukan ke Kepala Balai.
+                                                        Periksa kelayakan draf surat keterangan nomor order <strong>{{ $suket->nomor_order }}</strong> sebelum diajukan ke Kepala Balai untuk penandatanganan.
                                                     </p>
 
                                                     <div class="d-flex gap-2 mb-3">
@@ -1225,7 +1235,7 @@
                                                         >
                                                             <i class="bi bi-eye me-1"></i>Preview Draf Suket
                                                         </button>
-                                                        @if($suket->lhu_file_path)
+                                                        @if($suket->hasLhuDocument())
                                                             <button 
                                                                 type="button" 
                                                                 class="btn btn-sm btn-outline-secondary"
@@ -1238,31 +1248,68 @@
 
                                                     <div class="mb-3">
                                                         <label class="form-label small fw-bold text-dark">Keputusan Review QC <span class="text-danger">*</span></label>
-                                                        <div class="d-flex gap-3">
+                                                        <div class="d-flex gap-3 flex-wrap p-2 bg-light rounded-3 border">
                                                             <div class="form-check">
-                                                                <input class="form-check-input" type="radio" name="action" id="qc_app_{{ $suket->id }}" value="approve" checked>
+                                                                <input class="form-check-input" type="radio" name="action" id="qc_app_{{ $suket->id }}" value="approve" checked onchange="toggleQcNomorSurat('{{ $suket->id }}', true)">
                                                                 <label class="form-check-label text-success fw-bold small" for="qc_app_{{ $suket->id }}">
-                                                                    <i class="bi bi-check-circle me-1"></i>Setujui (Lanjut ke TTD)
+                                                                    <i class="bi bi-check-circle me-1"></i>Setujui & Tetapkan Nomor Surat (Lanjut ke TTD)
                                                                 </label>
                                                             </div>
                                                             <div class="form-check">
-                                                                <input class="form-check-input" type="radio" name="action" id="qc_rej_{{ $suket->id }}" value="revision">
+                                                                <input class="form-check-input" type="radio" name="action" id="qc_rej_{{ $suket->id }}" value="revision" onchange="toggleQcNomorSurat('{{ $suket->id }}', false)">
                                                                 <label class="form-check-label text-danger fw-bold small" for="qc_rej_{{ $suket->id }}">
-                                                                    <i class="bi bi-arrow-return-left me-1"></i>Kembalikan (Perlu Revisi)
+                                                                    <i class="bi bi-arrow-return-left me-1"></i>Kembalikan ke Penyusunan (Perlu Revisi)
                                                                 </label>
                                                             </div>
                                                         </div>
                                                     </div>
 
+                                                    {{-- FORM INPUT NOMOR SURAT RESMI DI QC --}}
+                                                    <div class="p-3 bg-white rounded-3 mb-3 border shadow-sm" id="qcNomorWrap{{ $suket->id }}">
+                                                        <div class="row g-2">
+                                                            <div class="col-md-8">
+                                                                <label class="form-label small fw-bold text-dark">
+                                                                    Nomor Surat Keterangan Resmi <span class="text-danger" id="qcNomorStar{{ $suket->id }}">*</span>
+                                                                </label>
+                                                                <input 
+                                                                    type="text" 
+                                                                    name="nomor_surat" 
+                                                                    id="qcNomorInput{{ $suket->id }}" 
+                                                                    class="form-control fw-bold text-primary" 
+                                                                    placeholder="Contoh: 566/SK-LK/BK3-SBY/IX/2026"
+                                                                    value="{{ $suket->nomor_surat ?: ('566/SK-LK/BK3-SBY/' . \Carbon\Carbon::now()->format('m/Y')) }}"
+                                                                    required
+                                                                >
+                                                                <div class="form-text small text-muted" style="font-size: 11px;">
+                                                                    <i class="bi bi-info-circle text-primary me-1"></i>
+                                                                    Nomor surat resmi yang ditetapkan Tim QC akan langsung tercantum pada draf dokumen yang diajukan ke Kepala Balai.
+                                                                </div>
+                                                            </div>
+                                                            <div class="col-md-4">
+                                                                <label class="form-label small fw-bold text-dark">
+                                                                    Tanggal Surat <span class="text-danger">*</span>
+                                                                </label>
+                                                                <input 
+                                                                    type="date" 
+                                                                    name="tanggal_surat" 
+                                                                    id="qcTanggalInput{{ $suket->id }}"
+                                                                    class="form-control" 
+                                                                    value="{{ $suket->tanggal_surat ? \Carbon\Carbon::parse($suket->tanggal_surat)->format('Y-m-d') : \Carbon\Carbon::now()->format('Y-m-d') }}"
+                                                                    required
+                                                                >
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
                                                     <div class="mb-3">
-                                                        <label class="form-label small fw-semibold">Catatan / Arahan QC</label>
-                                                        <textarea name="catatan" rows="3" class="form-control" placeholder="Tuliskan catatan verifikasi QC atau instruksi perbaikan draf...">{{ $suket->qc_note }}</textarea>
+                                                        <label class="form-label small fw-semibold">Catatan / Arahan Tim QC</label>
+                                                        <textarea name="catatan" id="qcCatatan{{ $suket->id }}" rows="3" class="form-control" placeholder="Tuliskan catatan verifikasi kelayakan QC atau arahan perbaikan draf jika dikembalikan...">{{ $suket->qc_note }}</textarea>
                                                     </div>
                                                 </div>
                                                 <div class="modal-footer border-0 pt-0">
                                                     <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">Batal</button>
-                                                    <button type="submit" class="btn btn-warning text-dark rounded-pill px-4 fw-semibold">
-                                                        Simpan Keputusan QC
+                                                    <button type="submit" class="btn btn-warning text-dark rounded-pill px-4 fw-semibold" id="qcSubmitBtn{{ $suket->id }}">
+                                                        <i class="bi bi-check2-circle me-1"></i> Simpan Keputusan QC
                                                     </button>
                                                 </div>
                                             </form>
@@ -1270,6 +1317,86 @@
                                     </div>
                                 </div>
                                 @endif
+
+                                {{-- MODAL RIWAYAT & LOG PERUBAHAN SUKET --}}
+                                <div class="modal fade text-start" id="modalHistory{{ $suket->id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                                        <div class="modal-content border-0 shadow rounded-4 overflow-hidden">
+                                            <div class="modal-header border-bottom py-3 px-4 bg-light">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <i class="bi bi-clock-history fs-5 text-primary"></i>
+                                                    <div>
+                                                        <h6 class="modal-title fw-bold text-dark mb-0">Riwayat & Log Perubahan Suket</h6>
+                                                        <div class="small text-muted" style="font-size: 11px;">
+                                                            Order: <strong class="text-dark">{{ $suket->nomor_order }}</strong> &bull; {{ $suket->perusahaan_nama }}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body p-4" style="max-height: 70vh; overflow-y: auto;">
+                                                @if($suket->histories->isEmpty())
+                                                    <div class="text-center py-4 text-muted">
+                                                        <i class="bi bi-hourglass-split fs-2 text-secondary d-block mb-2"></i>
+                                                        <span class="small">Belum ada riwayat aktivitas yang tercatat untuk berkas suket ini.</span>
+                                                    </div>
+                                                @else
+                                                    <div class="position-relative ps-3" style="border-left: 2px solid #e2e8f0; margin-left: 12px;">
+                                                        @foreach($suket->histories as $history)
+                                                            <div class="position-relative mb-4 ps-3">
+                                                                {{-- Bullet Dot --}}
+                                                                <div class="position-absolute rounded-circle bg-{{ $history->action_badge }}" style="width: 12px; height: 12px; left: -23px; top: 5px; border: 2px solid #fff; box-shadow: 0 0 0 1px #cbd5e1;"></div>
+                                                                
+                                                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-1 mb-1">
+                                                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                                        <span class="badge bg-{{ $history->action_badge }} rounded-pill px-2 py-1" style="font-size: 10px;">
+                                                                            {{ $history->action_label }}
+                                                                        </span>
+                                                                        @if($history->stage_before || $history->stage_after)
+                                                                            <span class="small text-muted" style="font-size: 11px;">
+                                                                                {{ $history->stage_before_label ?? '-' }} <i class="bi bi-arrow-right text-primary mx-1"></i> {{ $history->stage_after_label ?? '-' }}
+                                                                            </span>
+                                                                        @endif
+                                                                    </div>
+                                                                    <div class="small text-muted" style="font-size: 11px;">
+                                                                        <i class="bi bi-clock me-1"></i>{{ $history->created_at?->translatedFormat('d M Y, H:i') ?? '-' }}
+                                                                        <span class="text-secondary">({{ $history->created_at?->diffForHumans() }})</span>
+                                                                    </div>
+                                                                </div>
+
+                                                                <div class="bg-light p-3 rounded-3 border">
+                                                                    <div class="d-flex align-items-center justify-content-between mb-1" style="font-size: 11px;">
+                                                                        <span class="text-dark fw-semibold">
+                                                                            <i class="bi bi-person-fill text-secondary me-1"></i>{{ $history->user?->name ?? 'Sistem Balai K3' }}
+                                                                            @if($history->user?->role)
+                                                                                <span class="badge bg-secondary-subtle text-secondary rounded-pill px-1 ms-1" style="font-size: 9px;">
+                                                                                    {{ strtoupper(str_replace('_', ' ', $history->user->role)) }}
+                                                                                </span>
+                                                                            @endif
+                                                                        </span>
+                                                                        @if($history->nomor_surat)
+                                                                            <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size: 10px;">
+                                                                                <i class="bi bi-award me-1"></i>No: {{ $history->nomor_surat }}
+                                                                            </span>
+                                                                        @endif
+                                                                    </div>
+                                                                    @if($history->catatan)
+                                                                        <div class="text-secondary small mt-1" style="font-size: 11px; white-space: pre-line;">
+                                                                            {{ $history->catatan }}
+                                                                        </div>
+                                                                    @endif
+                                                                </div>
+                                                            </div>
+                                                        @endforeach
+                                                    </div>
+                                                @endif
+                                            </div>
+                                            <div class="modal-footer border-0 pt-0 bg-light">
+                                                <button type="button" class="btn btn-light rounded-pill px-4 border" data-bs-dismiss="modal">Tutup</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
 
                             </td>
                         </tr>
@@ -1386,6 +1513,40 @@ function switchEvalDoc(url, iframeId, imgId, type) {
         img.style.display = 'none';
         iframe.src = url;
         iframe.style.display = 'block';
+    }
+}
+
+function toggleQcNomorSurat(suketId, isApprove) {
+    const wrap = document.getElementById('qcNomorWrap' + suketId);
+    const input = document.getElementById('qcNomorInput' + suketId);
+    const tglInput = document.getElementById('qcTanggalInput' + suketId);
+    const star = document.getElementById('qcNomorStar' + suketId);
+    const tglStar = document.getElementById('qcTglStar' + suketId);
+    const catatan = document.getElementById('qcCatatan' + suketId);
+
+    if (isApprove) {
+        if (wrap) {
+            wrap.style.opacity = '1';
+            wrap.style.pointerEvents = 'auto';
+        }
+        if (input) input.required = true;
+        if (tglInput) tglInput.required = true;
+        if (star) star.style.display = 'inline';
+        if (tglStar) tglStar.style.display = 'inline';
+        if (catatan) catatan.required = false;
+    } else {
+        if (wrap) {
+            wrap.style.opacity = '0.5';
+            wrap.style.pointerEvents = 'none';
+        }
+        if (input) input.required = false;
+        if (tglInput) tglInput.required = false;
+        if (star) star.style.display = 'none';
+        if (tglStar) tglStar.style.display = 'none';
+        if (catatan) {
+            catatan.required = true;
+            catatan.focus();
+        }
     }
 }
 </script>

@@ -9,18 +9,12 @@ use App\Models\Permohonan;
 use App\Models\PermohonanStep;
 use App\Models\User;
 use App\Models\WorkflowStep;
-use App\Support\SafeDocumentUpload;
-use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 
 class InvoiceController extends Controller
 {
     use InteractsWithSuketSetting;
-
-    private const PRIVATE_DISK = 'local';
-    private const LEGACY_DISK = 'public';
 
     public function index()
     {
@@ -52,8 +46,6 @@ class InvoiceController extends Controller
             $draft = $permohonan->draftLhu;
             $invoiceGeneratedAt = $draft?->invoice_generated_at;
             $statusKey = !empty($invoiceGeneratedAt) ? 'terkirim' : 'belum_kirim';
-            $hasSigned = !empty($draft?->invoice_file_path) && $this->fileExists($draft?->invoice_file_path);
-            $canSubmit = $hasSigned && empty($invoiceGeneratedAt);
 
             return [
                 'permohonan_id' => $permohonan->id,
@@ -66,13 +58,7 @@ class InvoiceController extends Controller
                 'subtotal_pengujian' => (float) $pengujian['subtotal'],
                 'has_perubahan_pengujian' => $hasPerubahan,
                 'invoice_url' => route($rolePrefix . '.invoice.show', $permohonan->id),
-                'signed_invoice_url' => $hasSigned ? route($rolePrefix . '.invoice.signed.show', $permohonan->id) : null,
-                'signed_invoice_name' => $draft?->invoice_file_name,
-                'signed_invoice_uploaded_at' => optional($draft?->invoice_uploaded_at)->format('d M Y H:i'),
-                'upload_url' => route($rolePrefix . '.invoice.upload', $permohonan->id),
                 'submit_url' => route($rolePrefix . '.invoice.submit', $permohonan->id),
-                'has_signed_invoice' => $hasSigned,
-                'can_submit' => $canSubmit,
                 'kuitansi_status' => $statusKey,
                 'kuitansi_sent_at' => optional($invoiceGeneratedAt)->format('d M Y H:i'),
             ];
@@ -111,67 +97,7 @@ class InvoiceController extends Controller
         ]);
     }
 
-    // =========================================================================
-    // [PERCOBAAN KUITANSI TTD BASAH] - Method Upload & Preview Scan Kuitansi Basah
-    // =========================================================================
-    public function uploadSigned(Request $request, Permohonan $permohonan)
-    {
-        $this->ensureAccess();
-
-        $data = $request->validate([
-            'signed_invoice_file' => ['required', 'file', 'max:10240'],
-        ], [
-            'signed_invoice_file.required' => 'File kuitansi bertanda tangan wajib dipilih.',
-            'signed_invoice_file.file' => 'File kuitansi bertanda tangan tidak valid.',
-            'signed_invoice_file.max' => 'Ukuran file maksimal 10 MB.',
-        ]);
-
-        $file = $data['signed_invoice_file'];
-        SafeDocumentUpload::validatePdfOrFail($file, 'signed_invoice_file');
-        $ext = strtolower((string) $file->getClientOriginalExtension());
-
-        $draft = DraftLhu::firstOrCreate(
-            ['permohonan_id' => $permohonan->id],
-            ['created_by' => auth()->id()]
-        );
-
-        $this->deleteIfExists($draft->invoice_file_path);
-
-        $folder = 'invoice/' . $permohonan->id;
-        $filename = 'kuitansi_ttd_' . now()->format('Ymd_His') . '.' . $ext;
-        $path = $file->storeAs($folder, $filename, self::PRIVATE_DISK);
-
-        DB::transaction(function () use ($draft, $path, $file) {
-            $draft->update([
-                'invoice_file_path' => $path,
-                'invoice_file_name' => $file->getClientOriginalName(),
-                'invoice_uploaded_by' => auth()->id(),
-                'invoice_uploaded_at' => now(),
-                'updated_by' => auth()->id(),
-            ]);
-        });
-
-        $rolePrefix = auth()->user()?->role === 'admin' ? 'admin' : 'superadmin';
-
-        return response()->json([
-            'message' => 'File kuitansi bertanda tangan basah berhasil diupload.',
-            'name' => $draft->invoice_file_name,
-            'uploaded_at' => optional($draft->invoice_uploaded_at)->format('d M Y H:i'),
-            'url' => route($rolePrefix . '.invoice.signed.show', $permohonan->id),
-            'can_submit' => true,
-        ]);
-    }
-
-    public function showSigned(Permohonan $permohonan)
-    {
-        $this->ensureAccess();
-        return $this->showFile($permohonan->draftLhu?->invoice_file_path, $permohonan->draftLhu?->invoice_file_name);
-    }
-    // =========================================================================
-    // [/PERCOBAAN KUITANSI TTD BASAH]
-    // =========================================================================
-
-    public function submitToBilling(Request $request, Permohonan $permohonan)
+    public function submitToBilling(Permohonan $permohonan)
     {
         $this->ensureAccess();
 
@@ -179,31 +105,13 @@ class InvoiceController extends Controller
             return response()->json(['message' => 'Pembayaran belum diverifikasi. Tahap kuitansi belum bisa diproses.'], 422);
         }
 
-        // [PERCOBAAN KUITANSI TTD BASAH] - Wajibkan upload PDF scan kuitansi TTD basah
-        $signedInvoicePath = $permohonan->draftLhu?->invoice_file_path;
-        if (!$signedInvoicePath || !$this->fileExists($signedInvoicePath)) {
-            return response()->json([
-                'message' => 'Upload PDF kuitansi bertanda tangan basah terlebih dahulu sebelum meneruskan ke pelanggan.',
-            ], 422);
-        }
-
-        // [PERCOBAAN KUITANSI TTD BASAH] - Baca opsi alur berikutnya (suket vs penyerahan_lhu)
-        $validated = $request->validate([
-            'next_step' => ['nullable', 'in:suket,penyerahan_lhu'],
-        ]);
-
-        $nextStepChoice = $validated['next_step'] ?? null;
-        $toSuket = $nextStepChoice !== null
-            ? ($nextStepChoice === 'suket')
-            : $this->isSuketEnabled();
-        // [/PERCOBAAN KUITANSI TTD BASAH]
-
         $invoiceStep = $this->ensureWorkflowStep('invoice', 'Kuitansi', 18);
         $suketStep = $this->ensureWorkflowStep('penerbitan_suket', 'Penerbitan Suket', 19);
         $penyerahanStep = $this->ensureWorkflowStep('penyerahan_lhu', 'Penyerahan LHU', 20);
         $targetUserIds = $this->resolveCustomerNotificationUserIds($permohonan);
+        $suketEnabled = $this->isSuketEnabled();
 
-        DB::transaction(function () use ($permohonan, $invoiceStep, $suketStep, $penyerahanStep, $targetUserIds, $toSuket) {
+        DB::transaction(function () use ($permohonan, $invoiceStep, $suketStep, $penyerahanStep, $targetUserIds, $suketEnabled) {
             DraftLhu::firstOrCreate(
                 ['permohonan_id' => $permohonan->id],
                 ['created_by' => auth()->id()]
@@ -226,17 +134,17 @@ class InvoiceController extends Controller
             PermohonanStep::updateOrCreate(
                 ['permohonan_id' => $permohonan->id, 'step_id' => $suketStep->id],
                 [
-                    'status' => $toSuket ? 'pending' : 'approved',
-                    'note' => $toSuket
+                    'status' => $suketEnabled ? 'pending' : 'approved',
+                    'note' => $suketEnabled
                         ? 'Menunggu penerbitan surat keterangan'
-                        : 'Tahap penerbitan surat keterangan dilewati (pemohon tidak memerlukan suket)',
+                        : 'Tahap penerbitan surat keterangan dilewati karena fitur nonaktif',
                     'started_at' => now(),
-                    'finished_at' => $toSuket ? null : now(),
+                    'finished_at' => $suketEnabled ? null : now(),
                     'updated_by' => auth()->id(),
                 ]
             );
 
-            if (!$toSuket) {
+            if (!$suketEnabled) {
                 PermohonanStep::updateOrCreate(
                     ['permohonan_id' => $permohonan->id, 'step_id' => $penyerahanStep->id],
                     [
@@ -250,8 +158,8 @@ class InvoiceController extends Controller
             }
 
             $permohonan->update([
-                'status_global' => $toSuket ? 'penerbitan_suket' : 'penyerahan_lhu',
-                'status_lab' => $toSuket ? 'penerbitan_suket' : 'penyerahan_lhu',
+                'status_global' => $suketEnabled ? 'penerbitan_suket' : 'penyerahan_lhu',
+                'status_lab' => $suketEnabled ? 'penerbitan_suket' : 'penyerahan_lhu',
             ]);
 
             foreach ($targetUserIds as $userId) {
@@ -267,23 +175,23 @@ class InvoiceController extends Controller
                 ->whereIn('role', ['admin', 'superadmin'])
                 ->select('id')
                 ->get()
-                ->each(function (User $user) use ($permohonan, $toSuket) {
+                ->each(function (User $user) use ($permohonan, $suketEnabled) {
                     Notifikasi::create([
                         'user_id' => $user->id,
                         'title' => 'Kuitansi Diteruskan',
                         'message' => 'Kuitansi permohonan ' . $permohonan->kode . ' sudah diteruskan ke pemohon. '
-                            . ($toSuket
+                            . ($suketEnabled
                                 ? 'Lanjut ke tahap penerbitan suket.'
-                                : 'Tahap penerbitan suket dilewati dan permohonan langsung masuk ke penyerahan LHU.'),
+                                : 'Tahap penerbitan suket dilewati dan permohonan masuk ke penyerahan LHU.'),
                         'url' => url('/riwayat_pelayanan?kode=' . $permohonan->kode),
                     ]);
                 });
         });
 
         return response()->json([
-            'message' => $toSuket
+            'message' => $suketEnabled
                 ? 'Kuitansi berhasil diteruskan ke pelanggan. Permohonan lanjut ke tahap Penerbitan Suket.'
-                : 'Kuitansi berhasil diteruskan ke pelanggan. Tahap Suket dilewati dan permohonan langsung masuk ke Penyerahan LHU.',
+                : 'Kuitansi berhasil diteruskan ke pelanggan. Tahap Penerbitan Suket dilewati dan permohonan langsung masuk ke Penyerahan LHU.',
         ]);
     }
 
@@ -458,54 +366,5 @@ class InvoiceController extends Controller
             ->all();
     }
 
-    private function showFile(?string $path, ?string $name)
-    {
-        if (!$path || !$this->fileExists($path)) {
-            abort(404);
-        }
 
-        $disk = $this->resolveDisk($path);
-        if ($disk === null) {
-            abort(404);
-        }
-        $fullPath = Storage::disk($disk)->path($path);
-        $originalName = $name ?: basename($path);
-        $ext = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-
-        if ($ext === 'pdf') {
-            return response()->file($fullPath, [
-                'Content-Type' => 'application/pdf',
-                'Content-Disposition' => 'inline; filename="' . $originalName . '"',
-            ]);
-        }
-
-        return response()->download($fullPath, $originalName);
-    }
-
-    private function resolveDisk(?string $path): ?string
-    {
-        if (!$path) {
-            return null;
-        }
-        if (Storage::disk(self::PRIVATE_DISK)->exists($path)) {
-            return self::PRIVATE_DISK;
-        }
-        if (Storage::disk(self::LEGACY_DISK)->exists($path)) {
-            return self::LEGACY_DISK;
-        }
-        return null;
-    }
-
-    private function fileExists(?string $path): bool
-    {
-        return $this->resolveDisk($path) !== null;
-    }
-
-    private function deleteIfExists(?string $path): void
-    {
-        $disk = $this->resolveDisk($path);
-        if ($disk) {
-            Storage::disk($disk)->delete($path);
-        }
-    }
 }
