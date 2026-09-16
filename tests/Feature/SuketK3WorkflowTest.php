@@ -263,12 +263,141 @@ class SuketK3WorkflowTest extends TestCase
         $this->assertEquals('approved', $suket->qc_status);
         $this->assertEquals(4, $suket->status_tahap);
 
-        // E. Tahap 5 to 6 requires nomor_surat
-        $suket->update(['status_tahap' => 5]);
+        // E. Tahap 5 to 6 publishes suket
+        $suket->update(['status_tahap' => 5, 'nomor_surat' => '566/SK-LK/BK3-SBY/09/2026']);
         $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
             'action' => 'next',
-            'nomor_surat' => '',
-        ])->assertSessionHas('error');
+            'catatan' => 'Suket resmi diterbitkan',
+        ])->assertSessionHasNoErrors();
+
+        $suket->refresh();
+        $this->assertEquals(6, $suket->status_tahap);
+        $this->assertNotNull($suket->published_at);
+    }
+
+    public function test_evaluasi_dokumen_side_by_side_comments_and_rejection(): void
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $admin = User::create([
+            'name' => 'Penguji K3 Evaluator',
+            'email' => 'evaluator.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
+        ]);
+        $pemohon = User::create([
+            'name' => 'Pemohon PT Berkah',
+            'email' => 'pemohon.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+
+        $suket = SuketK3::create([
+            'user_id' => $pemohon->id,
+            'nomor_order' => 'ORD-EVAL-001',
+            'status_tahap' => 2,
+            'faktor_k3' => ['fisika'],
+            'perusahaan_nama' => 'PT Berkah Sentosa',
+            'lokasi' => 'Surabaya',
+            'lhu_file_path' => 'draft_lhus/test_eval_lhu.pdf',
+        ]);
+
+        // 1. Admin/Penguji menambahkan sorotan kesalahan dengan field bagian & highlight_text
+        $cmt1Response = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/comment", [
+            'bagian' => 'Halaman 3 - Titik Pengukuran Suhu',
+            'highlight_text' => 'ISBB 34.5 C tanpa keterangan istirahat',
+            'comment' => 'Nilai ISBB melebihi NAB, wajib mencantumkan pengaturan waktu kerja istirahat',
+            'target' => 'pemohon',
+        ]);
+        $cmt1Response->assertSessionHas('success');
+
+        $this->actingAs($admin)->post("/suket-k3/{$suket->id}/comment", [
+            'bagian' => 'Halaman 2 - Tabel Kebisingan',
+            'highlight_text' => '89 dBA',
+            'comment' => 'Mohon lengkapi rekomendasi APD hearing protection pada ruang genset',
+            'target' => 'pemohon',
+        ])->assertSessionHas('success');
+
+        $this->assertCount(2, $suket->fresh()->comments);
+        $this->assertDatabaseHas('suket_k3_comments', [
+            'suket_id' => $suket->id,
+            'bagian' => 'Halaman 2 - Tabel Kebisingan',
+            'highlight_text' => '89 dBA',
+        ]);
+
+        // Uji coba hapus salah satu sorotan jika ada koreksi
+        $firstCmt = $suket->fresh()->comments->first();
+        $this->actingAs($admin)->delete("/suket-k3/{$suket->id}/comment/{$firstCmt->id}")
+            ->assertSessionHas('success');
+        $this->assertCount(1, $suket->fresh()->comments);
+
+        // 2. Evaluasi ditolak oleh Penguji K3 (reject_evaluasi)
+        $rejectRes = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'reject_evaluasi',
+            'catatan' => 'Dokumen LHU belum lengkap data denah dan parameter NAB melebihi batas tanpa rekomendasi pengendalian',
+        ]);
+        $rejectRes->assertSessionHas('warning');
+
+        $suket->refresh();
+        $this->assertEquals(2, $suket->status_tahap);
+        $this->assertEquals('rejected', $suket->evaluasi_status);
+        $this->assertTrue($suket->isEvaluasiRejected());
+        $this->assertEquals($admin->id, $suket->evaluasi_by);
+        $this->assertNotNull($suket->evaluasi_at);
+
+        // 3. User pemohon mengakses /permohonan-suket: melihat badge Evaluasi Perlu Revisi, bagian yang disorot, dan teks yang salah
+        $userView = $this->actingAs($pemohon)->get('/permohonan-suket');
+        $userView->assertStatus(200);
+        $userView->assertSee('Evaluasi Perlu Revisi');
+        $userView->assertSee('Hasil Evaluasi LHU Memerlukan Perbaikan / Revisi');
+        $userView->assertSee('Halaman 2 - Tabel Kebisingan');
+        $userView->assertSee('89 dBA');
+        $userView->assertSee("modalUserEvaluasiLhu{$suket->id}");
+        $userView->assertSee('Tunjukkan di Dokumen');
+        $userView->assertSee('lhu-annotator.js');
+        $userView->assertSee('data-bs-target="#modalUserEvaluasiLhu' . $suket->id . '"', false);
+
+        // Uji tampilan admin side-by-side: memastikan tombol floating Google Docs dan PDF annotator ter-render
+        $adminView = $this->actingAs($admin)->get('/suket-k3?stage=2');
+        $adminView->assertStatus(200);
+        $adminView->assertSee("modalEvaluasiSideBySide{$suket->id}");
+        $adminView->assertSee("gdocsFloatingBtn{$suket->id}");
+        $adminView->assertSee("evalSidePanelScroll{$suket->id}");
+        $adminView->assertSee("cardAddComment{$suket->id}");
+        $adminView->assertSee('lhu-annotator.js');
+        $adminView->assertSee('Pengajuan suket didaftarkan melalui Nomor Order ' . $suket->nomor_order);
+
+        // 4. Setelah diperbaiki, Penguji K3 menyetujui Evaluasi Dokumen
+        $approveRes = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'next',
+            'catatan' => 'LHU dan data pendukung telah diverifikasi dan memenuhi Permenaker No. 5/2018',
+        ]);
+        $approveRes->assertSessionHas('success');
+
+        $suket->refresh();
+        $this->assertEquals(3, $suket->status_tahap);
+        $this->assertEquals('approved', $suket->evaluasi_status);
+
+        // 5. Di Tahap 3, Penguji K3 menginput nomor_surat sebelum penandatanganan
+        $suket->update(['qc_status' => 'approved']); // QC sudah approved
+        $advanceT3 = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'next',
+            'nomor_surat' => '566/SK-LK/BK3-SBY/09/2026',
+            'tanggal_surat' => '2026-09-16',
+            'catatan' => 'Diajukan ke penandatanganan Kepala Balai',
+        ]);
+        $advanceT3->assertSessionHas('success');
+
+        $suket->refresh();
+        $this->assertEquals(4, $suket->status_tahap);
+        $this->assertEquals('566/SK-LK/BK3-SBY/09/2026', $suket->nomor_surat);
+        $this->assertEquals('2026-09-16', $suket->tanggal_surat?->format('Y-m-d'));
+
+        // 6. User melihat progres Tahap 4 dengan Nomor Surat resmi tercantum
+        $userViewT4 = $this->actingAs($pemohon)->get('/permohonan-suket');
+        $userViewT4->assertStatus(200);
+        $userViewT4->assertSee('Tahap 4: Penandatanganan Suket');
+        $userViewT4->assertSee('566/SK-LK/BK3-SBY/09/2026');
     }
 
     public function test_tahap_4_upload_signed_doc_file_advances_to_stage_5(): void

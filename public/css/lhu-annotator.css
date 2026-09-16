@@ -1,0 +1,133 @@
+/* LHU Annotator Google Docs Style Styling */
+
+.gdocs-floating-btn {
+    position: fixed;
+    z-index: 2050;
+    pointer-events: auto;
+    filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.25));
+    animation: gdocsFadeIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.gdocs-floating-btn button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #15406A;
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 9999px;
+    padding: 6px 16px;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(21, 64, 106, 0.35);
+    transition: all 0.15s ease-in-out;
+}
+
+.gdocs-floating-btn button:hover {
+    background: #0d2843;
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(21, 64, 106, 0.5);
+}
+
+@keyframes gdocsFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.pdf-page-wrapper {
+    position: relative;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    background-color: #ffffff;
+}
+
+.textLayer {
+    position: absolute;
+    text-align: initial;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    opacity: 0.25;
+    line-height: 1.0;
+    user-select: text;
+    -webkit-user-select: text;
+}
+
+.textLayer ::selection {
+    background: rgba(13, 110, 253, 0.45) !important;
+    color: transparent !important;
+}
+
+mark.lhu-saved-highlight {
+    background-color: #ffe066 !important;
+    color: #1f2937 !important;
+    border-bottom: 2px solid #e03131;
+    padding: 1px 3px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+    display: inline;
+}
+
+mark.lhu-saved-highlight:hover {
+    background-color: #ffd43b !important;
+    box-shadow: 0 0 10px rgba(240, 62, 62, 0.6);
+}
+
+@keyframes pulseHighlightAnim {
+    0% {
+        box-shadow: 0 0 0 0 rgba(224, 49, 49, 0.7);
+        transform: scale(1);
+    }
+    50% {
+        box-shadow: 0 0 0 10px rgba(224, 49, 49, 0);
+        transform: scale(1.04);
+        background-color: #ffc078 !important;
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(224, 49, 49, 0);
+        transform: scale(1);
+    }
+}
+
+.pulse-highlight {
+    animation: pulseHighlightAnim 1.4s ease-in-out infinite;
+}
+
+mark.lhu-active-selection,
+.textLayer .lhu-active-selection {
+    background-color: #ffd43b !important;
+    outline: 2px dashed #e03131;
+    border-radius: 2px;
+    box-shadow: 0 0 8px rgba(224, 49, 49, 0.5);
+}
+
+@keyframes pulsePageAnim {
+    0% {
+        box-shadow: 0 0 0 0 rgba(224, 49, 49, 0.85);
+        outline: 3px solid #e03131;
+    }
+    50% {
+        box-shadow: 0 0 0 16px rgba(224, 49, 49, 0.35);
+        outline: 4px solid #c92a2a;
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(224, 49, 49, 0);
+        outline: 3px solid #e03131;
+    }
+}
+
+.pulse-page-highlight {
+    animation: pulsePageAnim 1.2s ease-in-out 3;
+    outline: 3px solid #e03131 !important;
+    outline-offset: 4px;
+}

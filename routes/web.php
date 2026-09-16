@@ -192,6 +192,8 @@ Route::middleware(['auth', 'role:superadmin,admin,mp,pcu,kepala_balai,penguji_k3
         Route::post('/{suket}/qc-review', [PenerbitanSuketController::class, 'qcReview'])->name('qc-review');
         Route::get('/{suket}/generate-draft', [PenerbitanSuketController::class, 'generateDraft'])->name('generate-draft');
         Route::post('/{suket}/upload-doc', [PenerbitanSuketController::class, 'uploadDocument'])->name('upload-doc');
+        Route::post('/{suket}/comment', [PenerbitanSuketController::class, 'addComment'])->name('comment');
+        Route::delete('/{suket}/comment/{comment}', [PenerbitanSuketController::class, 'deleteComment'])->name('comment.delete');
         Route::get('/{suket}/preview/{type}', [PenerbitanSuketController::class, 'previewDocument'])->name('preview-doc');
         Route::get('/{suket}/download/{type}', [PenerbitanSuketController::class, 'downloadDocument'])->name('download-doc');
     });

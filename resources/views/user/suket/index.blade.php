@@ -175,6 +175,18 @@
             color: #198754;
             font-weight: 600;
         }
+        .track-step.is-rejected .line {
+            background: #dc3545;
+        }
+        .track-step.is-rejected .circle {
+            background: #dc3545;
+            color: #ffffff;
+            box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.25);
+        }
+        .track-step.is-rejected .step-label {
+            color: #dc3545;
+            font-weight: 700;
+        }
 
         /* History Card */
         .history-card {
@@ -341,13 +353,36 @@
                                         No: {{ $suket->nomor_surat }}
                                     </div>
                                 @endif
+                            @elseif($suket->isEvaluasiRejected())
+                                <span class="badge bg-danger text-white px-3 py-2 rounded-pill fw-semibold shadow-sm mb-1 d-inline-block" 
+                                      style="cursor: pointer;" 
+                                      data-bs-toggle="modal" 
+                                      data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}"
+                                      title="Klik untuk membuka dokumen LHU dan melihat bagian yang disorot salah"
+                                >
+                                    <i class="bi bi-x-circle me-1"></i>Evaluasi Perlu Revisi
+                                </span>
+                                <div class="small text-danger fw-semibold" style="font-size: 11px;">
+                                    Terdapat {{ $suket->comments ? $suket->comments->count() : 0 }} Poin Catatan Penguji K3 (Klik untuk lihat)
+                                </div>
                             @else
-                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill fw-semibold mb-1 d-inline-block">
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill fw-semibold mb-1 d-inline-block"
+                                      style="cursor: pointer;"
+                                      data-bs-toggle="modal"
+                                      data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}"
+                                      title="Klik untuk melihat dokumen LHU dan progres evaluasi"
+                                >
                                     <i class="bi bi-clock-history me-1"></i>Tahap {{ $stageNumber }}: {{ $labelTahap }}
                                 </span>
-                                <div class="small text-muted" style="font-size: 11px;">
-                                    Sedang Diproses Balai K3
-                                </div>
+                                @if(!empty($suket->nomor_surat))
+                                    <div class="small fw-bold text-primary" style="font-size: 11.5px;">
+                                        No: {{ $suket->nomor_surat }}
+                                    </div>
+                                @else
+                                    <div class="small text-muted" style="font-size: 11px;">
+                                        Sedang Diproses Balai K3
+                                    </div>
+                                @endif
                             @endif
                         </div>
                     </div>
@@ -378,22 +413,38 @@
                                             if ($sNum < $stageNumber) {
                                                 $stepClass = 'is-complete';
                                             } elseif ($sNum == $stageNumber) {
-                                                $stepClass = 'is-active';
+                                                $stepClass = ($suket->isEvaluasiRejected() && $sNum === 2) ? 'is-rejected' : 'is-active';
                                             } else {
                                                 $stepClass = '';
                                             }
                                         }
                                     @endphp
-                                    <div class="track-step {{ $stepClass }}">
+                                    <div class="track-step {{ $stepClass }}"
+                                         @if($sNum === 2)
+                                             style="cursor: pointer;"
+                                             data-bs-toggle="modal"
+                                             data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}"
+                                             title="Klik untuk melihat dokumen dan hasil evaluasi LHU"
+                                         @endif
+                                    >
                                         <div class="line"></div>
                                         <div class="circle">
                                             @if($stepClass === 'is-complete')
                                                 <i class="bi bi-check-lg"></i>
+                                            @elseif($stepClass === 'is-rejected')
+                                                <i class="bi bi-x-lg"></i>
                                             @else
                                                 {{ $sNum }}
                                             @endif
                                         </div>
-                                        <div class="step-label">{{ $sName }}</div>
+                                        <div class="step-label">
+                                            {{ $sName }}
+                                            @if($sNum === 2)
+                                                <span class="badge {{ $suket->isEvaluasiRejected() ? 'bg-danger' : 'bg-primary-subtle text-primary border' }} rounded-pill d-block mt-1" style="font-size: 8.5px;">
+                                                    <i class="bi bi-eye me-1"></i>Buka
+                                                </span>
+                                            @endif
+                                        </div>
                                     </div>
                                 @endforeach
                             </div>
@@ -418,17 +469,21 @@
                         {{-- Action Buttons & Document Gate --}}
                         <div class="col-md-5">
                             <div class="d-flex justify-content-md-end align-items-center gap-2 flex-wrap">
-                                {{-- Jika LHU Terlampir, User boleh preview berkas LHU yang mereka ajukan --}}
-                                @if($suket->lhu_file_path)
-                                    <button 
-                                        type="button" 
-                                        class="btn btn-outline-secondary btn-sm rounded-pill px-3"
-                                        onclick="openUserPreview('{{ route('user.suket.preview-doc', [$suket->id, 'lhu']) }}', 'Dokumen LHU - {{ $suket->nomor_order }}')"
-                                        title="Preview Berkas LHU"
-                                    >
-                                        <i class="bi bi-file-earmark-pdf me-1 text-danger"></i>Lihat LHU
-                                    </button>
-                                @endif
+                                {{-- Tombol Buka Evaluasi LHU --}}
+                                <button 
+                                    type="button" 
+                                    class="btn btn-sm rounded-pill px-3 {{ $suket->isEvaluasiRejected() ? 'btn-danger shadow-sm' : 'btn-outline-primary' }}"
+                                    data-bs-toggle="modal" 
+                                    data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}"
+                                    title="Buka Dokumen LHU & Hasil Evaluasi"
+                                >
+                                    <i class="bi bi-file-earmark-check me-1"></i>
+                                    @if($suket->isEvaluasiRejected())
+                                        Lihat Hasil Evaluasi ({{ $suket->comments ? $suket->comments->count() : 0 }})
+                                    @else
+                                        Evaluasi Dokumen LHU
+                                    @endif
+                                </button>
 
                                 {{-- GATE KEAMANAN TAHAP 6: HANYA TAMPIL JIKA SUKET SUDAH DISERAHKAN (sent_to_customer_at) --}}
                                 @if($isDelivered && ($suket->signed_file_path || $suket->draft_file_path))
@@ -461,8 +516,81 @@
                         </div>
                     </div>
 
-                    {{-- Alert Box Informasi Tambahan --}}
-                    @if($isDelivered)
+                    {{-- Alert Box Informasi Status Alur & Catatan Evaluator --}}
+                    @if($suket->isEvaluasiRejected())
+                        <div class="alert alert-danger border-0 rounded-3 p-3 mt-3 mb-0">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2 pb-2 border-bottom border-danger-subtle">
+                                <div class="fw-bold d-flex align-items-center gap-2 text-danger fs-6 mb-0">
+                                    <i class="bi bi-exclamation-triangle-fill"></i> Hasil Evaluasi LHU Memerlukan Perbaikan / Revisi
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-danger text-white rounded-pill px-2 py-1 small">
+                                        {{ $suket->comments ? $suket->comments->count() : 0 }} Poin Sorotan Kesalahan
+                                    </span>
+                                    <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}">
+                                        <i class="bi bi-eye-fill me-1"></i>Buka Dokumen LHU & Lihat Sorotan
+                                    </button>
+                                </div>
+                            </div>
+
+                            @if($suket->catatan_evaluasi)
+                                <div class="p-2 bg-white bg-opacity-75 rounded border border-danger-subtle mb-3 text-dark small">
+                                    <strong>Kesimpulan Penguji K3:</strong> {{ $suket->catatan_evaluasi }}
+                                </div>
+                            @endif
+
+                            {{-- DAFTAR HIGHLIGHT / SOROTAN KESALAHAN LHU DARI PENGUJI --}}
+                            @if($suket->comments && $suket->comments->count() > 0)
+                                <div class="mb-1">
+                                    <div class="small fw-bold text-dark mb-2">
+                                        <i class="bi bi-highlighter text-danger me-1"></i>Daftar Bagian LHU yang Disorot Salah oleh Penguji K3:
+                                    </div>
+                                    <div class="d-flex flex-column gap-2">
+                                        @foreach($suket->comments as $cm)
+                                            <div class="card border rounded-3 p-3 bg-white shadow-xs border-danger-subtle" id="user-comment-card-{{ $suket->id }}-{{ $cm->id }}">
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                        <span class="badge bg-danger text-white" style="font-size: 10px;">
+                                                            Sorotan #{{ $loop->iteration }}
+                                                        </span>
+                                                        @if($cm->bagian)
+                                                            <span class="badge bg-light text-dark border" style="font-size: 11px;">
+                                                                <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ $cm->bagian }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                    <div class="d-flex align-items-center gap-2">
+                                                        <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-0" style="font-size: 10.5px;" data-bs-toggle="modal" data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}" onclick="setTimeout(() => window.LhuAnnotator.scrollToHighlight({{ $suket->id }}, {{ $cm->id }}, '{{ addslashes($cm->bagian ?? '') }}'), 400)">
+                                                            <i class="bi bi-geo-alt-fill me-1"></i>Tunjukkan di Dokumen
+                                                        </button>
+                                                        <span class="text-muted" style="font-size: 10px;">
+                                                            {{ $cm->created_at ? $cm->created_at->diffForHumans() : '' }}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                @if($cm->highlight_text)
+                                                    <div class="p-2 rounded bg-warning bg-opacity-25 border border-warning my-2">
+                                                        <div class="text-muted small fw-bold" style="font-size: 10px; text-transform: uppercase;">
+                                                            <i class="bi bi-highlighter text-warning-emphasis me-1"></i>Bagian / Data yang Salah:
+                                                        </div>
+                                                        <div class="font-monospace small text-dark fw-bold mt-1">
+                                                            <mark class="bg-warning text-dark px-1 rounded">{{ $cm->highlight_text }}</mark>
+                                                        </div>
+                                                    </div>
+                                                @endif
+
+                                                <div class="small text-dark mt-1">
+                                                    <strong class="text-danger"><i class="bi bi-arrow-right-circle-fill me-1"></i>Instruksi Perbaikan:</strong>
+                                                    <div class="mt-1 text-muted" style="white-space: pre-wrap;">{{ $cm->comment }}</div>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    @elseif($isDelivered)
                         <div class="alert alert-success border-0 rounded-3 p-2 px-3 mt-3 mb-0 small d-flex align-items-center justify-content-between">
                             <div>
                                 <i class="bi bi-check-circle-fill text-success me-1"></i>
@@ -473,10 +601,156 @@
                         <div class="alert alert-light border rounded-3 p-2 px-3 mt-3 mb-0 small text-muted d-flex align-items-center">
                             <i class="bi bi-info-circle text-navy me-2 fs-6"></i>
                             <div>
-                                Permohonan Anda saat ini berada pada <strong>Tahap {{ $stageNumber }}: {{ $labelTahap }}</strong>. Berkas resmi Suket akan otomatis dapat dilihat dan diunduh di sini setelah tuntas diserahkan oleh tim Balai K3.
+                                @if($stageNumber === 2)
+                                    Permohonan Anda saat ini sedang dalam <strong>Tahap 2: Evaluasi Dokumen LHU</strong> oleh tim Penguji K3 Lingkungan Kerja Balai K3 Surabaya.
+                                @elseif($stageNumber === 3)
+                                    Permohonan Anda saat ini dalam <strong>Tahap 3: Penyusunan Suket</strong>. 
+                                    @if($suket->evaluasi_status === 'approved' && $suket->catatan_evaluasi)
+                                        <div class="mt-1 small text-success"><i class="bi bi-check2-circle me-1"></i><strong>Hasil Evaluasi Dokumen LHU:</strong> Disetujui ({{ $suket->catatan_evaluasi }})</div>
+                                    @endif
+                                    @if($suket->nomor_surat)
+                                        <div class="mt-1">Nomor Surat Keterangan resmi telah disematkan (<strong>{{ $suket->nomor_surat }}</strong>) dan sedang melalui proses review Quality Control (QC).</div>
+                                    @else
+                                        <div class="mt-1">Draf surat keterangan sedang disusun sesuai standar Permenaker No. 5/2018.</div>
+                                    @endif
+                                @elseif($stageNumber === 4)
+                                    Permohonan Anda berada pada <strong>Tahap 4: Penandatanganan Suket</strong>. Dokumen Surat Keterangan resmi (No: <strong>{{ $suket->nomor_surat }}</strong>) sedang dalam proses penandatanganan dan pengesahan oleh Kepala Balai K3 Surabaya.
+                                @elseif($stageNumber === 5)
+                                    Permohonan Anda berada pada <strong>Tahap 5: Penerbitan Suket</strong>. Dokumen resmi telah disahkan oleh Kepala Balai dan sedang dalam proses finalisasi penerbitan surat.
+                                @else
+                                    Permohonan Anda saat ini berada pada <strong>Tahap {{ $stageNumber }}: {{ $labelTahap }}</strong>. Berkas resmi Suket akan otomatis dapat dilihat dan diunduh di sini setelah tuntas diserahkan oleh tim Balai K3.
+                                @endif
                             </div>
                         </div>
                     @endif
+                </div>
+            </div>
+
+            {{-- MODAL EVALUASI DOKUMEN SIDE-BY-SIDE (SISI USER / PEMOHON) --}}
+            {{-- MODAL EVALUASI DOKUMEN SIDE-BY-SIDE (SISI USER / PEMOHON) --}}
+            <div class="modal fade text-start modal-evaluasi-lhu-user" id="modalUserEvaluasiLhu{{ $suket->id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 95vw;">
+                    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="height: 90vh;">
+                        <div class="modal-header py-2 px-3 bg-light border-bottom">
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="badge bg-primary px-2 py-1 rounded-pill">
+                                    <i class="bi bi-file-earmark-check me-1"></i>Hasil Evaluasi Dokumen LHU (Tahap 2)
+                                </span>
+                                <h6 class="modal-title fw-bold text-dark mb-0">
+                                    {{ $suket->nomor_order }} - {{ $suket->perusahaan_nama }}
+                                </h6>
+                                @if($suket->isEvaluasiRejected())
+                                    <span class="badge bg-danger rounded-pill"><i class="bi bi-x-circle me-1"></i>Evaluasi Perlu Revisi</span>
+                                @elseif($suket->evaluasi_status === 'approved')
+                                    <span class="badge bg-success rounded-pill"><i class="bi bi-check-circle me-1"></i>Telah Disetujui</span>
+                                @else
+                                    <span class="badge bg-warning text-dark rounded-pill"><i class="bi bi-clock me-1"></i>Dalam Proses Telaah</span>
+                                @endif
+                            </div>
+                            <div class="d-flex align-items-center gap-2">
+                                @if($suket->hasLhuDocument())
+                                    <a href="{{ route('user.suket.download-doc', [$suket->id, 'lhu']) }}" class="btn btn-xs btn-outline-secondary rounded px-2 py-1" download>
+                                        <i class="bi bi-download me-1"></i>Unduh Berkas LHU
+                                    </a>
+                                @endif
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                        </div>
+                        <div class="modal-body p-0" style="height: calc(90vh - 56px);">
+                            <div class="row g-0 h-100">
+                                {{-- SISI KIRI: DOKUMEN LHU DENGAN HIGHLIGHT KUNING & MARKER NOMOR --}}
+                                <div class="col-lg-7 d-flex flex-column h-100 border-end bg-dark bg-opacity-10">
+                                    <div class="d-flex justify-content-between align-items-center p-2 bg-white border-bottom flex-shrink-0">
+                                        <span class="small fw-semibold text-muted">
+                                            <i class="bi bi-file-earmark-pdf text-danger me-1"></i>Dokumen LHU (Disorot Bagian yang Memerlukan Revisi)
+                                        </span>
+                                        <span class="badge bg-warning text-dark" style="font-size: 10px;">
+                                            <i class="bi bi-highlighter me-1"></i>{{ $suket->comments ? $suket->comments->count() : 0 }} Titik Sorotan
+                                        </span>
+                                    </div>
+
+                                    <div class="flex-grow-1 position-relative overflow-y-auto p-3 d-flex flex-column align-items-center" id="evalUserPdfWrap{{ $suket->id }}" style="background-color: #525659; min-height: 0;">
+                                        @if($suket->hasLhuDocument())
+                                            <div id="evalUserPdfContainer{{ $suket->id }}" class="w-100 d-flex flex-column align-items-center"></div>
+                                        @else
+                                            <div class="text-center p-5 text-white my-auto">
+                                                <i class="bi bi-file-earmark-pdf fs-1 text-warning mb-3 d-block"></i>
+                                                <h6 class="fw-bold">Dokumen LHU Sedang Dipersiapkan</h6>
+                                                <p class="small text-white-50 mb-0">Berkas LHU belum diunggah atau masih dalam proses oleh tim Balai K3.</p>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                {{-- SISI KANAN: PANEL CATATAN EVALUASI & INSTRUKSI REVISI --}}
+                                <div class="col-lg-5 d-flex flex-column h-100 bg-white">
+                                    <div class="p-3 border-bottom bg-light flex-shrink-0">
+                                        <h6 class="fw-bold text-dark mb-1">
+                                            <i class="bi bi-clipboard2-check text-primary me-2"></i>Catatan & Sorotan Evaluator K3
+                                        </h6>
+                                        <p class="small text-muted mb-0" style="font-size: 11.5px;">
+                                            Tinjau bagian yang disorot kuning di sebelah kiri beserta instruksi perbaikannya di bawah ini.
+                                        </p>
+                                    </div>
+
+                                    {{-- Feed Sorotan Kesalahan untuk User --}}
+                                    <div class="p-3 flex-grow-1 overflow-y-auto" style="min-height: 0;">
+                                        @if($suket->catatan_evaluasi)
+                                            <div class="p-2 rounded bg-light border mb-3 small text-dark">
+                                                <strong>Kesimpulan Penguji K3:</strong>
+                                                <div class="mt-1">{{ $suket->catatan_evaluasi }}</div>
+                                            </div>
+                                        @endif
+
+                                        @if($suket->comments && $suket->comments->count() > 0)
+                                            <div class="d-flex flex-column gap-2">
+                                                @foreach($suket->comments as $cm)
+                                                    <div class="card border rounded-3 p-3 bg-white shadow-xs border-danger-subtle" id="user-modal-comment-card-{{ $suket->id }}-{{ $cm->id }}">
+                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                            <div class="d-flex align-items-center gap-1 flex-wrap">
+                                                                <span class="badge bg-danger text-white" style="font-size: 10px;">
+                                                                    Sorotan #{{ $loop->iteration }}
+                                                                </span>
+                                                                @if($cm->bagian)
+                                                                    <span class="badge bg-light text-dark border" style="font-size: 10.5px;">
+                                                                        <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ $cm->bagian }}
+                                                                    </span>
+                                                                @endif
+                                                            </div>
+                                                            <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-0" style="font-size: 10px;" onclick="window.LhuAnnotator.scrollToHighlight({{ $suket->id }}, {{ $cm->id }}, '{{ addslashes($cm->bagian ?? '') }}')">
+                                                                <i class="bi bi-geo-alt-fill me-1"></i>Tunjukkan di Dokumen
+                                                            </button>
+                                                        </div>
+
+                                                        @if($cm->highlight_text)
+                                                            <div class="p-2 rounded bg-warning bg-opacity-25 border border-warning my-2">
+                                                                <div class="text-muted small fw-bold" style="font-size: 10px; text-transform: uppercase;">
+                                                                    <i class="bi bi-highlighter text-warning-emphasis me-1"></i>Bagian / Data yang Salah:
+                                                                </div>
+                                                                <div class="font-monospace small text-dark fw-bold mt-1">
+                                                                    <mark class="bg-warning text-dark px-1 rounded">{{ $cm->highlight_text }}</mark>
+                                                                </div>
+                                                            </div>
+                                                        @endif
+
+                                                        <div class="small text-dark mt-1">
+                                                            <strong class="text-danger"><i class="bi bi-arrow-right-circle-fill me-1"></i>Instruksi Perbaikan:</strong>
+                                                            <div class="mt-1 text-muted" style="white-space: pre-wrap;">{{ $cm->comment }}</div>
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @else
+                                            <div class="text-center py-5 text-muted">
+                                                <i class="bi bi-check-circle fs-2 text-success mb-2 d-block"></i>
+                                                <p class="small mb-0">Tidak ada catatan kesalahan spesifik pada berkas LHU.</p>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         @empty
@@ -773,6 +1047,11 @@
         if (modalPreview && modalPreview.parentElement !== document.body) {
             document.body.appendChild(modalPreview);
         }
+        document.querySelectorAll('.modal-evaluasi-lhu-user').forEach(function(m) {
+            if (m.parentElement !== document.body) {
+                document.body.appendChild(m);
+            }
+        });
 
         const filterBtns = document.querySelectorAll('[data-user-filter]');
         const searchInput = document.getElementById('userSearchInput');
@@ -822,5 +1101,31 @@
             }
         @endif
     });
+</script>
+
+<link rel="stylesheet" href="{{ asset('vendor/pdfjs/pdf_viewer.min.css') }}">
+<link rel="stylesheet" href="{{ asset('css/lhu-annotator.css') }}">
+<script src="{{ asset('vendor/pdfjs/pdf.min.js') }}"></script>
+<script src="{{ asset('js/lhu-annotator.js') }}"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    @foreach($sukets as $suketItem)
+        @if($suketItem->hasLhuDocument())
+            const userModalEl{{ $suketItem->id }} = document.getElementById('modalUserEvaluasiLhu{{ $suketItem->id }}');
+            if (userModalEl{{ $suketItem->id }}) {
+                userModalEl{{ $suketItem->id }}.addEventListener('shown.bs.modal', function () {
+                    window.LhuAnnotator.init({
+                        suketId: {{ $suketItem->id }},
+                        containerId: 'evalUserPdfContainer{{ $suketItem->id }}',
+                        pdfUrl: '{{ route('user.suket.preview-doc', [$suketItem->id, 'lhu']) }}',
+                        comments: @json($suketItem->comments ?? []),
+                        readOnly: true,
+                    });
+                });
+            }
+        @endif
+    @endforeach
+});
 </script>
 @endsection

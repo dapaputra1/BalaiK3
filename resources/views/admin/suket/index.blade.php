@@ -211,7 +211,7 @@
             {{-- Tahap 3: Penyusunan Suket --}}
             @php
                 $isT3 = $activeStage == '3';
-                $canT3 = in_array($currentRole, ['pcu', 'penguji_k3', 'superadmin'], true);
+                $canT3 = in_array($currentRole, ['pcu', 'penguji_k3', 'admin', 'superadmin'], true);
             @endphp
             <div class="col-6 col-md-4 col-xl">
                 <a href="{{ route('suket.index', ['stage' => $isT3 ? null : 3]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT3 ? 'is-active' : '' }}">
@@ -229,7 +229,7 @@
                         @if($canT3)
                             <span class="badge bg-success bg-opacity-25 text-success border border-success-subtle px-1 rounded">Kewenangan Anda</span>
                         @else
-                            <span>PENGUJI K3</span>
+                            <span>PENGUJI / ADMIN</span>
                         @endif
                     </div>
                 </a>
@@ -462,20 +462,41 @@
                                         aria-valuemax="6">
                                     </div>
                                 </div>
-                                {{-- Status QC --}}
+                                {{-- Status Evaluasi Dokumen (Tahap 2) atau QC (Tahap 3 ke atas) --}}
                                 <div>
-                                    @if($suket->qc_status === 'approved')
-                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-1" style="font-size: 10px;">
-                                            <i class="bi bi-check-circle me-1"></i>QC Approved
-                                        </span>
-                                    @elseif($suket->qc_status === 'revision')
-                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-1" style="font-size: 10px;">
-                                            <i class="bi bi-exclamation-triangle me-1"></i>QC Perlu Revisi
-                                        </span>
+                                    @if($suket->status_tahap === 2)
+                                        @if($suket->evaluasi_status === 'rejected')
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-1" style="font-size: 10px;">
+                                                <i class="bi bi-x-circle me-1"></i>Evaluasi Ditolak
+                                            </span>
+                                        @elseif($suket->evaluasi_status === 'approved')
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-1" style="font-size: 10px;">
+                                                <i class="bi bi-check-circle me-1"></i>Evaluasi Disetujui
+                                            </span>
+                                        @else
+                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-1" style="font-size: 10px;">
+                                                <i class="bi bi-clock me-1"></i>Perlu Evaluasi
+                                            </span>
+                                        @endif
+                                        @if($suket->comments && $suket->comments->count() > 0)
+                                            <span class="badge bg-info-subtle text-info border border-info-subtle px-1" style="font-size: 10px;">
+                                                <i class="bi bi-chat-left-text me-1"></i>{{ $suket->comments->count() }}
+                                            </span>
+                                        @endif
                                     @else
-                                        <span class="badge bg-light text-muted border px-1" style="font-size: 10px;">
-                                            QC Pending
-                                        </span>
+                                        @if($suket->qc_status === 'approved')
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-1" style="font-size: 10px;">
+                                                <i class="bi bi-check-circle me-1"></i>QC Approved
+                                            </span>
+                                        @elseif($suket->qc_status === 'revision')
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-1" style="font-size: 10px;">
+                                                <i class="bi bi-exclamation-triangle me-1"></i>QC Perlu Revisi
+                                            </span>
+                                        @else
+                                            <span class="badge bg-light text-muted border px-1" style="font-size: 10px;">
+                                                QC Pending
+                                            </span>
+                                        @endif
                                     @endif
                                 </div>
                             </td>
@@ -566,14 +587,20 @@
                                     </div>
                                 @endif
                                 <div class="text-muted" style="max-width: 220px; font-size: 11px;">
-                                    @if($suket->catatan_evaluasi)
+                                    @if($suket->evaluasi_status === 'rejected')
+                                        <span class="text-danger fw-bold"><i class="bi bi-x-circle me-1"></i>Ditolak Penguji:</span> {{ Str::limit($suket->catatan_evaluasi, 80) }}<br>
+                                    @elseif($suket->catatan_evaluasi)
                                         <strong>Evaluasi:</strong> {{ Str::limit($suket->catatan_evaluasi, 80) }}<br>
                                     @endif
                                     @if($suket->qc_note)
-                                        <strong>QC:</strong> {{ Str::limit($suket->qc_note, 80) }}
+                                        <strong>QC:</strong> {{ Str::limit($suket->qc_note, 80) }}<br>
                                     @endif
                                     @if(!$suket->catatan_evaluasi && !$suket->qc_note)
-                                        {{ Str::limit($suket->catatan, 60) ?: '-' }}
+                                        {{ Str::limit($suket->catatan ?: ('Pengajuan suket didaftarkan melalui Nomor Order ' . $suket->nomor_order), 80) }}
+                                    @else
+                                        <div class="mt-1 text-muted" style="font-size: 10px;">
+                                            <i class="bi bi-info-circle me-1"></i>{{ Str::limit($suket->catatan ?: ('Pengajuan suket didaftarkan melalui Nomor Order ' . $suket->nomor_order), 70) }}
+                                        </div>
                                     @endif
                                 </div>
                                 @if($suket->sent_to_customer_at)
@@ -614,23 +641,33 @@
 
                                     {{-- TOMBOL PROSES TAHAP (Advance Stage) --}}
                                     @if($canProcess && $suket->status_tahap < 6)
-                                        <button
-                                            type="button"
-                                            class="btn btn-sm btn-primary rounded-pill px-3 py-1"
-                                            style="background-color: #15406A; border-color: #15406A; font-size: 11px;"
-                                            data-bs-toggle="modal"
-                                            data-bs-target="#modalAdvance{{ $suket->id }}"
-                                        >
-                                            @if($suket->status_tahap === 2)
-                                                <i class="bi bi-check2-circle me-1"></i> Selesai Evaluasi
-                                            @elseif($suket->status_tahap === 3)
-                                                <i class="bi bi-send-check me-1"></i> Ajukan ke TTD
-                                            @elseif($suket->status_tahap === 4)
-                                                <i class="bi bi-pen me-1"></i> Pengesahan TTD
-                                            @elseif($suket->status_tahap === 5)
-                                                <i class="bi bi-award me-1"></i> Terbitkan Suket
-                                            @endif
-                                        </button>
+                                        @if($suket->status_tahap === 2)
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-primary rounded-pill px-3 py-1"
+                                                style="background-color: #15406A; border-color: #15406A; font-size: 11px;"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalEvaluasiSideBySide{{ $suket->id }}"
+                                            >
+                                                <i class="bi bi-layout-split me-1"></i> Evaluasi Dokumen
+                                            </button>
+                                        @else
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-primary rounded-pill px-3 py-1"
+                                                style="background-color: #15406A; border-color: #15406A; font-size: 11px;"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalAdvance{{ $suket->id }}"
+                                            >
+                                                @if($suket->status_tahap === 3)
+                                                    <i class="bi bi-send-check me-1"></i> Ajukan ke TTD
+                                                @elseif($suket->status_tahap === 4)
+                                                    <i class="bi bi-pen me-1"></i> Pengesahan TTD
+                                                @elseif($suket->status_tahap === 5)
+                                                    <i class="bi bi-award me-1"></i> Terbitkan Suket
+                                                @endif
+                                            </button>
+                                        @endif
                                     @elseif($suket->status_tahap === 6)
                                         @if(!$suket->sent_to_customer_at && in_array($currentRole, ['admin', 'superadmin']))
                                             <button
@@ -653,6 +690,240 @@
                                         </span>
                                     @endif
                                 </div>
+
+                                {{-- MODAL EVALUASI DOKUMEN SIDE-BY-SIDE (TAHAP 2) --}}
+                                @if($suket->status_tahap === 2)
+                                <div class="modal fade text-start" id="modalEvaluasiSideBySide{{ $suket->id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 95vw;">
+                                        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="height: 90vh;">
+                                            <div class="modal-header py-2 px-3 bg-light border-bottom">
+                                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                    <span class="badge bg-primary px-2 py-1 rounded-pill">
+                                                        <i class="bi bi-file-earmark-check me-1"></i>Evaluasi Dokumen LHU (Tahap 2)
+                                                    </span>
+                                                    <h6 class="modal-title fw-bold text-dark mb-0">
+                                                        {{ $suket->nomor_order }} - {{ $suket->perusahaan_nama }}
+                                                    </h6>
+                                                    @if($suket->evaluasi_status === 'rejected')
+                                                        <span class="badge bg-danger rounded-pill"><i class="bi bi-x-circle me-1"></i>Status: Ditolak / Perlu Revisi</span>
+                                                    @elseif($suket->evaluasi_status === 'approved')
+                                                        <span class="badge bg-success rounded-pill"><i class="bi bi-check-circle me-1"></i>Status: Telah Disetujui</span>
+                                                    @else
+                                                        <span class="badge bg-warning text-dark rounded-pill"><i class="bi bi-clock me-1"></i>Status: Menunggu Evaluasi</span>
+                                                    @endif
+                                                </div>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                            </div>
+                                            <div class="modal-body p-0" style="height: calc(90vh - 56px);">
+                                                <div class="row g-0 h-100">
+                                                    {{-- SISI KIRI: PREVIEW DOKUMEN LHU (Ala Google Docs/Word) --}}
+                                                    <div class="col-lg-7 d-flex flex-column h-100 border-end bg-dark bg-opacity-10">
+                                                        <div class="d-flex justify-content-between align-items-center p-2 bg-white border-bottom flex-shrink-0">
+                                                            <div class="d-flex align-items-center gap-1">
+                                                                <span class="small fw-semibold text-muted me-2"><i class="bi bi-file-earmark-text text-danger me-1"></i>Dokumen Uji:</span>
+                                                                @if($suket->hasLhuDocument())
+                                                                    <button type="button" class="btn btn-xs btn-outline-danger active rounded px-2 py-1" onclick="switchEvalDoc('{{ route('suket.preview-doc', [$suket->id, 'lhu']) }}', 'evalIframe{{ $suket->id }}', 'evalImg{{ $suket->id }}', 'pdf')">
+                                                                        <i class="bi bi-file-earmark-pdf me-1"></i>LHU
+                                                                    </button>
+                                                                @endif
+                                                                @if($suket->foto_pengujian_path)
+                                                                    <button type="button" class="btn btn-xs btn-outline-info rounded px-2 py-1" onclick="switchEvalDoc('{{ route('suket.preview-doc', [$suket->id, 'foto']) }}', 'evalIframe{{ $suket->id }}', 'evalImg{{ $suket->id }}', 'image')">
+                                                                        <i class="bi bi-image me-1"></i>Foto
+                                                                    </button>
+                                                                @endif
+                                                                @if($suket->denah_lokasi_path)
+                                                                    <button type="button" class="btn btn-xs btn-outline-warning rounded px-2 py-1" onclick="switchEvalDoc('{{ route('suket.preview-doc', [$suket->id, 'denah']) }}', 'evalIframe{{ $suket->id }}', 'evalImg{{ $suket->id }}', 'image')">
+                                                                        <i class="bi bi-map me-1"></i>Denah
+                                                                    </button>
+                                                                @endif
+                                                            </div>
+                                                            <div>
+                                                                @if($suket->hasLhuDocument())
+                                                                    <a href="{{ route('suket.preview-doc', [$suket->id, 'lhu']) }}" target="_blank" class="btn btn-xs btn-light border rounded px-2 py-1 text-muted" title="Buka di Tab Baru">
+                                                                        <i class="bi bi-box-arrow-up-right me-1"></i>Tab Baru
+                                                                    </a>
+                                                                    <a href="{{ route('suket.download-doc', [$suket->id, 'lhu']) }}" class="btn btn-xs btn-outline-secondary rounded px-2 py-1" title="Unduh File LHU" download>
+                                                                        <i class="bi bi-download me-1"></i>Unduh
+                                                                    </a>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="flex-grow-1 position-relative overflow-y-auto p-3 d-flex flex-column align-items-center" id="evalPdfWrap{{ $suket->id }}" style="background-color: #525659; min-height: 0;">
+                                                            {{-- Floating Action Button ala Google Docs (Muncul otomatis saat teks diseleksi kursor) --}}
+                                                            <div id="gdocsFloatingBtn{{ $suket->id }}" class="gdocs-floating-btn" style="display: none;">
+                                                                <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 py-1 shadow-lg fw-bold d-flex align-items-center gap-1" onmousedown="event.preventDefault(); event.stopPropagation();" onclick="window.LhuAnnotator.onFloatingCommentClick({{ $suket->id }})">
+                                                                    <i class="bi bi-chat-left-text-fill"></i> Tulis Komentar
+                                                                </button>
+                                                            </div>
+
+                                                            @if($suket->hasLhuDocument())
+                                                                {{-- PDF Container dengan PDF.js & TextLayer --}}
+                                                                <div id="evalPdfContainer{{ $suket->id }}" class="w-100 d-flex flex-column align-items-center"></div>
+
+                                                                {{-- Fallback iframe & img --}}
+                                                                <iframe id="evalIframe{{ $suket->id }}" src="" class="w-100 h-100 border-0 rounded" style="display: none; min-height: 75vh;"></iframe>
+                                                                <img id="evalImg{{ $suket->id }}" src="" class="img-fluid mx-auto" style="display: none; max-height: 100%; object-fit: contain;">
+                                                            @else
+                                                                <div class="text-center p-4 text-white">
+                                                                    <i class="bi bi-exclamation-triangle fs-1 text-warning mb-2 d-block"></i>
+                                                                    <h6>Dokumen LHU Belum Terlampir</h6>
+                                                                    <p class="small mb-0 text-white-50">Berkas LHU belum diunggah oleh pemohon atau di-generate otomatis.</p>
+                                                                </div>
+                                                            @endif
+                                                        </div>
+                                                    </div>
+
+                                                    {{-- SISI KANAN: PANEL SOROTAN KESALAHAN & KEPUTUSAN EVALUASI --}}
+                    <div class="col-lg-5 d-flex flex-column h-100 bg-white" style="min-height: 0;">
+                        {{-- Header Sorotan (Tetap di atas) --}}
+                        <div class="p-3 border-bottom bg-light d-flex justify-content-between align-items-center flex-shrink-0">
+                            <div>
+                                <h6 class="fw-bold text-dark mb-0">
+                                    <i class="bi bi-highlighter text-danger me-2"></i>Sorotan Kesalahan & Evaluasi LHU
+                                </h6>
+                                <div class="small text-muted" style="font-size: 11px;">
+                                    Sorot teks/parameter di dokumen (ala Google Docs) untuk menulis komentar koreksi.
+                                </div>
+                            </div>
+                            <span class="badge bg-danger rounded-pill" id="commentBadgeCount{{ $suket->id }}">
+                                {{ $suket->comments ? $suket->comments->count() : 0 }} Poin Sorotan
+                            </span>
+                        </div>
+
+                        {{-- Body Panel Kanan (Scrollable Terpadu - Tidak Terpotong) --}}
+                        <div class="p-3 flex-grow-1 overflow-y-auto d-flex flex-column gap-3" style="min-height: 0;" id="evalSidePanelScroll{{ $suket->id }}">
+                            {{-- 1. Feed Sorotan Kesalahan --}}
+                            <div id="commentFeedList{{ $suket->id }}">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold small text-dark">
+                                        <i class="bi bi-list-check text-danger me-1"></i>Daftar Poin Sorotan ({{ $suket->comments ? $suket->comments->count() : 0 }}):
+                                    </span>
+                                </div>
+
+                                @if($suket->comments && $suket->comments->count() > 0)
+                                    <div class="d-flex flex-column gap-2">
+                                        @foreach($suket->comments as $cmt)
+                                            <div class="card border rounded-3 p-2 shadow-xs border-danger-subtle bg-white" id="comment-card-{{ $suket->id }}-{{ $cmt->id }}">
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <div class="d-flex align-items-center gap-1 flex-wrap">
+                                                        <span class="badge bg-danger text-white" style="font-size: 10px;">
+                                                            <i class="bi bi-exclamation-octagon-fill me-1"></i>Poin #{{ $loop->iteration }}
+                                                        </span>
+                                                        @if($cmt->bagian)
+                                                            <span class="badge bg-light text-dark border" style="font-size: 10px;">
+                                                                <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ $cmt->bagian }}
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                    <div class="d-flex align-items-center gap-1">
+                                                        <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-0" style="font-size: 10px;" onclick="window.LhuAnnotator.scrollToHighlight({{ $suket->id }}, {{ $cmt->id }}, '{{ addslashes($cmt->bagian ?? '') }}')" title="Tunjukkan di dokumen">
+                                                            <i class="bi bi-geo-alt-fill me-1"></i>Tunjukkan
+                                                        </button>
+                                                        <form action="{{ route('suket.comment.delete', [$suket->id, $cmt->id]) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus sorotan kesalahan ini?')">
+                                                            @csrf
+                                                            @method('DELETE')
+                                                            <button type="submit" class="btn btn-link text-danger p-0 ms-1" title="Hapus Sorotan" style="font-size: 12px; line-height: 1;">
+                                                                <i class="bi bi-trash"></i>
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+
+                                                @if($cmt->highlight_text)
+                                                    <div class="p-2 rounded bg-warning bg-opacity-25 border border-warning-subtle my-1">
+                                                        <div class="text-muted" style="font-size: 9.5px; font-weight: 600; text-transform: uppercase;">
+                                                            <i class="bi bi-highlighter text-warning-emphasis me-1"></i>Bagian / Data yang Disorot Salah:
+                                                        </div>
+                                                        <div class="font-monospace small text-dark fw-semibold mt-1" style="font-size: 11px;">
+                                                            <mark class="bg-warning text-dark px-1 rounded">{{ $cmt->highlight_text }}</mark>
+                                                        </div>
+                                                    </div>
+                                                @endif
+
+                                                <div class="small text-dark mt-1" style="font-size: 11.5px;">
+                                                    <strong>Catatan Perbaikan:</strong> {{ $cmt->comment }}
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <div class="alert alert-light border border-dashed text-center py-3 px-3 text-muted mb-0 rounded-3">
+                                        <i class="bi bi-highlighter fs-3 text-secondary mb-1 d-block"></i>
+                                        <div class="small fw-semibold text-dark">Belum ada poin sorotan kesalahan</div>
+                                        <div class="small mt-1 text-muted" style="font-size: 11.5px;">
+                                            Seleksi teks di dokumen LHU di sebelah kiri lalu klik tombol <span class="badge bg-primary text-white"><i class="bi bi-chat-left-text-fill me-1"></i>Tulis Komentar</span>.
+                                        </div>
+                                    </div>
+                                @endif
+                            </div>
+
+                            {{-- 2. Form Tambah Sorotan Bagian yang Salah --}}
+                            <div class="card border rounded-3 p-3 bg-white shadow-xs border-danger-subtle" id="cardAddComment{{ $suket->id }}">
+                                <form id="formAddComment{{ $suket->id }}" action="{{ route('suket.comment', $suket->id) }}" method="POST">
+                                    @csrf
+                                    <input type="hidden" name="target" value="pemohon">
+                                    <div class="fw-bold small text-dark mb-2 d-flex align-items-center justify-content-between">
+                                        <span><i class="bi bi-plus-circle-fill text-danger me-1"></i>Tambah Sorotan Bagian yang Salah:</span>
+                                        <span class="badge bg-danger-subtle text-danger" style="font-size: 9px;">Google Docs Highlight</span>
+                                    </div>
+
+                                    {{-- Chip Pratinjau Teks yang Diseleksi / Disorot --}}
+                                    <div id="selectedHighlightBanner{{ $suket->id }}" class="alert alert-warning py-1 px-2 mb-2 rounded border border-warning-subtle small justify-content-between align-items-center" style="display: none;">
+                                        <div class="text-truncate me-2" style="font-size: 11px;">
+                                            <i class="bi bi-highlighter text-danger me-1"></i><strong>Teks Disorot:</strong> <mark class="bg-warning text-dark px-1 rounded font-monospace" id="selectedHighlightPreview{{ $suket->id }}"></mark>
+                                        </div>
+                                        <button type="button" class="btn-close btn-close-sm" onclick="window.LhuAnnotator.clearActiveSelection({{ $suket->id }})" title="Batalkan Sorotan"></button>
+                                    </div>
+
+                                    <div class="mb-2">
+                                        <label class="form-label small fw-semibold text-muted mb-1" style="font-size: 11px;">Posisi Bagian / Halaman <span class="text-danger">*</span></label>
+                                        <input type="text" name="bagian" id="bagianInput{{ $suket->id }}" class="form-control form-control-sm" placeholder="Contoh: Halaman 2 - Tabel Kebisingan Titik 1" required>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small fw-semibold text-muted mb-1" style="font-size: 11px;">Kutipan Teks / Nilai Data yang Salah</label>
+                                        <textarea name="highlight_text" id="highlightTextInput{{ $suket->id }}" rows="2" class="form-control form-control-sm font-monospace" placeholder="Kutipan teks / nilai data yang salah di dokumen LHU (otomatis terisi saat teks diseleksi di dokumen)..."></textarea>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label class="form-label small fw-semibold text-muted mb-1" style="font-size: 11px;">Catatan / Instruksi Perbaikan <span class="text-danger">*</span></label>
+                                        <textarea name="comment" id="commentInput{{ $suket->id }}" rows="2" class="form-control form-control-sm" placeholder="Tuliskan kenapa salah dan bagaimana seharusnya (instruksi perbaikan)..." required></textarea>
+                                    </div>
+                                    <div class="text-end">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1" style="font-size: 11px;">
+                                            <i class="bi bi-highlighter me-1"></i>Simpan Sorotan
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+
+                            {{-- 3. Form Keputusan Evaluasi (Setujui / Tolak) --}}
+                            <div class="card border rounded-3 p-3 bg-light shadow-xs border-secondary-subtle">
+                                <form action="{{ route('suket.advance', $suket->id) }}" method="POST">
+                                    @csrf
+                                    <label class="form-label small fw-bold text-dark mb-1">
+                                        <i class="bi bi-clipboard-check me-1"></i>Kesimpulan Akhir Telaah Teknis K3:
+                                    </label>
+                                    <textarea name="catatan" rows="2" class="form-control form-control-sm mb-2" placeholder="Tuliskan kesimpulan evaluasi hasil uji berdasarkan Permenaker No. 5/2018 (atau alasan umum jika ditolak)..." required>{{ $suket->catatan_evaluasi }}</textarea>
+                                    <div class="d-flex justify-content-between align-items-center gap-2">
+                                        <button type="submit" name="action" value="reject_evaluasi" class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-semibold" style="font-size: 11px;" onclick="return confirm('Apakah Anda yakin ingin MENOLAK dokumen LHU ini dan mengirimkan daftar poin sorotan kesalahan di atas ke pemohon untuk diperbaiki?')">
+                                            <i class="bi bi-x-circle me-1"></i>Tolak / Minta Revisi LHU
+                                        </button>
+                                        <button type="submit" name="action" value="next" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold" style="font-size: 11px;">
+                                            <i class="bi bi-check-circle me-1"></i>Setujui & Lanjut Tahap 3
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
 
                                 {{-- MODAL ADVANCE STAGE --}}
                                 <div class="modal fade text-start" id="modalAdvance{{ $suket->id }}" tabindex="-1" aria-hidden="true">
@@ -692,55 +963,18 @@
                                                     {{-- FORM KHUSUS TAHAP 2: EVALUASI DOKUMEN --}}
                                                     @if($suket->status_tahap === 2)
                                                         <div class="p-3 bg-light rounded-3 mb-3 border">
-                                                            <h6 class="fw-bold text-dark mb-2">
-                                                                <i class="bi bi-folder2-open text-primary me-2"></i>Dokumen Dasar Evaluasi Penguji K3:
-                                                            </h6>
-                                                            <div class="d-flex flex-wrap gap-2 mb-3">
-                                                                @if($suket->lhu_file_path)
-                                                                    <button 
-                                                                        type="button" 
-                                                                        class="btn btn-sm btn-outline-primary"
-                                                                        onclick="openDocPreview('{{ route('suket.preview-doc', [$suket->id, 'lhu']) }}', 'Dokumen LHU: {{ $suket->nomor_order }}', 'pdf')"
-                                                                    >
-                                                                        <i class="bi bi-eye me-1"></i>Preview Dokumen LHU ({{ $suket->lhu_source === 'auto' ? 'Auto Order' : 'Manual' }})
-                                                                    </button>
-                                                                @else
-                                                                    <span class="text-danger small"><i class="bi bi-exclamation-circle me-1"></i>File LHU belum tersedia</span>
-                                                                @endif
-
-                                                                @if($suket->foto_pengujian_path)
-                                                                    <button 
-                                                                        type="button" 
-                                                                        class="btn btn-sm btn-outline-info"
-                                                                        onclick="openDocPreview('{{ route('suket.preview-doc', [$suket->id, 'foto']) }}', 'Foto Pengujian: {{ $suket->nomor_order }}', 'image')"
-                                                                    >
-                                                                        <i class="bi bi-image me-1"></i>Preview Foto Pengujian
-                                                                    </button>
-                                                                @endif
-
-                                                                @if($suket->denah_lokasi_path)
-                                                                    <button 
-                                                                        type="button" 
-                                                                        class="btn btn-sm btn-outline-warning"
-                                                                        onclick="openDocPreview('{{ route('suket.preview-doc', [$suket->id, 'denah']) }}', 'Denah Lokasi: {{ $suket->nomor_order }}', 'image')"
-                                                                    >
-                                                                        <i class="bi bi-map me-1"></i>Preview Denah Lokasi
-                                                                    </button>
-                                                                @endif
-                                                            </div>
-
                                                             <label class="form-label small fw-semibold text-dark">Hasil Telaah / Evaluasi Teknis K3 <span class="text-danger">*</span></label>
                                                             <textarea 
                                                                 name="catatan" 
                                                                 rows="3" 
                                                                 class="form-control" 
-                                                                placeholder="Tuliskan kesimpulan evaluasi hasil uji berdasarkan Permenaker No. 5/2018 (misal: Seluruh parameter NAB lingkungan kerja memenuhi syarat, tidak ditemukan anomali paparan...)"
+                                                                placeholder="Tuliskan kesimpulan evaluasi hasil uji berdasarkan Permenaker No. 5/2018..."
                                                                 required
                                                             >{{ $suket->catatan_evaluasi }}</textarea>
                                                         </div>
                                                     @endif
 
-                                                    {{-- FORM KHUSUS TAHAP 3: PENYUSUNAN DRAF SUKET --}}
+                                                    {{-- FORM KHUSUS TAHAP 3: PENYUSUNAN DRAF SUKET & PENOMORAN RESMI --}}
                                                     @if($suket->status_tahap === 3)
                                                         <div class="p-3 bg-light rounded-3 mb-3 border">
                                                             <div class="d-flex justify-content-between align-items-center mb-2">
@@ -761,12 +995,48 @@
                                                                 </div>
                                                             </div>
                                                             <p class="small text-muted mb-0">
-                                                                Draf telah disusun otomatis sesuai template resmi. Jika telah disetujui Tim QC, klik tombol di bawah untuk mengajukan ke penandatanganan Kepala Balai.
+                                                                Draf telah disusun otomatis sesuai template resmi. Cantumkan nomor surat resmi di bawah ini sebelum diajukan ke Kepala Balai untuk penandatanganan di Tahap 4.
                                                                 @if($suket->qc_status !== 'approved')
                                                                     <br><span class="text-danger fw-bold"><i class="bi bi-info-circle me-1"></i>Perhatian: Sebelum diajukan ke TTD Kepala Balai, draf ini harus disetujui (Approved) oleh Tim QC terlebih dahulu.</span>
                                                                 @endif
                                                             </p>
                                                         </div>
+
+                                                        {{-- INPUT NOMOR SURAT RESMI PADA TAHAP 3 (SEBELUM TTD TAHAP 4) --}}
+                                                        <div class="p-3 bg-white rounded-3 mb-3 border">
+                                                            <div class="row g-2">
+                                                                <div class="col-md-8">
+                                                                    <label class="form-label small fw-bold text-dark">
+                                                                        Nomor Surat Keterangan Resmi <span class="text-danger">*</span>
+                                                                    </label>
+                                                                    <input 
+                                                                        type="text" 
+                                                                        name="nomor_surat" 
+                                                                        class="form-control fw-bold text-primary" 
+                                                                        placeholder="Contoh: 566/SK-LK/BK3-SBY/IX/2026"
+                                                                        value="{{ $suket->nomor_surat ?: ('566/SK-LK/BK3-SBY/' . \Carbon\Carbon::now()->format('m/Y')) }}"
+                                                                        required
+                                                                    >
+                                                                    <div class="form-text small text-muted" style="font-size: 11px;">
+                                                                        <i class="bi bi-info-circle text-primary me-1"></i>
+                                                                        Nomor surat resmi akan langsung otomatis tercantum pada draf dokumen Word & PDF yang diajukan ke Kepala Balai.
+                                                                    </div>
+                                                                </div>
+                                                                <div class="col-md-4">
+                                                                    <label class="form-label small fw-bold text-dark">
+                                                                        Tanggal Surat <span class="text-danger">*</span>
+                                                                    </label>
+                                                                    <input 
+                                                                        type="date" 
+                                                                        name="tanggal_surat" 
+                                                                        class="form-control" 
+                                                                        value="{{ $suket->tanggal_surat ? \Carbon\Carbon::parse($suket->tanggal_surat)->format('Y-m-d') : \Carbon\Carbon::now()->format('Y-m-d') }}"
+                                                                        required
+                                                                    >
+                                                                </div>
+                                                            </div>
+                                                        </div>
+
                                                         <div class="mb-3">
                                                             <label class="form-label small fw-semibold">Catatan Pengantar ke Kepala Balai (Opsional)</label>
                                                             <textarea name="catatan" rows="2" class="form-control" placeholder="Catatan pengantar draf suket...">{{ $suket->catatan }}</textarea>
@@ -780,7 +1050,7 @@
                                                                 <i class="bi bi-pen-fill text-danger me-2"></i>Pengesahan & Upload Dokumen Bertanda Tangan (TTD / TTE)
                                                             </h6>
                                                             <p class="small text-muted mb-3">
-                                                                Kepala Balai atau Admin dapat meninjau draf dokumen, lalu mengunggah berkas Surat Keterangan yang telah ditandatangani secara basah (scan) atau bersertifikat elektronik (TTE).
+                                                                Kepala Balai atau Admin dapat meninjau draf dokumen (Nomor Surat: <strong>{{ $suket->nomor_surat }}</strong>), lalu mengunggah berkas Surat Keterangan yang telah ditandatangani secara basah (scan) atau bersertifikat elektronik (TTE).
                                                             </p>
                                                             <div class="d-flex gap-2 mb-3">
                                                                 <button 
@@ -832,26 +1102,21 @@
                                                         </div>
                                                     @endif
 
-                                                    {{-- FORM KHUSUS TAHAP 5: PENERBITAN SUKET (INPUT NOMOR SURAT RESMI) --}}
+                                                    {{-- FORM KHUSUS TAHAP 5: PENERBITAN SUKET RESMI --}}
                                                     @if($suket->status_tahap === 5)
                                                         <div class="p-3 bg-light rounded-3 mb-3 border">
-                                                            <div class="mb-3">
-                                                                <label class="form-label small fw-bold text-dark">
-                                                                    Nomor Surat Keterangan Resmi <span class="text-danger">*</span>
-                                                                </label>
-                                                                <input 
-                                                                    type="text" 
-                                                                    name="nomor_surat" 
-                                                                    class="form-control form-control-lg fw-bold text-primary" 
-                                                                    placeholder="Contoh: 566/SK-LK/BK3-SBY/IX/2026"
-                                                                    value="{{ $suket->nomor_surat ?: ('566/SK-LK/BK3-SBY/' . \Carbon\Carbon::now()->format('m/Y')) }}"
-                                                                    required
-                                                                >
-                                                                <div class="form-text small text-muted mt-2">
-                                                                    <i class="bi bi-info-circle text-primary me-1"></i>
-                                                                    <strong>Auto-Replace:</strong> Nomor surat yang Anda simpan di sini akan secara otomatis memperbarui nomor surat pada draf dokumen Word resmi Suket K3 Balai K3.
+                                                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                                                <div>
+                                                                    <span class="text-muted small">Nomor Surat Resmi Suket K3:</span>
+                                                                    <div class="fs-5 fw-bold text-primary">{{ $suket->nomor_surat ?: '-' }}</div>
                                                                 </div>
+                                                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill">
+                                                                    <i class="bi bi-patch-check-fill me-1"></i>Telah Ditandatangani
+                                                                </span>
                                                             </div>
+                                                            <p class="small text-muted mb-0">
+                                                                Dokumen Surat Keterangan K3 telah ditandatangani oleh Kepala Balai. Klik tombol di bawah untuk mengonfirmasi penerbitan suket resmi sebelum diserahkan ke pelanggan di Tahap 6.
+                                                            </p>
                                                         </div>
                                                         <div class="mb-3">
                                                             <label class="form-label small fw-semibold">Catatan Penerbitan (Opsional)</label>
@@ -879,7 +1144,11 @@
                                                 <div class="modal-footer border-0 pt-0">
                                                     <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">Batal</button>
                                                     <button type="submit" class="btn btn-primary rounded-pill px-4" style="background-color: #15406A; border-color: #15406A;">
-                                                        @if($suket->status_tahap === 6)
+                                                        @if($suket->status_tahap === 3)
+                                                            <i class="bi bi-send-check me-1"></i> Simpan Nomor & Ajukan ke TTD
+                                                        @elseif($suket->status_tahap === 5)
+                                                            <i class="bi bi-award me-1"></i> Terbitkan Suket Resmi
+                                                        @elseif($suket->status_tahap === 6)
                                                             <i class="bi bi-send-check me-1"></i> Serahkan Suket ke Pemohon
                                                         @else
                                                             Konfirmasi & Proses Lanjut
@@ -1103,5 +1372,53 @@ function docPreviewLoaded() {
         iframe.style.display = 'block';
     }
 }
+
+function switchEvalDoc(url, iframeId, imgId, type) {
+    const iframe = document.getElementById(iframeId);
+    const img = document.getElementById(imgId);
+    if (!iframe || !img) return;
+
+    if (type === 'image') {
+        iframe.style.display = 'none';
+        img.src = url;
+        img.style.display = 'block';
+    } else {
+        img.style.display = 'none';
+        iframe.src = url;
+        iframe.style.display = 'block';
+    }
+}
+</script>
+
+<link rel="stylesheet" href="{{ asset('vendor/pdfjs/pdf_viewer.min.css') }}">
+<link rel="stylesheet" href="{{ asset('css/lhu-annotator.css') }}">
+<script src="{{ asset('vendor/pdfjs/pdf.min.js') }}"></script>
+<script src="{{ asset('js/lhu-annotator.js') }}"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    @foreach($sukets as $suketItem)
+        @if($suketItem->status_tahap === 2 && $suketItem->hasLhuDocument())
+            const modalEl{{ $suketItem->id }} = document.getElementById('modalEvaluasiSideBySide{{ $suketItem->id }}');
+            if (modalEl{{ $suketItem->id }}) {
+                modalEl{{ $suketItem->id }}.addEventListener('shown.bs.modal', function () {
+                    window.LhuAnnotator.init({
+                        suketId: {{ $suketItem->id }},
+                        containerId: 'evalPdfContainer{{ $suketItem->id }}',
+                        pdfUrl: '{{ route('suket.preview-doc', [$suketItem->id, 'lhu']) }}',
+                        comments: @json($suketItem->comments ?? []),
+                        readOnly: false,
+                        floatingBtnId: 'gdocsFloatingBtn{{ $suketItem->id }}',
+                        highlightBannerId: 'selectedHighlightBanner{{ $suketItem->id }}',
+                        highlightPreviewId: 'selectedHighlightPreview{{ $suketItem->id }}',
+                        highlightTextInputId: 'highlightTextInput{{ $suketItem->id }}',
+                        bagianInputId: 'bagianInput{{ $suketItem->id }}',
+                        commentInputId: 'commentInput{{ $suketItem->id }}',
+                    });
+                });
+            }
+        @endif
+    @endforeach
+});
 </script>
 @endsection

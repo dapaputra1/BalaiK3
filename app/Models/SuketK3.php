@@ -29,6 +29,9 @@ class SuketK3 extends Model
         'lokasi',
         'catatan',
         'catatan_evaluasi',
+        'evaluasi_status',
+        'evaluasi_by',
+        'evaluasi_at',
         'qc_status',
         'qc_note',
         'qc_by',
@@ -55,6 +58,7 @@ class SuketK3 extends Model
         'status_tahap' => 'integer',
         'faktor_k3' => 'array',
         'tanggal_surat' => 'date',
+        'evaluasi_at' => 'datetime',
         'qc_at' => 'datetime',
         'signed_at' => 'datetime',
         'published_at' => 'datetime',
@@ -89,15 +93,15 @@ class SuketK3 extends Model
         3 => [
             'code' => 'penyusunan_suket',
             'label' => 'Penyusunan Suket',
-            'desc' => 'Auto generate draft Suket standar Permenaker 05/2018 & review internal.',
-            'roles' => ['pcu', 'penguji_k3', 'superadmin'],
+            'desc' => 'Auto generate draft Suket standar Permenaker 05/2018, penomoran resmi & review internal.',
+            'roles' => ['admin', 'superadmin', 'pcu', 'penguji_k3'],
             'badge' => 'info',
             'icon' => 'bi-pencil-square',
         ],
         4 => [
             'code' => 'penandatanganan_suket',
             'label' => 'Penandatanganan Suket',
-            'desc' => 'Pengesahan dan penandatanganan (TTE / tanda tangan basah) oleh Kepala Balai & Admin.',
+            'desc' => 'Pengesahan dan penandatanganan berkas ber-Nomor Surat (TTE / tanda tangan basah) oleh Kepala Balai & Admin.',
             'roles' => ['mp', 'kepala_balai', 'admin', 'superadmin'],
             'badge' => 'dark',
             'icon' => 'bi-pen',
@@ -105,7 +109,7 @@ class SuketK3 extends Model
         5 => [
             'code' => 'penerbitan_suket',
             'label' => 'Penerbitan Suket',
-            'desc' => 'Input nomor surat resmi dan penerbitan sah oleh Administrator.',
+            'desc' => 'Verifikasi berkas bertanda tangan dan penerbitan sah oleh Administrator.',
             'roles' => ['admin', 'superadmin'],
             'badge' => 'success',
             'icon' => 'bi-award',
@@ -152,12 +156,31 @@ class SuketK3 extends Model
         if (!$role) {
             return false;
         }
-        return in_array($role, ['qc', 'superadmin'], true);
+        return in_array($role, ['qc', 'admin', 'superadmin'], true);
     }
 
     public function isQcApproved(): bool
     {
         return $this->qc_status === 'approved';
+    }
+
+    public function isEvaluasiRejected(): bool
+    {
+        return $this->evaluasi_status === 'rejected';
+    }
+
+    public function getEffectiveLhuPathAttribute(): ?string
+    {
+        if (!empty($this->lhu_file_path)) {
+            return $this->lhu_file_path;
+        }
+        return $this->permohonan?->draftLhu?->signed_file_path 
+            ?: $this->permohonan?->draftLhu?->final_file_path;
+    }
+
+    public function hasLhuDocument(): bool
+    {
+        return !empty($this->effective_lhu_path);
     }
 
     public function user(): BelongsTo
@@ -168,6 +191,16 @@ class SuketK3 extends Model
     public function permohonan(): BelongsTo
     {
         return $this->belongsTo(Permohonan::class, 'permohonan_id');
+    }
+
+    public function comments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SuketK3Comment::class, 'suket_id')->latest();
+    }
+
+    public function evaluator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'evaluasi_by');
     }
 
     public function qcUser(): BelongsTo
