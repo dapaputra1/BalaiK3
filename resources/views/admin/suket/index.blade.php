@@ -612,8 +612,20 @@
                             <td class="text-end pe-4">
                                 <div class="d-flex justify-content-end align-items-center gap-1 flex-wrap">
 
-                                    {{-- TAHAP 3: Upload Lampiran Revisi Draf Word (Hanya di Penyusunan, bukan saat QC Pending) --}}
+                                    {{-- TAHAP 3: Upload Lampiran Revisi Draf Word & Review Poin QC --}}
                                     @if($suket->status_tahap === 3 && $suket->qc_status !== 'pending' && in_array($currentRole, ['pcu', 'penguji_k3', 'admin', 'superadmin']))
+                                        @if($suket->qc_status === 'revision' && $suket->suketComments && $suket->suketComments->count() > 0)
+                                            <button
+                                                type="button"
+                                                class="btn btn-sm btn-outline-danger rounded-pill px-2 py-1 fw-semibold"
+                                                style="font-size: 11px;"
+                                                data-bs-toggle="modal"
+                                                data-bs-target="#modalReviewQcPoints{{ $suket->id }}"
+                                                title="Lihat Poin Sorotan Kesalahan Draf Suket dari QC"
+                                            >
+                                                <i class="bi bi-highlighter me-1"></i>Poin Sorotan QC ({{ $suket->suketComments->count() }})
+                                            </button>
+                                        @endif
                                         <button
                                             type="button"
                                             class="btn btn-sm btn-outline-secondary rounded-pill px-2 py-1"
@@ -774,6 +786,16 @@
                                                                     </button>
                                                                 @endif
                                                             </div>
+                                                            {{-- Toolbar Mode Alat Sorot (Teks vs Kotak Area Scan) --}}
+                                                            <div class="lhu-annotator-toolbar mx-2 py-1 px-2" data-suket="{{ $suket->id }}">
+                                                                <span class="small fw-semibold text-white-50" style="font-size: 11px;"><i class="bi bi-pen me-1"></i>Alat:</span>
+                                                                <button type="button" class="btn-mode active" data-mode="text" onclick="window.LhuAnnotator.setMode({{ $suket->id }}, 'text')" title="Sorot Teks / Parameter yang dapat diseleksi">
+                                                                    <i class="bi bi-cursor-text"></i> Sorot Teks
+                                                                </button>
+                                                                <button type="button" class="btn-mode" data-mode="box" onclick="window.LhuAnnotator.setMode({{ $suket->id }}, 'box')" title="Klik dan seret (drag) kursor untuk menandai kotak area pada dokumen scan">
+                                                                    <i class="bi bi-bounding-box-circles"></i> Kotak Area Scan
+                                                                </button>
+                                                            </div>
                                                             <div>
                                                                 @if($suket->hasLhuDocument())
                                                                     <a href="{{ route('suket.preview-doc', [$suket->id, 'lhu']) }}" target="_blank" class="btn btn-xs btn-light border rounded px-2 py-1 text-muted" title="Buka di Tab Baru">
@@ -824,23 +846,41 @@
                                 </div>
                             </div>
                             <span class="badge bg-danger rounded-pill" id="commentBadgeCount{{ $suket->id }}">
-                                {{ $suket->comments ? $suket->comments->count() : 0 }} Poin Sorotan
+                                {{ $suket->lhuComments ? $suket->lhuComments->count() : 0 }} Poin Sorotan
                             </span>
                         </div>
 
                         {{-- Body Panel Kanan (Scrollable Terpadu - Tidak Terpotong) --}}
                         <div class="p-3 flex-grow-1 overflow-y-auto d-flex flex-column gap-3" style="min-height: 0;" id="evalSidePanelScroll{{ $suket->id }}">
-                            {{-- 1. Feed Sorotan Kesalahan --}}
+                            {{-- Tanggapan & Penjelasan Revisi dari Pemohon (Jika Pemohon Mengirimkan Tanggapan) --}}
+                            @if(!empty($suket->catatan_revisi_pemohon))
+                                <div class="card border-warning rounded-3 p-3 bg-warning bg-opacity-10 shadow-xs border-1">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-bold text-dark small d-flex align-items-center gap-1">
+                                            <i class="bi bi-person-check-fill text-warning fs-6"></i>
+                                            <span>Penjelasan / Tanggapan Revisi Pemohon:</span>
+                                        </span>
+                                        @if($suket->revisi_pemohon_at)
+                                            <span class="badge bg-white text-dark border" style="font-size: 10px;">
+                                                <i class="bi bi-clock me-1"></i>{{ $suket->revisi_pemohon_at->diffForHumans() }}
+                                            </span>
+                                        @endif
+                                    </div>
+                                    <div class="p-2 rounded bg-white border border-warning-subtle small text-dark mt-1" style="white-space: pre-wrap;">{{ $suket->catatan_revisi_pemohon }}</div>
+                                </div>
+                            @endif
+
+                            {{-- 1. Feed Sorotan Kesalahan LHU --}}
                             <div id="commentFeedList{{ $suket->id }}">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <span class="fw-bold small text-dark">
-                                        <i class="bi bi-list-check text-danger me-1"></i>Daftar Poin Sorotan ({{ $suket->comments ? $suket->comments->count() : 0 }}):
+                                        <i class="bi bi-list-check text-danger me-1"></i>Daftar Poin Sorotan Dokumen LHU ({{ $suket->lhuComments ? $suket->lhuComments->count() : 0 }}):
                                     </span>
                                 </div>
 
-                                @if($suket->comments && $suket->comments->count() > 0)
+                                @if($suket->lhuComments && $suket->lhuComments->count() > 0)
                                     <div class="d-flex flex-column gap-2">
-                                        @foreach($suket->comments as $cmt)
+                                        @foreach($suket->lhuComments as $cmt)
                                             <div class="card border rounded-3 p-2 shadow-xs border-danger-subtle bg-white" id="comment-card-{{ $suket->id }}-{{ $cmt->id }}">
                                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                                     <div class="d-flex align-items-center gap-1 flex-wrap">
@@ -879,7 +919,7 @@
                                                 @endif
 
                                                 <div class="small text-dark mt-1" style="font-size: 11.5px;">
-                                                    <strong>Catatan Perbaikan:</strong> {{ $cmt->comment }}
+                                                    <strong>Instruksi Koreksi Evaluator:</strong> {{ $cmt->comment }}
                                                 </div>
                                             </div>
                                         @endforeach
@@ -900,6 +940,7 @@
                                 <form id="formAddComment{{ $suket->id }}" action="{{ route('suket.comment', $suket->id) }}" method="POST">
                                     @csrf
                                     <input type="hidden" name="target" value="pemohon">
+                                    <input type="hidden" name="document_type" value="lhu">
                                     <div class="fw-bold small text-dark mb-2 d-flex align-items-center justify-content-between">
                                         <span><i class="bi bi-plus-circle-fill text-danger me-1"></i>Tambah Sorotan Bagian yang Salah:</span>
                                         <span class="badge bg-danger-subtle text-danger" style="font-size: 9px;">Google Docs Highlight</span>
@@ -942,8 +983,8 @@
                                     </label>
                                     <textarea name="catatan" rows="2" class="form-control form-control-sm mb-2" placeholder="Tuliskan kesimpulan evaluasi hasil uji berdasarkan Permenaker No. 5/2018 (atau alasan umum jika ditolak)..." required>{{ $suket->catatan_evaluasi }}</textarea>
                                     <div class="d-flex justify-content-between align-items-center gap-2">
-                                        <button type="submit" name="action" value="reject_evaluasi" class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-semibold" style="font-size: 11px;" onclick="return confirm('Apakah Anda yakin ingin MENOLAK dokumen LHU ini dan mengirimkan daftar poin sorotan kesalahan di atas ke pemohon untuk diperbaiki?')">
-                                            <i class="bi bi-x-circle me-1"></i>Tolak / Minta Revisi LHU
+                                        <button type="submit" name="action" value="reject_evaluasi" class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-semibold" style="font-size: 11px;" onclick="return confirm('Apakah Anda yakin ingin meminta revisi dokumen/LHU ke pemohon beserta daftar poin sorotan kesalahan di atas?')">
+                                            <i class="bi bi-arrow-return-left me-1"></i>Minta Revisi ke Pemohon
                                         </button>
                                         <button type="submit" name="action" value="next" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold" style="font-size: 11px;">
                                             <i class="bi bi-check-circle me-1"></i>Setujui & Lanjut Tahap 3
@@ -1037,12 +1078,24 @@
                                                         </div>
 
                                                         @if($suket->qc_status === 'revision')
-                                                            <div class="alert alert-warning d-flex align-items-start gap-2 p-2 mb-3 rounded-3 small">
-                                                                <i class="bi bi-exclamation-triangle-fill text-warning fs-6 mt-1"></i>
-                                                                <div>
-                                                                    <strong>Catatan Arahan Revisi QC Sebelumnya:</strong><br>
-                                                                    {{ $suket->qc_note ?: 'Mohon lakukan perbaikan draf dokumen sesuai klausul rekomendasi sebelum diajukan kembali ke QC.' }}
+                                                            <div class="alert alert-warning p-3 mb-3 rounded-3 small border border-warning-subtle">
+                                                                <div class="d-flex align-items-start gap-2">
+                                                                    <i class="bi bi-exclamation-triangle-fill text-warning fs-5 mt-1"></i>
+                                                                    <div class="flex-grow-1">
+                                                                        <strong>Catatan Arahan Revisi QC Sebelumnya:</strong><br>
+                                                                        {{ $suket->qc_note ?: 'Mohon lakukan perbaikan draf dokumen sesuai klausul rekomendasi sebelum diajukan kembali ke QC.' }}
+                                                                    </div>
                                                                 </div>
+                                                                @if($suket->suketComments && $suket->suketComments->count() > 0)
+                                                                    <div class="mt-2 pt-2 border-top border-warning-subtle d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                                                        <span class="fw-semibold text-dark">
+                                                                            <i class="bi bi-highlighter text-danger me-1"></i>Terdapat <strong>{{ $suket->suketComments->count() }} Poin Sorotan Kesalahan</strong> dari QC
+                                                                        </span>
+                                                                        <button type="button" class="btn btn-xs btn-outline-dark rounded-pill px-2 py-1 shadow-xs fw-semibold" data-bs-toggle="modal" data-bs-target="#modalReviewQcPoints{{ $suket->id }}">
+                                                                            <i class="bi bi-eye me-1"></i>Lihat Sorotan Dokumen
+                                                                        </button>
+                                                                    </div>
+                                                                @endif
                                                             </div>
                                                         @endif
 
@@ -1209,110 +1262,427 @@
                                 </div>
                                 @endif
 
-                                {{-- MODAL GERBANG QC (KHUSUS ROLE QC / SUPERADMIN - Tahap 3 Pending QC) --}}
+                                {{-- MODAL GERBANG QC (KHUSUS ROLE QC / SUPERADMIN - Tahap 3 Pending QC) - SIDE BY SIDE DRAF SUKET ANNOTATOR --}}
                                 @if($canQc && $suket->status_tahap === 3 && $suket->qc_status === 'pending')
                                 <div class="modal fade text-start" id="modalQc{{ $suket->id }}" tabindex="-1" aria-hidden="true">
-                                    <div class="modal-dialog modal-dialog-centered modal-lg">
-                                        <div class="modal-content border-0 shadow rounded-4">
-                                            <form action="{{ route('suket.qc-review', $suket->id) }}" method="POST">
-                                                @csrf
-                                                <div class="modal-header border-0 pb-0">
-                                                    <h5 class="modal-title fw-bold text-dark">
-                                                        <i class="bi bi-shield-check text-warning me-2"></i>Gerbang Quality Control (QC)
-                                                    </h5>
+                                    <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 95vw;">
+                                        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="height: 90vh;">
+                                            <div class="modal-header py-2 px-3 bg-light border-bottom">
+                                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                    <span class="badge bg-warning text-dark px-2 py-1 rounded-pill">
+                                                        <i class="bi bi-shield-check me-1"></i>Gerbang Review QC (Quality Control)
+                                                    </span>
+                                                    <h6 class="modal-title fw-bold text-dark mb-0">
+                                                        {{ $suket->nomor_order }} - {{ $suket->perusahaan_nama }}
+                                                    </h6>
+                                                    <span class="badge bg-primary rounded-pill">
+                                                        <i class="bi bi-clock-history me-1"></i>Menunggu Verifikasi Draf Suket
+                                                    </span>
+                                                </div>
+                                                <div class="d-flex align-items-center gap-2">
                                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                 </div>
-                                                <div class="modal-body py-3">
-                                                    <p class="small text-muted mb-3">
-                                                        Periksa kelayakan draf surat keterangan nomor order <strong>{{ $suket->nomor_order }}</strong> sebelum diajukan ke Kepala Balai untuk penandatanganan.
-                                                    </p>
-
-                                                    <div class="d-flex gap-2 mb-3">
-                                                        <button 
-                                                            type="button" 
-                                                            class="btn btn-sm btn-outline-primary"
-                                                            onclick="openDocPreview('{{ route('suket.preview-doc', [$suket->id, 'draft']) }}', 'Draf Suket: {{ $suket->nomor_order }}', 'html')"
-                                                        >
-                                                            <i class="bi bi-eye me-1"></i>Preview Draf Suket
-                                                        </button>
-                                                        @if($suket->hasLhuDocument())
-                                                            <button 
-                                                                type="button" 
-                                                                class="btn btn-sm btn-outline-secondary"
-                                                                onclick="openDocPreview('{{ route('suket.preview-doc', [$suket->id, 'lhu']) }}', 'LHU: {{ $suket->nomor_order }}', 'pdf')"
-                                                            >
-                                                                <i class="bi bi-file-earmark-pdf me-1"></i>Lihat LHU
-                                                            </button>
-                                                        @endif
-                                                    </div>
-
-                                                    <div class="mb-3">
-                                                        <label class="form-label small fw-bold text-dark">Keputusan Review QC <span class="text-danger">*</span></label>
-                                                        <div class="d-flex gap-3 flex-wrap p-2 bg-light rounded-3 border">
-                                                            <div class="form-check">
-                                                                <input class="form-check-input" type="radio" name="action" id="qc_app_{{ $suket->id }}" value="approve" checked onchange="toggleQcNomorSurat('{{ $suket->id }}', true)">
-                                                                <label class="form-check-label text-success fw-bold small" for="qc_app_{{ $suket->id }}">
-                                                                    <i class="bi bi-check-circle me-1"></i>Setujui & Tetapkan Nomor Surat (Lanjut ke TTD)
-                                                                </label>
+                                            </div>
+                                            <div class="modal-body p-0" style="height: calc(90vh - 56px);">
+                                                <div class="row g-0 h-100">
+                                                    {{-- SISI KIRI: PREVIEW DRAF SUKET DENGAN ANNOTATOR (PDF.js Text & Box Area) --}}
+                                                    <div class="col-lg-7 d-flex flex-column h-100 border-end bg-dark bg-opacity-10">
+                                                        <div class="d-flex justify-content-between align-items-center p-2 bg-white border-bottom flex-shrink-0 flex-wrap gap-1">
+                                                            <div class="d-flex align-items-center gap-1">
+                                                                <span class="small fw-semibold text-muted me-2"><i class="bi bi-file-earmark-text text-primary me-1"></i>Dokumen:</span>
+                                                                <button type="button" id="btnSwitchQcDraft{{ $suket->id }}" class="btn btn-xs btn-outline-primary active rounded px-2 py-1" onclick="switchQcDoc('{{ route('suket.preview-doc', [$suket->id, 'draft_pdf']) }}', 'qcPdfContainer{{ $suket->id }}', 'qcIframe{{ $suket->id }}', 'pdf', 'qc_{{ $suket->id }}', this)">
+                                                                    <i class="bi bi-file-earmark-check me-1"></i>Draf Suket
+                                                                </button>
+                                                                @if($suket->hasLhuDocument())
+                                                                    <button type="button" id="btnSwitchQcLhu{{ $suket->id }}" class="btn btn-xs btn-outline-secondary rounded px-2 py-1" onclick="switchQcDoc('{{ route('suket.preview-doc', [$suket->id, 'lhu']) }}', 'qcPdfContainer{{ $suket->id }}', 'qcIframe{{ $suket->id }}', 'pdf', 'qc_{{ $suket->id }}', this)">
+                                                                        <i class="bi bi-file-earmark-pdf me-1"></i>LHU (Ref)
+                                                                    </button>
+                                                                @endif
                                                             </div>
-                                                            <div class="form-check">
-                                                                <input class="form-check-input" type="radio" name="action" id="qc_rej_{{ $suket->id }}" value="revision" onchange="toggleQcNomorSurat('{{ $suket->id }}', false)">
-                                                                <label class="form-check-label text-danger fw-bold small" for="qc_rej_{{ $suket->id }}">
-                                                                    <i class="bi bi-arrow-return-left me-1"></i>Kembalikan ke Penyusunan (Perlu Revisi)
-                                                                </label>
+                                                            {{-- Toolbar Mode Alat Sorot (Teks vs Kotak Area Scan) --}}
+                                                            <div class="lhu-annotator-toolbar mx-2 py-1 px-2" data-suket="qc_{{ $suket->id }}">
+                                                                <span class="small fw-semibold text-white-50" style="font-size: 11px;"><i class="bi bi-pen me-1"></i>Alat:</span>
+                                                                <button type="button" class="btn-mode active" data-mode="text" onclick="window.LhuAnnotator.setMode('qc_{{ $suket->id }}', 'text')" title="Sorot Teks / Klausul Draf Suket yang dapat diseleksi">
+                                                                    <i class="bi bi-cursor-text"></i> Sorot Teks
+                                                                </button>
+                                                                <button type="button" class="btn-mode" data-mode="box" onclick="window.LhuAnnotator.setMode('qc_{{ $suket->id }}', 'box')" title="Klik dan seret (drag) kursor untuk menandai kotak area pada dokumen suket">
+                                                                    <i class="bi bi-bounding-box-circles"></i> Kotak Area Scan
+                                                                </button>
                                                             </div>
+                                                            <div class="d-flex align-items-center gap-1">
+                                                                <a href="{{ route('suket.preview-doc', [$suket->id, 'draft']) }}" target="_blank" class="btn btn-xs btn-light border rounded px-2 py-1 text-muted" title="Buka Draf Format Asli di Tab Baru">
+                                                                    <i class="bi bi-box-arrow-up-right me-1"></i>Tab Baru
+                                                                </a>
+                                                                <a href="{{ route('suket.download-doc', [$suket->id, 'draft']) }}" class="btn btn-xs btn-outline-secondary rounded px-2 py-1" title="Unduh File Draf Word" download>
+                                                                    <i class="bi bi-download me-1"></i>Unduh Word
+                                                                </a>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="flex-grow-1 position-relative overflow-y-auto p-3 d-flex flex-column align-items-center" id="qcPdfWrap{{ $suket->id }}" style="background-color: #525659; min-height: 0;">
+                                                            {{-- Floating Action Button ala Google Docs (Muncul otomatis saat teks diseleksi kursor) --}}
+                                                            <div id="qcFloatingBtn{{ $suket->id }}" class="gdocs-floating-btn" style="display: none;">
+                                                                <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 py-1 shadow-lg fw-bold d-flex align-items-center gap-1" onmousedown="event.preventDefault(); event.stopPropagation();" onclick="window.LhuAnnotator.onFloatingCommentClick('qc_{{ $suket->id }}')">
+                                                                    <i class="bi bi-chat-left-text-fill"></i> Tulis Komentar QC
+                                                                </button>
+                                                            </div>
+
+                                                            {{-- PDF Container dengan PDF.js & TextLayer --}}
+                                                            <div id="qcPdfContainer{{ $suket->id }}" class="w-100 d-flex flex-column align-items-center"></div>
+
+                                                            {{-- Fallback iframe --}}
+                                                            <iframe id="qcIframe{{ $suket->id }}" src="" class="w-100 h-100 border-0 rounded" style="display: none; min-height: 75vh;"></iframe>
                                                         </div>
                                                     </div>
 
-                                                    {{-- FORM INPUT NOMOR SURAT RESMI DI QC --}}
-                                                    <div class="p-3 bg-white rounded-3 mb-3 border shadow-sm" id="qcNomorWrap{{ $suket->id }}">
-                                                        <div class="row g-2">
-                                                            <div class="col-md-8">
-                                                                <label class="form-label small fw-bold text-dark">
-                                                                    Nomor Surat Keterangan Resmi <span class="text-danger" id="qcNomorStar{{ $suket->id }}">*</span>
-                                                                </label>
-                                                                <input 
-                                                                    type="text" 
-                                                                    name="nomor_surat" 
-                                                                    id="qcNomorInput{{ $suket->id }}" 
-                                                                    class="form-control fw-bold text-primary" 
-                                                                    placeholder="Contoh: 566/SK-LK/BK3-SBY/IX/2026"
-                                                                    value="{{ $suket->nomor_surat ?: ('566/SK-LK/BK3-SBY/' . \Carbon\Carbon::now()->format('m/Y')) }}"
-                                                                    required
-                                                                >
-                                                                <div class="form-text small text-muted" style="font-size: 11px;">
-                                                                    <i class="bi bi-info-circle text-primary me-1"></i>
-                                                                    Nomor surat resmi yang ditetapkan Tim QC akan langsung tercantum pada draf dokumen yang diajukan ke Kepala Balai.
+                                                    {{-- SISI KANAN: PANEL SOROTAN KESALAHAN & KEPUTUSAN REVIEW QC --}}
+                                                    <div class="col-lg-5 d-flex flex-column h-100 bg-white" style="min-height: 0;">
+                                                        {{-- Header Sorotan --}}
+                                                        <div class="p-3 border-bottom bg-light d-flex justify-content-between align-items-center flex-shrink-0">
+                                                            <div>
+                                                                <h6 class="fw-bold text-dark mb-0">
+                                                                    <i class="bi bi-shield-check text-warning me-2"></i>Sorotan Kesalahan & Evaluasi SUKET (QC)
+                                                                </h6>
+                                                                <div class="small text-muted" style="font-size: 11px;">
+                                                                    Sorot teks/klausul di draf suket untuk menandai koreksi yang harus diperbaiki penguji.
                                                                 </div>
                                                             </div>
-                                                            <div class="col-md-4">
-                                                                <label class="form-label small fw-bold text-dark">
-                                                                    Tanggal Surat <span class="text-danger">*</span>
-                                                                </label>
-                                                                <input 
-                                                                    type="date" 
-                                                                    name="tanggal_surat" 
-                                                                    id="qcTanggalInput{{ $suket->id }}"
-                                                                    class="form-control" 
-                                                                    value="{{ $suket->tanggal_surat ? \Carbon\Carbon::parse($suket->tanggal_surat)->format('Y-m-d') : \Carbon\Carbon::now()->format('Y-m-d') }}"
-                                                                    required
-                                                                >
+                                                            <span class="badge bg-warning text-dark rounded-pill" id="qcCommentBadgeCount{{ $suket->id }}">
+                                                                {{ $suket->suketComments ? $suket->suketComments->count() : 0 }} Poin Sorotan Suket
+                                                            </span>
+                                                        </div>
+
+                                                        {{-- Body Panel Kanan (Scrollable) --}}
+                                                        <div class="p-3 flex-grow-1 overflow-y-auto d-flex flex-column gap-3" style="min-height: 0;" id="qcSidePanelScroll{{ $suket->id }}">
+                                                            {{-- Catatan Pengantar dari Penguji / Penyusun Suket --}}
+                                                            @if(!empty($suket->catatan))
+                                                                <div class="card border-primary rounded-3 p-3 bg-primary bg-opacity-10 shadow-xs border-1">
+                                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                                        <span class="fw-bold text-dark small d-flex align-items-center gap-1">
+                                                                            <i class="bi bi-chat-left-quote-fill text-primary fs-6"></i>
+                                                                            <span>Catatan Pengantar dari Penguji K3:</span>
+                                                                        </span>
+                                                                    </div>
+                                                                    <div class="p-2 rounded bg-white border border-primary-subtle small text-dark mt-1" style="white-space: pre-wrap;">{{ $suket->catatan }}</div>
+                                                                </div>
+                                                            @endif
+
+                                                            {{-- 1. Feed Sorotan Kesalahan Draf Suket --}}
+                                                            <div id="qcCommentFeedList{{ $suket->id }}">
+                                                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                                                    <span class="fw-bold small text-dark">
+                                                                        <i class="bi bi-list-check text-warning me-1"></i>Daftar Poin Sorotan Draf Suket ({{ $suket->suketComments ? $suket->suketComments->count() : 0 }}):
+                                                                    </span>
+                                                                </div>
+
+                                                                @if($suket->suketComments && $suket->suketComments->count() > 0)
+                                                                    <div class="d-flex flex-column gap-2">
+                                                                        @foreach($suket->suketComments as $cmt)
+                                                                            <div class="card border rounded-3 p-2 shadow-xs border-warning-subtle bg-white" id="comment-card-qc_{{ $suket->id }}-{{ $cmt->id }}">
+                                                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                                                    <div class="d-flex align-items-center gap-1 flex-wrap">
+                                                                                        <span class="badge bg-warning text-dark" style="font-size: 10px;">
+                                                                                            <i class="bi bi-exclamation-octagon-fill me-1"></i>Poin #{{ $loop->iteration }}
+                                                                                        </span>
+                                                                                        @if($cmt->bagian)
+                                                                                            <span class="badge bg-light text-dark border" style="font-size: 10px;">
+                                                                                                <i class="bi bi-geo-alt-fill text-warning me-1"></i>{{ $cmt->bagian }}
+                                                                                            </span>
+                                                                                        @endif
+                                                                                    </div>
+                                                                                    <div class="d-flex align-items-center gap-1">
+                                                                                        <button type="button" class="btn btn-xs btn-outline-warning rounded-pill px-2 py-0 text-dark" style="font-size: 10px;" onclick="window.LhuAnnotator.scrollToHighlight('qc_{{ $suket->id }}', {{ $cmt->id }}, '{{ addslashes($cmt->bagian ?? '') }}')" title="Tunjukkan di dokumen">
+                                                                                            <i class="bi bi-geo-alt-fill me-1"></i>Tunjukkan
+                                                                                        </button>
+                                                                                        <form action="{{ route('suket.comment.delete', [$suket->id, $cmt->id]) }}" method="POST" class="d-inline" onsubmit="return confirm('Hapus sorotan kesalahan draf suket ini?')">
+                                                                                            @csrf
+                                                                                            @method('DELETE')
+                                                                                            <button type="submit" class="btn btn-link text-danger p-0 ms-1" title="Hapus Sorotan" style="font-size: 12px; line-height: 1;">
+                                                                                                <i class="bi bi-trash"></i>
+                                                                                            </button>
+                                                                                        </form>
+                                                                                    </div>
+                                                                                </div>
+
+                                                                                @if($cmt->highlight_text)
+                                                                                    <div class="p-2 rounded bg-warning bg-opacity-25 border border-warning-subtle my-1">
+                                                                                        <div class="text-muted" style="font-size: 9.5px; font-weight: 600; text-transform: uppercase;">
+                                                                                            <i class="bi bi-highlighter text-warning-emphasis me-1"></i>Klausul / Teks yang Disorot Salah:
+                                                                                        </div>
+                                                                                        <div class="font-monospace small text-dark fw-semibold mt-1" style="font-size: 11px;">
+                                                                                            <mark class="bg-warning text-dark px-1 rounded">{{ $cmt->highlight_text }}</mark>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                @endif
+
+                                                                                <div class="small text-dark mt-1" style="font-size: 11.5px;">
+                                                                                    <strong>Catatan / Arahan Tim QC:</strong> {{ $cmt->comment }}
+                                                                                </div>
+                                                                            </div>
+                                                                        @endforeach
+                                                                    </div>
+                                                                @else
+                                                                    <div class="alert alert-light border border-dashed text-center py-3 px-3 text-muted mb-0 rounded-3">
+                                                                        <i class="bi bi-highlighter fs-3 text-secondary mb-1 d-block"></i>
+                                                                        <div class="small fw-semibold text-dark">Belum ada poin sorotan pada draf suket</div>
+                                                                        <div class="small mt-1 text-muted" style="font-size: 11.5px;">
+                                                                            Seleksi teks atau buat kotak area di dokumen draf suket di sebelah kiri, lalu klik <span class="badge bg-primary text-white"><i class="bi bi-chat-left-text-fill me-1"></i>Tulis Komentar QC</span>.
+                                                                        </div>
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+
+                                                            {{-- 2. Form Tambah Sorotan Draf Suket --}}
+                                                            <div class="card border rounded-3 p-3 bg-white shadow-xs border-warning-subtle" id="cardAddCommentqc_{{ $suket->id }}">
+                                                                <form id="formAddCommentqc_{{ $suket->id }}" action="{{ route('suket.comment', $suket->id) }}" method="POST">
+                                                                    @csrf
+                                                                    <input type="hidden" name="target" value="internal">
+                                                                    <input type="hidden" name="document_type" value="suket">
+                                                                    <div class="fw-bold small text-dark mb-2 d-flex align-items-center justify-content-between">
+                                                                        <span><i class="bi bi-plus-circle-fill text-warning me-1"></i>Tambah Sorotan Koreksi Draf Suket:</span>
+                                                                        <span class="badge bg-warning-subtle text-dark" style="font-size: 9px;">Annotator QC</span>
+                                                                    </div>
+
+                                                                    {{-- Chip Pratinjau Teks yang Diseleksi / Disorot --}}
+                                                                    <div id="qcSelectedHighlightBanner{{ $suket->id }}" class="alert alert-warning py-1 px-2 mb-2 rounded border border-warning-subtle small justify-content-between align-items-center" style="display: none;">
+                                                                        <div class="text-truncate me-2" style="font-size: 11px;">
+                                                                            <i class="bi bi-highlighter text-warning-emphasis me-1"></i><strong>Teks Disorot:</strong> <mark class="bg-warning text-dark px-1 rounded font-monospace" id="qcSelectedHighlightPreview{{ $suket->id }}"></mark>
+                                                                        </div>
+                                                                        <button type="button" class="btn-close btn-close-sm" onclick="window.LhuAnnotator.clearActiveSelection('qc_{{ $suket->id }}')" title="Batalkan Sorotan"></button>
+                                                                    </div>
+
+                                                                    <div class="mb-2">
+                                                                        <label class="form-label small fw-semibold text-muted mb-1" style="font-size: 11px;">Posisi Bagian / Klausul / Halaman <span class="text-danger">*</span></label>
+                                                                        <input type="text" name="bagian" id="qcBagianInput{{ $suket->id }}" class="form-control form-control-sm" placeholder="Contoh: Halaman 1 - Paragraf Pertimbangan / Tabel Faktor Bahaya" required>
+                                                                    </div>
+                                                                    <div class="mb-2">
+                                                                        <label class="form-label small fw-semibold text-muted mb-1" style="font-size: 11px;">Kutipan Teks / Nilai Klausul yang Salah</label>
+                                                                        <textarea name="highlight_text" id="qcHighlightTextInput{{ $suket->id }}" rows="2" class="form-control form-control-sm font-monospace" placeholder="Kutipan teks yang salah di draf suket (otomatis terisi saat diseleksi di dokumen)..."></textarea>
+                                                                    </div>
+                                                                    <div class="mb-2">
+                                                                        <label class="form-label small fw-semibold text-muted mb-1" style="font-size: 11px;">Arahan Koreksi / Klausul Pengganti <span class="text-danger">*</span></label>
+                                                                        <textarea name="comment" id="qcCommentInput{{ $suket->id }}" rows="2" class="form-control form-control-sm" placeholder="Jelaskan kesalahan dan apa yang perlu diubah oleh Penguji K3..." required></textarea>
+                                                                    </div>
+                                                                    <div class="text-end">
+                                                                        <button type="submit" class="btn btn-sm btn-warning text-dark rounded-pill px-3 shadow-xs fw-semibold">
+                                                                            <i class="bi bi-check-circle me-1"></i> Simpan Poin Sorotan Suket
+                                                                        </button>
+                                                                    </div>
+                                                                </form>
+                                                            </div>
+
+                                                            {{-- 3. Form Keputusan Akhir Review QC --}}
+                                                            <div class="card border rounded-3 p-3 bg-light shadow-xs border-primary-subtle">
+                                                                <form action="{{ route('suket.qc-review', $suket->id) }}" method="POST">
+                                                                    @csrf
+                                                                    <div class="fw-bold small text-dark mb-2">
+                                                                        <i class="bi bi-shield-check text-primary me-1"></i>Keputusan Final Review QC
+                                                                    </div>
+
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label small fw-bold text-dark">Pilih Keputusan: <span class="text-danger">*</span></label>
+                                                                        <div class="d-flex flex-column gap-2 p-2 bg-white rounded-3 border">
+                                                                            <div class="form-check">
+                                                                                <input class="form-check-input" type="radio" name="action" id="qc_app_{{ $suket->id }}" value="approve" checked onchange="toggleQcNomorSurat('{{ $suket->id }}', true)">
+                                                                                <label class="form-check-label text-success fw-bold small" for="qc_app_{{ $suket->id }}">
+                                                                                    <i class="bi bi-check-circle me-1"></i>Setujui & Tetapkan Nomor Surat (Lanjut ke TTD)
+                                                                                </label>
+                                                                            </div>
+                                                                            <div class="form-check">
+                                                                                <input class="form-check-input" type="radio" name="action" id="qc_rej_{{ $suket->id }}" value="revision" onchange="toggleQcNomorSurat('{{ $suket->id }}', false)">
+                                                                                <label class="form-check-label text-danger fw-bold small" for="qc_rej_{{ $suket->id }}">
+                                                                                    <i class="bi bi-arrow-return-left me-1"></i>Kembalikan ke Penyusunan (Perlu Revisi)
+                                                                                </label>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {{-- Form Nomor Surat (Aktif saat Setujui) --}}
+                                                                    <div class="p-3 bg-white rounded-3 mb-3 border shadow-xs" id="qcNomorWrap{{ $suket->id }}">
+                                                                        <div class="mb-2">
+                                                                            <label class="form-label small fw-bold text-dark">
+                                                                                Nomor Surat Keterangan Resmi <span class="text-danger" id="qcNomorStar{{ $suket->id }}">*</span>
+                                                                            </label>
+                                                                            <input 
+                                                                                type="text" 
+                                                                                name="nomor_surat" 
+                                                                                id="qcNomorInput{{ $suket->id }}" 
+                                                                                class="form-control form-control-sm fw-bold text-primary" 
+                                                                                placeholder="Contoh: 566/SK-LK/BK3-SBY/IX/2026"
+                                                                                value="{{ $suket->nomor_surat ?: ('566/SK-LK/BK3-SBY/' . \Carbon\Carbon::now()->format('m/Y')) }}"
+                                                                                required
+                                                                            >
+                                                                        </div>
+                                                                        <div class="mb-0">
+                                                                            <label class="form-label small fw-bold text-dark">
+                                                                                Tanggal Surat <span class="text-danger" id="qcTglStar{{ $suket->id }}">*</span>
+                                                                            </label>
+                                                                            <input 
+                                                                                type="date" 
+                                                                                name="tanggal_surat" 
+                                                                                id="qcTanggalInput{{ $suket->id }}"
+                                                                                class="form-control form-control-sm" 
+                                                                                value="{{ $suket->tanggal_surat ? \Carbon\Carbon::parse($suket->tanggal_surat)->format('Y-m-d') : \Carbon\Carbon::now()->format('Y-m-d') }}"
+                                                                                required
+                                                                            >
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {{-- Catatan / Instruksi Tambahan QC --}}
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label small fw-semibold text-dark">Catatan / Arahan Umum QC (Wajib jika Kembalikan)</label>
+                                                                        <textarea name="catatan" id="qcCatatan{{ $suket->id }}" rows="2" class="form-control form-control-sm" placeholder="Tuliskan catatan arahan verifikasi atau instruksi revisi...">{{ $suket->qc_note }}</textarea>
+                                                                    </div>
+
+                                                                    <div class="d-flex justify-content-between align-items-center">
+                                                                        <button type="button" class="btn btn-light rounded-pill px-3 btn-sm" data-bs-dismiss="modal">Tutup</button>
+                                                                        <button type="submit" class="btn btn-primary rounded-pill px-4 btn-sm fw-bold" id="qcSubmitBtn{{ $suket->id }}" style="background-color: #15406A; border-color: #15406A;">
+                                                                            <i class="bi bi-save me-1"></i> Simpan Keputusan QC
+                                                                        </button>
+                                                                    </div>
+                                                                </form>
                                                             </div>
                                                         </div>
                                                     </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                @endif
 
-                                                    <div class="mb-3">
-                                                        <label class="form-label small fw-semibold">Catatan / Arahan Tim QC</label>
-                                                        <textarea name="catatan" id="qcCatatan{{ $suket->id }}" rows="3" class="form-control" placeholder="Tuliskan catatan verifikasi kelayakan QC atau arahan perbaikan draf jika dikembalikan...">{{ $suket->qc_note }}</textarea>
+                                {{-- MODAL PREVIEW POIN SOROTAN QC UNTUK PENGUJI K3 (Tahap 3 Status Revisi) --}}
+                                @if($suket->status_tahap === 3 && $suket->qc_status === 'revision')
+                                <div class="modal fade text-start" id="modalReviewQcPoints{{ $suket->id }}" tabindex="-1" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 95vw;">
+                                        <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="height: 90vh;">
+                                            <div class="modal-header py-2 px-3 bg-light border-bottom">
+                                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                    <span class="badge bg-danger text-white px-2 py-1 rounded-pill">
+                                                        <i class="bi bi-highlighter me-1"></i>Poin Sorotan & Evaluasi QC
+                                                    </span>
+                                                    <h6 class="modal-title fw-bold text-dark mb-0">
+                                                        Draf Suket: {{ $suket->nomor_order }} - {{ $suket->perusahaan_nama }}
+                                                    </h6>
+                                                    <span class="badge bg-warning text-dark rounded-pill">
+                                                        <i class="bi bi-arrow-return-left me-1"></i>Perlu Revisi Penyusunan
+                                                    </span>
+                                                </div>
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                            </div>
+                                            <div class="modal-body p-0" style="height: calc(90vh - 56px);">
+                                                <div class="row g-0 h-100">
+                                                    {{-- SISI KIRI: PREVIEW DRAF SUKET DENGAN HIGHLIGHT QC --}}
+                                                    <div class="col-lg-7 d-flex flex-column h-100 border-end bg-dark bg-opacity-10">
+                                                        <div class="d-flex justify-content-between align-items-center p-2 bg-white border-bottom flex-shrink-0">
+                                                            <span class="small fw-semibold text-muted">
+                                                                <i class="bi bi-file-earmark-text text-primary me-1"></i>Dokumen Draf Suket K3 (Sorotan QC Aktif)
+                                                            </span>
+                                                            <div class="d-flex align-items-center gap-1">
+                                                                <a href="{{ route('suket.preview-doc', [$suket->id, 'draft']) }}" target="_blank" class="btn btn-xs btn-light border rounded px-2 py-1 text-muted" title="Buka Draf di Tab Baru">
+                                                                    <i class="bi bi-box-arrow-up-right me-1"></i>Tab Baru
+                                                                </a>
+                                                                <a href="{{ route('suket.download-doc', [$suket->id, 'draft']) }}" class="btn btn-xs btn-outline-secondary rounded px-2 py-1" title="Unduh File Draf Word" download>
+                                                                    <i class="bi bi-download me-1"></i>Unduh Word
+                                                                </a>
+                                                            </div>
+                                                        </div>
+                                                        <div class="flex-grow-1 position-relative overflow-y-auto p-3 d-flex flex-column align-items-center" id="reviewQcPdfWrap{{ $suket->id }}" style="background-color: #525659; min-height: 0;">
+                                                            <div id="reviewQcPdfContainer{{ $suket->id }}" class="w-100 d-flex flex-column align-items-center"></div>
+                                                            <iframe id="reviewQcIframe{{ $suket->id }}" src="" class="w-100 h-100 border-0 rounded" style="display: none; min-height: 75vh;"></iframe>
+                                                        </div>
+                                                    </div>
+
+                                                    {{-- SISI KANAN: DAFTAR ARAHAN & POIN SOROTAN QC --}}
+                                                    <div class="col-lg-5 d-flex flex-column h-100 bg-white" style="min-height: 0;">
+                                                        <div class="p-3 border-bottom bg-light d-flex justify-content-between align-items-center flex-shrink-0">
+                                                            <div>
+                                                                <h6 class="fw-bold text-dark mb-0">
+                                                                    <i class="bi bi-list-check text-danger me-2"></i>Daftar Arahan & Sorotan QC
+                                                                </h6>
+                                                                <div class="small text-muted" style="font-size: 11px;">
+                                                                    Klik tombol "Tunjukkan" pada kartu untuk melihat posisi klausul di draf suket sebelah kiri.
+                                                                </div>
+                                                            </div>
+                                                            <span class="badge bg-danger rounded-pill">
+                                                                {{ $suket->suketComments ? $suket->suketComments->count() : 0 }} Poin
+                                                            </span>
+                                                        </div>
+
+                                                        <div class="p-3 flex-grow-1 overflow-y-auto d-flex flex-column gap-3" style="min-height: 0;">
+                                                            {{-- Catatan Arahan Umum QC --}}
+                                                            @if(!empty($suket->qc_note))
+                                                                <div class="card border-warning rounded-3 p-3 bg-warning bg-opacity-10 shadow-xs border-1">
+                                                                    <div class="fw-bold text-dark small d-flex align-items-center gap-1 mb-1">
+                                                                        <i class="bi bi-exclamation-triangle-fill text-warning fs-6"></i>
+                                                                        <span>Catatan Arahan Umum Tim QC:</span>
+                                                                    </div>
+                                                                    <div class="p-2 rounded bg-white border border-warning-subtle small text-dark mt-1" style="white-space: pre-wrap;">{{ $suket->qc_note }}</div>
+                                                                </div>
+                                                            @endif
+
+                                                            {{-- Feed Poin Sorotan QC --}}
+                                                            <div class="d-flex flex-column gap-2">
+                                                                @forelse($suket->suketComments as $cmt)
+                                                                    <div class="card border rounded-3 p-2 shadow-xs border-warning-subtle bg-white" id="comment-card-review_qc_{{ $suket->id }}-{{ $cmt->id }}">
+                                                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                                                            <div class="d-flex align-items-center gap-1 flex-wrap">
+                                                                                <span class="badge bg-danger text-white" style="font-size: 10px;">
+                                                                                    <i class="bi bi-exclamation-octagon-fill me-1"></i>Poin #{{ $loop->iteration }}
+                                                                                </span>
+                                                                                @if($cmt->bagian)
+                                                                                    <span class="badge bg-light text-dark border" style="font-size: 10px;">
+                                                                                        <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ $cmt->bagian }}
+                                                                                    </span>
+                                                                                @endif
+                                                                            </div>
+                                                                            <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-0" style="font-size: 10px;" onclick="window.LhuAnnotator.scrollToHighlight('review_qc_{{ $suket->id }}', {{ $cmt->id }}, '{{ addslashes($cmt->bagian ?? '') }}')" title="Tunjukkan di dokumen">
+                                                                                <i class="bi bi-geo-alt-fill me-1"></i>Tunjukkan
+                                                                            </button>
+                                                                        </div>
+
+                                                                        @if($cmt->highlight_text)
+                                                                            <div class="p-2 rounded bg-warning bg-opacity-25 border border-warning-subtle my-1">
+                                                                                <div class="text-muted" style="font-size: 9.5px; font-weight: 600; text-transform: uppercase;">
+                                                                                    <i class="bi bi-highlighter text-warning-emphasis me-1"></i>Klausul / Teks yang Disorot Salah:
+                                                                                </div>
+                                                                                <div class="font-monospace small text-dark fw-semibold mt-1" style="font-size: 11px;">
+                                                                                    <mark class="bg-warning text-dark px-1 rounded">{{ $cmt->highlight_text }}</mark>
+                                                                                </div>
+                                                                            </div>
+                                                                        @endif
+
+                                                                        <div class="small text-dark mt-1" style="font-size: 11.5px;">
+                                                                            <strong>Arahan Koreksi QC:</strong> {{ $cmt->comment }}
+                                                                        </div>
+                                                                    </div>
+                                                                @empty
+                                                                    <div class="text-center py-4 text-muted">
+                                                                        <i class="bi bi-check-circle fs-3 text-success d-block mb-1"></i>
+                                                                        <div class="small fw-semibold">Tidak ada poin sorotan klausul spesifik</div>
+                                                                        <div class="small text-muted" style="font-size: 11px;">Silakan perbaiki draf suket sesuai catatan arahan umum di atas.</div>
+                                                                    </div>
+                                                                @endforelse
+                                                            </div>
+
+                                                            {{-- Tombol Aksi Cepat Penguji --}}
+                                                            <div class="card border rounded-3 p-3 bg-light mt-auto border-secondary-subtle">
+                                                                <div class="small fw-semibold text-dark mb-2">Tindakan Perbaikan Penguji K3:</div>
+                                                                <div class="d-flex gap-2 flex-wrap">
+                                                                    <a href="{{ route('suket.download-doc', [$suket->id, 'draft']) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3" download>
+                                                                        <i class="bi bi-download me-1"></i>Unduh Draf Word
+                                                                    </a>
+                                                                    <button type="button" class="btn btn-sm btn-primary rounded-pill px-3" style="background-color: #15406A; border-color: #15406A;" data-bs-dismiss="modal" data-bs-toggle="modal" data-bs-target="#modalUploadDraft{{ $suket->id }}">
+                                                                        <i class="bi bi-upload me-1"></i>Upload Berkas Draf Revisi
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div class="modal-footer border-0 pt-0">
-                                                    <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">Batal</button>
-                                                    <button type="submit" class="btn btn-warning text-dark rounded-pill px-4 fw-semibold" id="qcSubmitBtn{{ $suket->id }}">
-                                                        <i class="bi bi-check2-circle me-1"></i> Simpan Keputusan QC
-                                                    </button>
-                                                </div>
-                                            </form>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1516,6 +1886,25 @@ function switchEvalDoc(url, iframeId, imgId, type) {
     }
 }
 
+function switchQcDoc(url, containerId, iframeId, type, suketKey, btnEl) {
+    if (btnEl) {
+        btnEl.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btnEl.classList.add('active');
+    }
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    if (window.LhuAnnotator && window.LhuAnnotator.instances[suketKey]) {
+        const inst = window.LhuAnnotator.instances[suketKey];
+        inst.loadedUrl = null;
+        inst.pdf = null;
+        window.LhuAnnotator.init({
+            ...inst.config,
+            pdfUrl: url
+        });
+    }
+}
+
 function toggleQcNomorSurat(suketId, isApprove) {
     const wrap = document.getElementById('qcNomorWrap' + suketId);
     const input = document.getElementById('qcNomorInput' + suketId);
@@ -1559,6 +1948,7 @@ function toggleQcNomorSurat(suketId, isApprove) {
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     @foreach($sukets as $suketItem)
+        {{-- 1. Evaluasi LHU Dokumen (Tahap 2) --}}
         @if($suketItem->status_tahap === 2 && $suketItem->hasLhuDocument())
             const modalEl{{ $suketItem->id }} = document.getElementById('modalEvaluasiSideBySide{{ $suketItem->id }}');
             if (modalEl{{ $suketItem->id }}) {
@@ -1567,7 +1957,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         suketId: {{ $suketItem->id }},
                         containerId: 'evalPdfContainer{{ $suketItem->id }}',
                         pdfUrl: '{{ route('suket.preview-doc', [$suketItem->id, 'lhu']) }}',
-                        comments: @json($suketItem->comments ?? []),
+                        comments: @json($suketItem->lhuComments ?? []),
                         readOnly: false,
                         floatingBtnId: 'gdocsFloatingBtn{{ $suketItem->id }}',
                         highlightBannerId: 'selectedHighlightBanner{{ $suketItem->id }}',
@@ -1575,6 +1965,44 @@ document.addEventListener('DOMContentLoaded', function() {
                         highlightTextInputId: 'highlightTextInput{{ $suketItem->id }}',
                         bagianInputId: 'bagianInput{{ $suketItem->id }}',
                         commentInputId: 'commentInput{{ $suketItem->id }}',
+                    });
+                });
+            }
+        @endif
+
+        {{-- 2. Gerbang Review QC Suket (Tahap 3 Menunggu QC) --}}
+        @if($canQc && $suketItem->status_tahap === 3 && $suketItem->qc_status === 'pending')
+            const modalQcEl{{ $suketItem->id }} = document.getElementById('modalQc{{ $suketItem->id }}');
+            if (modalQcEl{{ $suketItem->id }}) {
+                modalQcEl{{ $suketItem->id }}.addEventListener('shown.bs.modal', function () {
+                    window.LhuAnnotator.init({
+                        suketId: 'qc_{{ $suketItem->id }}',
+                        containerId: 'qcPdfContainer{{ $suketItem->id }}',
+                        pdfUrl: '{{ route('suket.preview-doc', [$suketItem->id, 'draft_pdf']) }}',
+                        comments: @json($suketItem->suketComments ?? []),
+                        readOnly: false,
+                        floatingBtnId: 'qcFloatingBtn{{ $suketItem->id }}',
+                        highlightBannerId: 'qcSelectedHighlightBanner{{ $suketItem->id }}',
+                        highlightPreviewId: 'qcSelectedHighlightPreview{{ $suketItem->id }}',
+                        highlightTextInputId: 'qcHighlightTextInput{{ $suketItem->id }}',
+                        bagianInputId: 'qcBagianInput{{ $suketItem->id }}',
+                        commentInputId: 'qcCommentInput{{ $suketItem->id }}',
+                    });
+                });
+            }
+        @endif
+
+        {{-- 3. Review Poin Sorotan QC oleh Penguji K3 (Tahap 3 Status Revisi) --}}
+        @if($suketItem->status_tahap === 3 && $suketItem->qc_status === 'revision')
+            const modalReviewQcEl{{ $suketItem->id }} = document.getElementById('modalReviewQcPoints{{ $suketItem->id }}');
+            if (modalReviewQcEl{{ $suketItem->id }}) {
+                modalReviewQcEl{{ $suketItem->id }}.addEventListener('shown.bs.modal', function () {
+                    window.LhuAnnotator.init({
+                        suketId: 'review_qc_{{ $suketItem->id }}',
+                        containerId: 'reviewQcPdfContainer{{ $suketItem->id }}',
+                        pdfUrl: '{{ route('suket.preview-doc', [$suketItem->id, 'draft_pdf']) }}',
+                        comments: @json($suketItem->suketComments ?? []),
+                        readOnly: true,
                     });
                 });
             }

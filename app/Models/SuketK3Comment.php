@@ -19,6 +19,7 @@ class SuketK3Comment extends Model
         'bagian',
         'highlight_text',
         'tipe',
+        'document_type',
         'comment',
     ];
 

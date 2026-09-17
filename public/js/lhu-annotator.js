@@ -1,5 +1,5 @@
 /**
- * LHU PDF Document Annotator (Google Docs Style Highlight & Floating Comment)
+ * LHU PDF Document Annotator (Google Docs Style Highlight & Floating Comment + Box Area for Scans)
  * Balai K3 Surabaya
  */
 
@@ -25,12 +25,44 @@ window.LhuAnnotator = {
             pagesRendered: 0,
             isRendering: true,
             pendingHighlight: null,
+            mode: 'text', // 'text' (default) or 'box'
         };
         this.instances[id] = instance;
 
         this.renderPdf(instance);
         if (!config.readOnly) {
             this.setupSelectionListener(instance);
+        }
+    },
+
+    setMode: function(suketId, mode) {
+        const instance = this.instances[suketId];
+        if (!instance) return;
+
+        instance.mode = (mode === 'box') ? 'box' : 'text';
+        const container = document.getElementById(instance.config.containerId);
+        if (container) {
+            if (instance.mode === 'box') {
+                container.classList.add('lhu-drawing-mode');
+            } else {
+                container.classList.remove('lhu-drawing-mode');
+            }
+        }
+
+        // Hide floating text button when switching modes
+        this.hideFloatingBtn(instance.config.floatingBtnId);
+
+        // Update toolbar button states
+        const toolbar = document.querySelector(`.lhu-annotator-toolbar[data-suket="${suketId}"]`) ||
+                        (container ? container.parentElement.querySelector('.lhu-annotator-toolbar') : null);
+        if (toolbar) {
+            toolbar.querySelectorAll('.btn-mode').forEach(btn => {
+                if (btn.dataset.mode === instance.mode) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
         }
     },
 
@@ -69,7 +101,7 @@ window.LhuAnnotator = {
                 await this.renderPage(instance, pageNum, container);
             }
 
-            // Apply highlights for all saved comments
+            // Apply highlights for all saved comments (both text & box areas)
             this.applySavedHighlights(instance);
 
             instance.isRendering = false;
@@ -141,11 +173,129 @@ window.LhuAnnotator = {
             }
         }
 
+        // Setup Box Drawing on this page if not read-only
+        if (!instance.config.readOnly) {
+            this.setupBoxDrawingOnPage(instance, pageWrapper, pageNum);
+        }
+
         container.appendChild(pageWrapper);
     },
 
     /**
-     * Pre-fill the comment form inputs immediately when text is selected or clicked
+     * Setup drag-to-box annotation on scanned pages or arbitrary areas
+     */
+    setupBoxDrawingOnPage: function(instance, pageWrapper, pageNum) {
+        pageWrapper.addEventListener('mousedown', (e) => {
+            if (instance.mode !== 'box') return;
+
+            // Only trigger on left click
+            if (e.button !== 0) return;
+
+            // Don't trigger if clicked on an existing comment box or badge
+            if (e.target.closest('.lhu-saved-area-box') || e.target.closest('.lhu-area-badge')) {
+                return;
+            }
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const pageRect = pageWrapper.getBoundingClientRect();
+            const startX = Math.max(0, Math.min(pageRect.width, e.clientX - pageRect.left));
+            const startY = Math.max(0, Math.min(pageRect.height, e.clientY - pageRect.top));
+
+            const preview = document.createElement('div');
+            preview.className = 'lhu-drag-preview-box';
+            preview.style.left = `${startX}px`;
+            preview.style.top = `${startY}px`;
+            preview.style.width = '0px';
+            preview.style.height = '0px';
+            pageWrapper.appendChild(preview);
+
+            let currentLeft = startX;
+            let currentTop = startY;
+            let currentWidth = 0;
+            let currentHeight = 0;
+
+            const onMouseMove = (moveEv) => {
+                const currX = Math.max(0, Math.min(pageRect.width, moveEv.clientX - pageRect.left));
+                const currY = Math.max(0, Math.min(pageRect.height, moveEv.clientY - pageRect.top));
+
+                currentLeft = Math.min(startX, currX);
+                currentTop = Math.min(startY, currY);
+                currentWidth = Math.abs(currX - startX);
+                currentHeight = Math.abs(currY - startY);
+
+                preview.style.left = `${currentLeft}px`;
+                preview.style.top = `${currentTop}px`;
+                preview.style.width = `${currentWidth}px`;
+                preview.style.height = `${currentHeight}px`;
+            };
+
+            const onMouseUp = (upEv) => {
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+
+                if (preview.parentElement) {
+                    preview.parentElement.removeChild(preview);
+                }
+
+                // Minimum 15px box to avoid accidental micro clicks
+                if (currentWidth >= 15 && currentHeight >= 15) {
+                    const leftPct = ((currentLeft / pageRect.width) * 100).toFixed(2);
+                    const topPct = ((currentTop / pageRect.height) * 100).toFixed(2);
+                    const widthPct = ((currentWidth / pageRect.width) * 100).toFixed(2);
+                    const heightPct = ((currentHeight / pageRect.height) * 100).toFixed(2);
+
+                    const boxCode = `[BOX:${pageNum},${leftPct}%,${topPct}%,${widthPct}%,${heightPct}%]`;
+
+                    // Render active temporary box on this page
+                    window.LhuAnnotator.renderTempBox(instance, pageNum, leftPct, topPct, widthPct, heightPct);
+
+                    // Pre-fill selection data
+                    window.LhuAnnotator.prefillSelectionData(instance, boxCode, pageNum);
+
+                    // Scroll to comment form & focus comment input
+                    const cardAdd = document.getElementById(`cardAddComment${instance.config.suketId}`) ||
+                                    document.getElementById(`formAddComment${instance.config.suketId}`);
+                    if (cardAdd) {
+                        cardAdd.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                    if (instance.config.commentInputId) {
+                        const el = document.getElementById(instance.config.commentInputId);
+                        if (el) el.focus();
+                    }
+                }
+            };
+
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('mouseup', onMouseUp);
+        });
+    },
+
+    /**
+     * Render temporary active preview box
+     */
+    renderTempBox: function(instance, pageNum, leftPct, topPct, widthPct, heightPct) {
+        const suketId = instance.config.suketId;
+        const prevTemp = document.getElementById(`temp-box-${suketId}`);
+        if (prevTemp) prevTemp.remove();
+
+        const pageWrapper = document.getElementById(`pdf-page-${suketId}-${pageNum}`);
+        if (!pageWrapper) return;
+
+        const tempBox = document.createElement('div');
+        tempBox.id = `temp-box-${suketId}`;
+        tempBox.className = 'lhu-saved-area-box is-active pulse-highlight';
+        tempBox.style.left = `${leftPct}%`;
+        tempBox.style.top = `${topPct}%`;
+        tempBox.style.width = `${widthPct}%`;
+        tempBox.style.height = `${heightPct}%`;
+        tempBox.innerHTML = `<span class="lhu-area-badge bg-warning text-dark"><i class="fas fa-crosshairs me-1"></i>Area Ditandai</span>`;
+        pageWrapper.appendChild(tempBox);
+    },
+
+    /**
+     * Pre-fill the comment form inputs immediately when text or box is selected
      */
     prefillSelectionData: function(instance, text, pageNum) {
         const config = instance.config;
@@ -156,6 +306,8 @@ window.LhuAnnotator = {
 
         instance.activeSelectionText = cleanText;
         instance.activePageNumber = validPage;
+
+        const isBox = cleanText.startsWith('[BOX:');
 
         // Save into floating button DOM dataset for persistent fallback
         const floatingBtn = document.getElementById(config.floatingBtnId);
@@ -178,7 +330,7 @@ window.LhuAnnotator = {
         if (config.bagianInputId) {
             const el = document.getElementById(config.bagianInputId);
             if (el && (!el.value || el.value.startsWith('Halaman '))) {
-                el.value = `Halaman ${validPage}`;
+                el.value = isBox ? `Halaman ${validPage} (Area Scan/Box)` : `Halaman ${validPage}`;
                 el.dispatchEvent(new Event('input', { bubbles: true }));
                 el.dispatchEvent(new Event('change', { bubbles: true }));
             }
@@ -188,7 +340,11 @@ window.LhuAnnotator = {
         if (config.highlightPreviewId) {
             const el = document.getElementById(config.highlightPreviewId);
             if (el) {
-                el.textContent = cleanText.length > 70 ? (cleanText.substring(0, 70) + '...') : cleanText;
+                if (isBox) {
+                    el.innerHTML = `<i class="fas fa-vector-square text-warning me-1"></i>Kotak Area Scan (Hal. ${validPage})`;
+                } else {
+                    el.textContent = cleanText.length > 70 ? (cleanText.substring(0, 70) + '...') : cleanText;
+                }
             }
         }
         if (config.highlightBannerId) {
@@ -209,6 +365,8 @@ window.LhuAnnotator = {
         }
 
         const handleSelection = () => {
+            if (instance.mode === 'box') return; // In box mode, don't trigger text selection popup
+
             const selection = window.getSelection();
             const text = selection ? selection.toString().trim() : '';
 
@@ -342,6 +500,8 @@ window.LhuAnnotator = {
         const container = document.getElementById(instance.config.containerId);
         if (!container || !instance.activeSelectionText) return;
 
+        if (instance.activeSelectionText.startsWith('[BOX:')) return; // Box preview already handled
+
         const searchStr = instance.activeSelectionText.trim();
         const spans = container.querySelectorAll('.textLayer > span');
         let matched = false;
@@ -394,6 +554,10 @@ window.LhuAnnotator = {
             if (el) el.style.display = 'none';
         }
 
+        // Remove temp box
+        const tempBox = document.getElementById(`temp-box-${suketId}`);
+        if (tempBox) tempBox.remove();
+
         const tempMark = document.getElementById(`temp-selection-${suketId}`);
         if (tempMark) {
             if (tempMark.tagName.toLowerCase() === 'mark') {
@@ -421,16 +585,55 @@ window.LhuAnnotator = {
 
         const comments = Array.isArray(config.comments) ? config.comments : Object.values(config.comments);
 
+        // Clear existing saved boxes to prevent duplicates upon re-render
+        container.querySelectorAll('.lhu-saved-area-box').forEach(el => {
+            if (!el.id || !el.id.startsWith('temp-box-')) el.remove();
+        });
+
+        // Box regex: [BOX:pageNum,left%,top%,width%,height%]
+        const boxRegex = /\[BOX:(\d+),\s*([\d.]+)%?,\s*([\d.]+)%?,\s*([\d.]+)%?,\s*([\d.]+)%?\]/i;
+
         comments.forEach((cmt, idx) => {
             if (!cmt.highlight_text || !cmt.highlight_text.trim()) return;
             const searchStr = cmt.highlight_text.trim();
             const commentId = cmt.id;
             const markerNum = idx + 1;
 
+            // 1. CHECK IF BOX ANNOTATION
+            const boxMatch = searchStr.match(boxRegex);
+            if (boxMatch) {
+                const pageNum = parseInt(boxMatch[1], 10);
+                const leftPct = parseFloat(boxMatch[2]);
+                const topPct = parseFloat(boxMatch[3]);
+                const widthPct = parseFloat(boxMatch[4]);
+                const heightPct = parseFloat(boxMatch[5]);
+
+                const pageWrapper = document.getElementById(`pdf-page-${instance.config.suketId}-${pageNum}`);
+                if (pageWrapper) {
+                    const boxEl = document.createElement('div');
+                    boxEl.className = 'lhu-saved-area-box';
+                    boxEl.dataset.commentId = commentId;
+                    boxEl.style.left = `${leftPct}%`;
+                    boxEl.style.top = `${topPct}%`;
+                    boxEl.style.width = `${widthPct}%`;
+                    boxEl.style.height = `${heightPct}%`;
+                    boxEl.title = `Area Kesalahan #${markerNum}: ${cmt.comment}`;
+                    boxEl.innerHTML = `<span class="lhu-area-badge"><i class="fas fa-vector-square me-1"></i>#${markerNum}</span>`;
+
+                    boxEl.addEventListener('click', () => {
+                        window.LhuAnnotator.scrollToCommentCard(instance.config.suketId, commentId);
+                    });
+
+                    pageWrapper.appendChild(boxEl);
+                }
+                return; // Done for this comment
+            }
+
+            // 2. TEXT LAYER SEARCH (High contrast highlights)
             const spans = container.querySelectorAll('.textLayer > span');
             let matched = false;
 
-            // 1. Direct span match
+            // Direct span match
             spans.forEach(span => {
                 if (matched) return;
                 const text = span.textContent;
@@ -452,7 +655,7 @@ window.LhuAnnotator = {
                 }
             });
 
-            // 2. Normalized whitespace match
+            // Normalized whitespace match
             if (!matched) {
                 const normSearch = searchStr.replace(/\s+/g, ' ').toLowerCase();
                 spans.forEach(span => {
@@ -472,7 +675,7 @@ window.LhuAnnotator = {
                 });
             }
 
-            // 3. Match first word phrase fallback
+            // Match first word phrase fallback
             if (!matched && searchStr.length > 4) {
                 const words = searchStr.split(/\s+/).filter(w => w.length > 3);
                 if (words.length > 0) {
@@ -505,7 +708,16 @@ window.LhuAnnotator = {
     scrollToHighlight: function(suketId, commentId, pageHint, attempt = 0) {
         const instance = this.instances[suketId];
 
-        // 1. Search for specific highlighted text element
+        // 1. Check for saved Box annotation element first
+        const box = document.querySelector(`#evalPdfContainer${suketId} .lhu-saved-area-box[data-comment-id="${commentId}"], #evalUserPdfContainer${suketId} .lhu-saved-area-box[data-comment-id="${commentId}"]`);
+        if (box) {
+            box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            box.classList.add('pulse-highlight');
+            setTimeout(() => box.classList.remove('pulse-highlight'), 3000);
+            return;
+        }
+
+        // 2. Search for specific highlighted text element
         const mark = document.querySelector(`#evalPdfContainer${suketId} mark[data-comment-id="${commentId}"], #evalUserPdfContainer${suketId} mark[data-comment-id="${commentId}"]`);
         if (mark) {
             mark.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -514,7 +726,7 @@ window.LhuAnnotator = {
             return;
         }
 
-        // 2. If PDF is still loading / rendering, retry asynchronously
+        // 3. If PDF is still loading / rendering, retry asynchronously
         if (instance && (instance.isRendering || !instance.pdf)) {
             instance.pendingHighlight = { commentId, pageHint };
             if (attempt < 15) {
@@ -523,7 +735,7 @@ window.LhuAnnotator = {
             }
         }
 
-        // 3. Fallback: Parse target page from pageHint (e.g. "Halaman 2" or "Hal 2")
+        // 4. Fallback: Parse target page from pageHint (e.g. "Halaman 2" or "Hal 2")
         let targetPage = 1;
         if (pageHint) {
             const match = String(pageHint).match(/(?:halaman|hal\.?|page)\s*(\d+)/i);

@@ -179,6 +179,7 @@ Route::middleware(['auth', 'role:user'])
     ->group(function () {
         Route::get('/', [PenerbitanSuketController::class, 'userIndex'])->name('index');
         Route::post('/store', [PenerbitanSuketController::class, 'userStore'])->name('store');
+        Route::post('/{suket}/submit-revision', [PenerbitanSuketController::class, 'userSubmitRevision'])->name('submit-revision');
     });
 
 // Menu Internal Petugas: Penerbitan Suket K3 Lingkungan Kerja (Mulai Tahap 2 s/d 6)

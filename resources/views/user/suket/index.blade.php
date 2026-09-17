@@ -485,6 +485,18 @@
                                     @endif
                                 </button>
 
+                                @if($suket->isEvaluasiRejected())
+                                    <button 
+                                        type="button" 
+                                        class="btn btn-warning btn-sm rounded-pill px-3 fw-bold text-dark shadow-sm"
+                                        data-bs-toggle="modal" 
+                                        data-bs-target="#modalRevisiPemohon{{ $suket->id }}"
+                                        title="Kirim Catatan Tanggapan / Berkas Revisi"
+                                    >
+                                        <i class="bi bi-pencil-square me-1"></i>Kirim Revisi
+                                    </button>
+                                @endif
+
                                 {{-- GATE KEAMANAN TAHAP 6: HANYA TAMPIL JIKA SUKET SUDAH DISERAHKAN (sent_to_customer_at) --}}
                                 @if($isDelivered && ($suket->signed_file_path || $suket->draft_file_path))
                                     <button 
@@ -527,8 +539,11 @@
                                     <span class="badge bg-danger text-white rounded-pill px-2 py-1 small">
                                         {{ $suket->comments ? $suket->comments->count() : 0 }} Poin Sorotan Kesalahan
                                     </span>
-                                    <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}">
-                                        <i class="bi bi-eye-fill me-1"></i>Buka Dokumen LHU & Lihat Sorotan
+                                    <button type="button" class="btn btn-sm btn-outline-danger bg-white rounded-pill px-3 shadow-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}">
+                                        <i class="bi bi-eye-fill me-1"></i>Lihat Sorotan Dokumen
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalRevisiPemohon{{ $suket->id }}">
+                                        <i class="bi bi-pencil-square me-1"></i>Kirim Tanggapan / Revisi
                                     </button>
                                 </div>
                             </div>
@@ -536,6 +551,13 @@
                             @if($suket->catatan_evaluasi)
                                 <div class="p-2 bg-white bg-opacity-75 rounded border border-danger-subtle mb-3 text-dark small">
                                     <strong>Kesimpulan Penguji K3:</strong> {{ $suket->catatan_evaluasi }}
+                                </div>
+                            @endif
+
+                            @if($suket->catatan_revisi_pemohon)
+                                <div class="p-2 bg-warning bg-opacity-15 rounded border border-warning-subtle mb-3 text-dark small">
+                                    <strong class="text-warning-emphasis"><i class="bi bi-chat-left-quote-fill me-1"></i>Penjelasan / Tanggapan Terakhir yang Anda Kirim:</strong>
+                                    <div class="mt-1" style="white-space: pre-wrap;">{{ $suket->catatan_revisi_pemohon }}</div>
                                 </div>
                             @endif
 
@@ -589,6 +611,13 @@
                                     </div>
                                 </div>
                             @endif
+
+                            <div class="mt-3 pt-2 border-top border-danger-subtle d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <span class="small text-muted"><i class="bi bi-info-circle me-1"></i>Silakan telaah poin catatan di atas atau buka dokumen LHU, lalu kirimkan jawaban atau berkas perbaikan.</span>
+                                <button type="button" class="btn btn-sm btn-danger rounded-pill px-4 py-1 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalRevisiPemohon{{ $suket->id }}">
+                                    <i class="bi bi-send-check me-1"></i>Kirim Revisi / Tanggapan Sekarang
+                                </button>
+                            </div>
                         </div>
                     @elseif($isDelivered)
                         <div class="alert alert-success border-0 rounded-3 p-2 px-3 mt-3 mb-0 small d-flex align-items-center justify-content-between">
@@ -747,12 +776,177 @@
                                             </div>
                                         @endif
                                     </div>
+
+                                    @if($suket->isEvaluasiRejected())
+                                        <div class="p-3 border-top bg-light flex-shrink-0">
+                                            <button type="button" class="btn btn-warning w-100 rounded-pill fw-bold text-dark shadow-sm" data-bs-toggle="modal" data-bs-target="#modalRevisiPemohon{{ $suket->id }}">
+                                                <i class="bi bi-pencil-square me-1"></i>Kirim Tanggapan / Dokumen Revisi Pemohon
+                                            </button>
+                                        </div>
+                                    @endif
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {{-- MODAL REVISI / TANGGAPAN PEMOHON --}}
+            @if($suket->isEvaluasiRejected())
+            <div class="modal fade text-start" id="modalRevisiPemohon{{ $suket->id }}" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog modal-dialog-centered modal-lg">
+                    <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
+                        <form action="{{ route('user.suket.submit-revision', $suket->id) }}" method="POST" enctype="multipart/form-data">
+                            @csrf
+                            <div class="modal-header bg-warning bg-opacity-10 border-bottom py-3 px-4">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-warning text-dark px-2 py-1 rounded-pill">
+                                        <i class="bi bi-pencil-square me-1"></i>Tanggapan & Revisi Pemohon
+                                    </span>
+                                    <h6 class="modal-title fw-bold text-dark mb-0">
+                                        Revisi Order {{ $suket->nomor_order }} - {{ $suket->perusahaan_nama }}
+                                    </h6>
+                                </div>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+
+                            <div class="modal-body p-4">
+                                {{-- Catatan Evaluasi Penguji Sebagai Referensi --}}
+                                @if($suket->catatan_evaluasi)
+                                    <div class="alert alert-danger bg-danger-subtle border-danger-subtle rounded-3 p-3 mb-3 text-dark small">
+                                        <div class="fw-bold text-danger mb-1">
+                                            <i class="bi bi-exclamation-triangle-fill me-1"></i>Instruksi Permintaan Revisi dari Penguji K3:
+                                        </div>
+                                        <div>{{ $suket->catatan_evaluasi }}</div>
+                                    </div>
+                                @endif
+
+                                {{-- DAFTAR TITIK SOROTAN KESALAHAN LHU / SCAN DARI PENGUJI K3 --}}
+                                @if($suket->comments && $suket->comments->count() > 0)
+                                    <div class="mb-3">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div class="small fw-bold text-dark">
+                                                <i class="bi bi-highlighter text-danger me-1"></i>Daftar Poin Sorotan Kesalahan LHU ({{ $suket->comments->count() }} Poin):
+                                            </div>
+                                            <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-1" style="font-size: 11px;" data-bs-toggle="modal" data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}">
+                                                <i class="bi bi-eye-fill me-1"></i>Buka & Lihat di Dokumen LHU
+                                            </button>
+                                        </div>
+                                        <div class="d-flex flex-column gap-2 overflow-y-auto pe-1" style="max-height: 220px;">
+                                            @foreach($suket->comments as $cm)
+                                                <div class="card border rounded-3 p-2 px-3 bg-white shadow-xs border-danger-subtle">
+                                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                                        <div class="d-flex align-items-center gap-1 flex-wrap">
+                                                            <span class="badge bg-danger text-white" style="font-size: 9.5px;">
+                                                                Sorotan #{{ $loop->iteration }}
+                                                            </span>
+                                                            @if($cm->bagian)
+                                                                <span class="badge bg-light text-dark border" style="font-size: 10px;">
+                                                                    <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ $cm->bagian }}
+                                                                </span>
+                                                            @endif
+                                                        </div>
+                                                        <span class="text-muted" style="font-size: 10px;">
+                                                            {{ $cm->created_at ? $cm->created_at->diffForHumans() : '' }}
+                                                        </span>
+                                                    </div>
+
+                                                    @if($cm->highlight_text)
+                                                        <div class="p-1 px-2 rounded bg-warning bg-opacity-25 border border-warning my-1 small">
+                                                            <span class="text-muted fw-bold" style="font-size: 10px; text-transform: uppercase;">
+                                                                <i class="bi bi-highlighter text-warning-emphasis me-1"></i>Data/Area Disorot:
+                                                            </span>
+                                                            @if(str_starts_with($cm->highlight_text, '[BOX:'))
+                                                                <span class="badge bg-warning text-dark fw-bold ms-1" style="font-size: 10px;">
+                                                                    <i class="bi bi-bounding-box-circles me-1"></i>Kotak Area Gambar/Scan LHU
+                                                                </span>
+                                                            @else
+                                                                <span class="font-monospace fw-bold text-dark ms-1">"{{ $cm->highlight_text }}"</span>
+                                                            @endif
+                                                        </div>
+                                                    @endif
+
+                                                    <div class="small text-dark mt-1">
+                                                        <strong class="text-danger" style="font-size: 11px;"><i class="bi bi-arrow-right-circle-fill me-1"></i>Instruksi:</strong>
+                                                        <span class="text-secondary" style="font-size: 11.5px;">{{ $cm->comment }}</span>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold text-dark small">
+                                        Penjelasan / Tanggapan Perbaikan dari Pemohon <span class="text-danger">*</span>
+                                    </label>
+                                    <textarea 
+                                        name="catatan_revisi" 
+                                        rows="4" 
+                                        class="form-control" 
+                                        placeholder="Tuliskan penjelasan mengenai bagian yang telah diperbaiki, jawaban atas pertanyaan evaluator K3, atau keterangan berkas baru yang Anda unggah..." 
+                                        required
+                                    >{{ old('catatan_revisi', $suket->catatan_revisi_pemohon) }}</textarea>
+                                    <div class="form-text small text-muted">
+                                        Jelaskan secara rinci tindakan perbaikan yang telah Anda lakukan sesuai poin sorotan evaluator.
+                                    </div>
+                                </div>
+
+                                <div class="p-3 bg-light rounded-3 border mb-2">
+                                    <div class="fw-bold text-dark small mb-1">
+                                        <i class="bi bi-paperclip me-1 text-primary"></i>Unggah Berkas Pembaharuan / Dokumen Pengganti (Opsional)
+                                    </div>
+                                    <div class="text-muted small mb-3">
+                                        Hanya unggah berkas berikut jika ada perubahan dokumen LHU, denah lokasi, atau foto pengujian.
+                                    </div>
+
+                                    <div class="row g-3">
+                                        <div class="col-md-12">
+                                            <label class="form-label small fw-semibold text-dark mb-1">
+                                                Unggah File LHU Baru (PDF) <span class="text-muted fw-normal">(Opsional)</span>
+                                            </label>
+                                            <input type="file" name="lhu_file" class="form-control form-control-sm" accept=".pdf">
+                                            <div class="form-text small text-muted">
+                                                Berkas LHU hasil perbaikan (maks. 20MB, format .pdf). Kosongkan jika tidak mengganti file LHU.
+                                            </div>
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold text-dark mb-1">
+                                                Unggah Denah Lokasi Baru <span class="text-muted fw-normal">(Opsional)</span>
+                                            </label>
+                                            <input type="file" name="denah_lokasi" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png">
+                                            <div class="form-text small text-muted">
+                                                Format: PDF / Gambar JPG / PNG (maks. 20MB).
+                                            </div>
+                                        </div>
+
+                                        <div class="col-md-6">
+                                            <label class="form-label small fw-semibold text-dark mb-1">
+                                                Unggah Foto Pengujian Baru <span class="text-muted fw-normal">(Opsional)</span>
+                                            </label>
+                                            <input type="file" name="foto_pengujian" class="form-control form-control-sm" accept=".pdf,.jpg,.jpeg,.png">
+                                            <div class="form-text small text-muted">
+                                                Format: PDF / Gambar JPG / PNG (maks. 20MB).
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal-footer bg-light py-2 px-4 border-top d-flex justify-content-between">
+                                <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">
+                                    Batal
+                                </button>
+                                <button type="submit" class="btn btn-sm btn-primary rounded-pill px-4 fw-bold shadow-sm" onclick="return confirm('Kirimkan tanggapan dan berkas revisi ke Tim Penguji K3?')">
+                                    <i class="bi bi-send-check me-1"></i>Kirim Revisi ke Penguji K3
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            @endif
         @empty
             <div class="col-12">
                 <div class="card border-0 shadow-sm rounded-4 p-5 text-center bg-white">

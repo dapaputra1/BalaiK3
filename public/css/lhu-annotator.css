@@ -56,42 +56,53 @@
     right: 0;
     bottom: 0;
     overflow: hidden;
-    opacity: 0.25;
+    opacity: 0.35;
     line-height: 1.0;
     user-select: text;
     -webkit-user-select: text;
 }
 
 .textLayer ::selection {
-    background: rgba(13, 110, 253, 0.45) !important;
+    background: rgba(13, 110, 253, 0.55) !important;
     color: transparent !important;
 }
 
-mark.lhu-saved-highlight {
+/* Sorotan Teks Tersimpan - Dibuat Kontras Tinggi & Sangat Terlihat */
+mark.lhu-saved-highlight,
+.textLayer mark.lhu-saved-highlight {
     background-color: #ffe066 !important;
-    color: #1f2937 !important;
-    border-bottom: 2px solid #e03131;
-    padding: 1px 3px;
-    border-radius: 3px;
+    background: linear-gradient(180deg, rgba(255, 243, 136, 0.95), rgba(255, 212, 59, 0.95)) !important;
+    color: #111827 !important;
+    border: 1.5px solid #e03131 !important;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-weight: 700 !important;
     cursor: pointer;
+    box-shadow: 0 2px 8px rgba(224, 49, 49, 0.45) !important;
     transition: all 0.2s ease-in-out;
-    display: inline;
+    display: inline-block;
+    position: relative;
+    z-index: 20;
+    opacity: 1 !important;
 }
 
-mark.lhu-saved-highlight:hover {
-    background-color: #ffd43b !important;
-    box-shadow: 0 0 10px rgba(240, 62, 62, 0.6);
+mark.lhu-saved-highlight:hover,
+.textLayer mark.lhu-saved-highlight:hover {
+    background: linear-gradient(180deg, #ffd43b, #fcc419) !important;
+    border-color: #c92a2a !important;
+    box-shadow: 0 0 12px rgba(224, 49, 49, 0.75) !important;
+    transform: scale(1.02);
 }
 
 @keyframes pulseHighlightAnim {
     0% {
-        box-shadow: 0 0 0 0 rgba(224, 49, 49, 0.7);
+        box-shadow: 0 0 0 0 rgba(224, 49, 49, 0.85);
         transform: scale(1);
     }
     50% {
-        box-shadow: 0 0 0 10px rgba(224, 49, 49, 0);
-        transform: scale(1.04);
-        background-color: #ffc078 !important;
+        box-shadow: 0 0 0 12px rgba(224, 49, 49, 0);
+        transform: scale(1.05);
+        background-color: #ff922b !important;
     }
     100% {
         box-shadow: 0 0 0 0 rgba(224, 49, 49, 0);
@@ -100,15 +111,151 @@ mark.lhu-saved-highlight:hover {
 }
 
 .pulse-highlight {
-    animation: pulseHighlightAnim 1.4s ease-in-out infinite;
+    animation: pulseHighlightAnim 1.3s ease-in-out infinite;
+    z-index: 25 !important;
 }
 
 mark.lhu-active-selection,
 .textLayer .lhu-active-selection {
-    background-color: #ffd43b !important;
-    outline: 2px dashed #e03131;
-    border-radius: 2px;
-    box-shadow: 0 0 8px rgba(224, 49, 49, 0.5);
+    background-color: #ffe066 !important;
+    outline: 2.5px dashed #d90429;
+    border-radius: 4px;
+    box-shadow: 0 0 10px rgba(217, 4, 41, 0.6);
+}
+
+/* ========================================================================== */
+/* [FITUR BOX AREA ANNOTATION] - Khusus untuk PDF Scan / Area Bebas           */
+/* ========================================================================== */
+
+.lhu-drawing-mode {
+    cursor: crosshair !important;
+    user-select: none !important;
+}
+
+.lhu-drawing-mode .textLayer {
+    pointer-events: none !important;
+}
+
+.lhu-area-overlay-layer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: auto;
+    z-index: 15;
+}
+
+/* Preview Kotak saat user sedang drag mouse */
+.lhu-drag-preview-box {
+    position: absolute;
+    border: 2px dashed #d90429;
+    background-color: rgba(255, 107, 107, 0.28);
+    pointer-events: none;
+    border-radius: 4px;
+    z-index: 30;
+    animation: boxPulse 1s infinite alternate;
+}
+
+@keyframes boxPulse {
+    from { background-color: rgba(255, 107, 107, 0.22); }
+    to { background-color: rgba(255, 107, 107, 0.38); }
+}
+
+/* Kotak Area Tersimpan */
+.lhu-saved-area-box {
+    position: absolute;
+    border: 2px solid #e03131;
+    background-color: rgba(255, 230, 0, 0.25);
+    border-radius: 6px;
+    cursor: pointer;
+    box-shadow: 0 2px 10px rgba(224, 49, 49, 0.35);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    z-index: 18;
+}
+
+.lhu-saved-area-box:hover {
+    background-color: rgba(255, 212, 59, 0.45);
+    border-color: #c92a2a;
+    border-width: 2.5px;
+    box-shadow: 0 4px 16px rgba(201, 42, 42, 0.55);
+    transform: translateY(-1px);
+}
+
+.lhu-saved-area-box.is-active,
+.lhu-saved-area-box.pulse-highlight {
+    background-color: rgba(255, 146, 43, 0.4) !important;
+    border-color: #d90429 !important;
+    border-width: 3px !important;
+    box-shadow: 0 0 20px rgba(217, 4, 41, 0.75) !important;
+    animation: pulseAreaBox 1.2s ease-in-out infinite;
+}
+
+@keyframes pulseAreaBox {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.02); }
+    100% { transform: scale(1); }
+}
+
+/* Badge Label Nomor Sorotan di Atas Kotak */
+.lhu-area-badge {
+    position: absolute;
+    top: -12px;
+    left: 4px;
+    background: #d90429;
+    color: #ffffff;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 9999px;
+    border: 1.5px solid #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    white-space: nowrap;
+    pointer-events: none;
+    line-height: 1.4;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+/* Toolbar Mode Annotator */
+.lhu-annotator-toolbar {
+    background: rgba(21, 64, 106, 0.95);
+    backdrop-filter: blur(8px);
+    border-radius: 14px;
+    padding: 6px 12px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #ffffff;
+    z-index: 100;
+}
+
+.lhu-annotator-toolbar .btn-mode {
+    background: transparent;
+    color: #e2e8f0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 4px 12px;
+    font-size: 11.5px;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    transition: all 0.15s ease-in-out;
+}
+
+.lhu-annotator-toolbar .btn-mode:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+}
+
+.lhu-annotator-toolbar .btn-mode.active {
+    background: #ffd43b;
+    color: #1a1a1a;
+    border-color: #ffd43b;
+    box-shadow: 0 2px 8px rgba(255, 212, 59, 0.5);
 }
 
 @keyframes pulsePageAnim {

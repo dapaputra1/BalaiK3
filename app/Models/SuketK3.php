@@ -29,6 +29,8 @@ class SuketK3 extends Model
         'lokasi',
         'catatan',
         'catatan_evaluasi',
+        'catatan_revisi_pemohon',
+        'revisi_pemohon_at',
         'evaluasi_status',
         'evaluasi_by',
         'evaluasi_at',
@@ -59,6 +61,7 @@ class SuketK3 extends Model
         'faktor_k3' => 'array',
         'tanggal_surat' => 'date',
         'evaluasi_at' => 'datetime',
+        'revisi_pemohon_at' => 'datetime',
         'qc_at' => 'datetime',
         'signed_at' => 'datetime',
         'published_at' => 'datetime',
@@ -196,6 +199,22 @@ class SuketK3 extends Model
     public function comments(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
         return $this->hasMany(SuketK3Comment::class, 'suket_id')->latest();
+    }
+
+    public function lhuComments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SuketK3Comment::class, 'suket_id')
+            ->where(function ($q) {
+                $q->where('document_type', 'lhu')->orWhereNull('document_type');
+            })
+            ->latest();
+    }
+
+    public function suketComments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SuketK3Comment::class, 'suket_id')
+            ->where('document_type', 'suket')
+            ->latest();
     }
 
     public function evaluator(): BelongsTo

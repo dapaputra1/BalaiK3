@@ -708,5 +708,239 @@ class SuketK3WorkflowTest extends TestCase
         $stageQcViewRevisi->assertDontSee('<div class="fw-bold text-dark fs-6">ORD-SEPARATION-01</div>', false); // Hilang dari tabel QC
         $stageQcViewRevisi->assertDontSee("modalQc{$suket->id}");
     }
+
+    public function test_evaluasi_revisi_ke_pemohon_and_pemohon_submit_revision()
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $user = User::create([
+            'name' => 'Pemohon PT Berjaya',
+            'email' => 'berjaya@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+        $penguji = User::create([
+            'name' => 'Penguji K3 Lapangan',
+            'email' => 'penguji.lap@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'pcu',
+        ]);
+
+        $order = Permohonan::query()->create([
+            'kode' => 'ORD-REV-001',
+            'user_id' => $user->id,
+            'status_global' => 'selesai',
+            'status_lab' => 'selesai',
+        ]);
+
+        $suket = SuketK3::create([
+            'user_id' => $user->id,
+            'permohonan_id' => $order->id,
+            'nomor_order' => $order->kode,
+            'status_tahap' => 2,
+            'evaluasi_status' => 'pending',
+            'faktor_k3' => ['fisika'],
+            'lhu_source' => 'manual',
+            'lhu_file_path' => 'suket_docs/lhu/sample.pdf',
+            'lhu_file_name' => 'sample.pdf',
+            'perusahaan_nama' => 'PT Berjaya Sukses',
+            'lokasi' => 'Surabaya',
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+
+        // 1. Penguji K3 menambahkan sorotan catatan (baik teks biasa maupun format BOX area scan)
+        $commentRes1 = $this->actingAs($penguji)->post("/suket-k3/{$suket->id}/comment", [
+            'bagian' => 'Halaman 1',
+            'highlight_text' => '85 dBA',
+            'comment' => 'Nilai kebisingan di ruang genset melebihi NAB tapi belum disertai rekomendasi APD.',
+        ]);
+        $commentRes1->assertSessionHas('success');
+
+        $commentRes2 = $this->actingAs($penguji)->post("/suket-k3/{$suket->id}/comment", [
+            'bagian' => 'Halaman 2 (Area Scan/Box)',
+            'highlight_text' => '[BOX:2,15.50,30.00,50.00,20.00]',
+            'comment' => 'Tabel hasil scan tidak terbaca jelas pada bagian tanda tangan teknisi.',
+        ]);
+        $commentRes2->assertSessionHas('success');
+
+        $this->assertEquals(2, $suket->comments()->count());
+
+        // 2. Penguji K3 meminta revisi ke pemohon (reject_evaluasi)
+        $rejectRes = $this->actingAs($penguji)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'reject_evaluasi',
+            'catatan' => 'Mohon lakukan revisi dokumen LHU dan beri keterangan klarifikasi pada APD genset.',
+        ]);
+        $rejectRes->assertSessionHas('warning');
+
+        $suket->refresh();
+        $this->assertEquals('rejected', $suket->evaluasi_status);
+        $this->assertTrue($suket->isEvaluasiRejected());
+        $this->assertDatabaseHas('suket_k3_histories', [
+            'suket_id' => $suket->id,
+            'action' => 'evaluasi_rejected',
+        ]);
+
+        // 3. Pemohon membuka portal permohonan dan melihat notifikasi revisi & modal revisi
+        $portalRes = $this->actingAs($user)->get('/permohonan-suket');
+        $portalRes->assertStatus(200);
+        $portalRes->assertSee('Hasil Evaluasi LHU Memerlukan Perbaikan / Revisi');
+        $portalRes->assertSee("modalRevisiPemohon{$suket->id}");
+        $portalRes->assertSee('Kirim Revisi');
+
+        // 4. Pemohon mengirimkan tanggapan dan revisi dokumen baru
+        $fakePdf = UploadedFile::fake()->create('LHU_Revisi_Resmi.pdf', 200, 'application/pdf');
+        $revisionRes = $this->actingAs($user)->post("/permohonan-suket/{$suket->id}/submit-revision", [
+            'catatan_revisi' => 'Kami telah melampirkan LHU baru dengan spesifikasi APD earmuff dan scan tanda tangan yang jelas.',
+            'lhu_file' => $fakePdf,
+        ]);
+        $revisionRes->assertSessionHas('success');
+        $revisionRes->assertRedirect(route('user.suket.index'));
+
+        // 5. Status evaluasi harus kembali ke 'pending' agar ditelaah ulang oleh Penguji K3
+        $suket->refresh();
+        $this->assertEquals('pending', $suket->evaluasi_status);
+        $this->assertEquals('manual', $suket->lhu_source);
+        $this->assertEquals('LHU_Revisi_Resmi.pdf', $suket->lhu_file_name);
+        $this->assertNotNull($suket->lhu_file_path);
+        $this->assertEquals('Kami telah melampirkan LHU baru dengan spesifikasi APD earmuff dan scan tanda tangan yang jelas.', $suket->catatan_revisi_pemohon);
+        $this->assertNotNull($suket->revisi_pemohon_at);
+
+        // Pastikan penjelasan pemohon TIDAK masuk ke suket_k3_comments (agar tidak tercampur dengan sorotan kesalahan)
+        $this->assertEquals(2, $suket->comments()->count());
+        $this->assertDatabaseMissing('suket_k3_comments', [
+            'suket_id' => $suket->id,
+            'comment' => '[Tanggapan & Revisi Pemohon]: Kami telah melampirkan LHU baru dengan spesifikasi APD earmuff dan scan tanda tangan yang jelas.',
+        ]);
+
+        $this->assertDatabaseHas('suket_k3_histories', [
+            'suket_id' => $suket->id,
+            'action' => 'user_revised',
+        ]);
+
+        // Penguji membuka modal evaluasi di /suket-k3?stage=2 dan melihat kotak terpisah penjelasan revisi pemohon
+        $evaluatorViewRes = $this->actingAs($penguji)->get('/suket-k3?stage=2');
+        $evaluatorViewRes->assertStatus(200);
+        $evaluatorViewRes->assertSee('Penjelasan / Tanggapan Revisi Pemohon:');
+        $evaluatorViewRes->assertSee('Kami telah melampirkan LHU baru dengan spesifikasi APD earmuff dan scan tanda tangan yang jelas.');
+        $evaluatorViewRes->assertSee('Instruksi Koreksi Evaluator:');
+
+        // 6. Penguji K3 meninjau kembali dan menyetujui evaluasi -> Melangkah ke Tahap 3
+        $approveRes = $this->actingAs($penguji)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'next',
+            'catatan' => 'Revisi pemohon telah sesuai dan memenuhi standar Permenaker 05/2018.',
+        ]);
+        $approveRes->assertSessionHas('success');
+
+        $suket->refresh();
+        $this->assertEquals(3, $suket->status_tahap);
+        $this->assertEquals('approved', $suket->evaluasi_status);
+    }
+
+    public function test_qc_annotates_draft_suket_and_returns_to_penyusunan_stage()
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $qc = User::create([
+            'name' => 'QC Reviewer',
+            'email' => 'qc.evaluator@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'qc',
+        ]);
+        $penguji = User::create([
+            'name' => 'Penguji K3',
+            'email' => 'penguji.stage3@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'pcu',
+        ]);
+        $companyUser = User::create([
+            'name' => 'PT Manufaktur Suket',
+            'email' => 'pt.manufaktur@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+
+        $order = Permohonan::create([
+            'kode' => 'ORD-QC-ANNOTATE-001',
+            'user_id' => $companyUser->id,
+            'status_global' => 'selesai',
+        ]);
+
+        $suket = SuketK3::create([
+            'user_id' => $companyUser->id,
+            'permohonan_id' => $order->id,
+            'nomor_order' => $order->kode,
+            'status_tahap' => 3,
+            'evaluasi_status' => 'approved',
+            'qc_status' => 'pending',
+            'perusahaan_nama' => 'PT Manufaktur Suket',
+            'lokasi' => 'Surabaya',
+            'catatan' => 'Draf suket mohon ditinjau kelayakannya oleh tim QC.',
+        ]);
+
+        // 1. Tambah komentar evaluasi LHU terdahulu (Tahap 2)
+        $suket->comments()->create([
+            'user_id' => $penguji->id,
+            'target' => 'pemohon',
+            'document_type' => 'lhu',
+            'bagian' => 'Halaman 1 - Hasil Uji Kebisingan',
+            'highlight_text' => '85.4 dBA',
+            'comment' => 'Koreksi penulisan satuan desibel',
+        ]);
+
+        // 2. QC melakukan preview PDF dari draf suket
+        $previewPdfRes = $this->actingAs($qc)->get("/suket-k3/{$suket->id}/preview/draft_pdf");
+        $previewPdfRes->assertStatus(200);
+        $this->assertEquals('application/pdf', $previewPdfRes->headers->get('Content-Type'));
+
+        // 3. QC menambahkan sorotan kesalahan pada draf suket (document_type = 'suket')
+        $commentQc1 = $this->actingAs($qc)->post("/suket-k3/{$suket->id}/comment", [
+            'document_type' => 'suket',
+            'target' => 'internal',
+            'bagian' => 'Halaman 1 - Klausul Menimbang',
+            'highlight_text' => 'bahwa berdasarkan hasil pengujian lingkungan kerja',
+            'comment' => 'Perbaiki penulisan nomor dasar hukum Permenaker 05/2018 pasal 5',
+        ]);
+        $commentQc1->assertSessionHas('success');
+
+        $commentQc2 = $this->actingAs($qc)->post("/suket-k3/{$suket->id}/comment", [
+            'document_type' => 'suket',
+            'target' => 'internal',
+            'bagian' => 'Halaman 1 (Area Scan/Box)',
+            'highlight_text' => '[BOX:1,12.5%,34.2%,50.0%,20.0%]',
+            'comment' => 'Format tabel faktor bahaya kurang rapi dan belum mencantumkan NAB',
+        ]);
+        $commentQc2->assertSessionHas('success');
+
+        // Verifikasi pemisahan relasi lhuComments vs suketComments
+        $suket->refresh();
+        $this->assertEquals(1, $suket->lhuComments()->count());
+        $this->assertEquals(2, $suket->suketComments()->count());
+        $this->assertEquals(4, $suket->comments()->count() + 1); // 1 lhu + 2 suket = 3 comments
+
+        // 4. QC mengambil keputusan: Kembalikan ke Penyusunan (Perlu Revisi)
+        $returnRes = $this->actingAs($qc)->post("/suket-k3/{$suket->id}/qc-review", [
+            'action' => 'revision',
+            'catatan' => 'Mohon sesuaikan klausul menimbang dan perbaiki format tabel faktor bahaya sesuai poin sorotan QC.',
+        ]);
+        $returnRes->assertRedirect(route('suket.index', ['stage' => 3]));
+        $returnRes->assertSessionHas('warning');
+
+        $suket->refresh();
+        $this->assertEquals(3, $suket->status_tahap);
+        $this->assertEquals('revision', $suket->qc_status);
+        $this->assertEquals('Mohon sesuaikan klausul menimbang dan perbaiki format tabel faktor bahaya sesuai poin sorotan QC.', $suket->qc_note);
+        $this->assertEquals($qc->id, $suket->qc_by);
+
+        // 5. Penguji K3 membuka /suket-k3?stage=3 dan melihat poin sorotan QC
+        $stage3ViewRes = $this->actingAs($penguji)->get('/suket-k3?stage=3');
+        $stage3ViewRes->assertStatus(200);
+        $stage3ViewRes->assertSee('Catatan Arahan Revisi QC Sebelumnya:');
+        $stage3ViewRes->assertSee('Mohon sesuaikan klausul menimbang dan perbaiki format tabel faktor bahaya sesuai poin sorotan QC.');
+        $stage3ViewRes->assertSee('Daftar Arahan');
+        $stage3ViewRes->assertSee('Sorotan QC');
+        $stage3ViewRes->assertSee('Perbaiki penulisan nomor dasar hukum Permenaker 05/2018 pasal 5');
+        $stage3ViewRes->assertSee('Format tabel faktor bahaya kurang rapi dan belum mencantumkan NAB');
+    }
 }
 

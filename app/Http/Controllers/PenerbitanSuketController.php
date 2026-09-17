@@ -184,6 +184,84 @@ class PenerbitanSuketController extends Controller
     }
 
     /**
+     * User Pemohon: Mengirimkan Catatan Revisi & Dokumen Pembaharuan Evaluasi Tahap 2
+     */
+    public function userSubmitRevision(Request $request, SuketK3 $suket)
+    {
+        $user = auth()->user();
+        if ($user->role !== 'user' && $user->role !== 'superadmin') {
+            abort(403, 'Hanya pemohon yang dapat mengirimkan revisi evaluasi.');
+        }
+
+        if ($suket->user_id !== $user->id && $suket->permohonan?->user_id !== $user->id && $user->role !== 'superadmin') {
+            abort(403, 'Akses ditolak ke permohonan suket ini.');
+        }
+
+        $request->validate([
+            'catatan_revisi' => ['required', 'string', 'max:2000'],
+            'lhu_file' => ['nullable', 'file', 'extensions:pdf', 'max:20480'],
+            'denah_lokasi' => ['nullable', 'file', 'extensions:pdf,jpg,jpeg,png', 'max:20480'],
+            'foto_pengujian' => ['nullable', 'file', 'extensions:pdf,jpg,jpeg,png', 'max:20480'],
+        ], [
+            'catatan_revisi.required' => 'Penjelasan / tanggapan revisi wajib diisi.',
+            'lhu_file.extensions' => 'Dokumen LHU pengganti harus berformat PDF.',
+            'lhu_file.max' => 'Ukuran berkas LHU maksimal 20MB.',
+            'denah_lokasi.extensions' => 'Dokumen denah lokasi harus berformat PDF, JPG, JPEG, atau PNG.',
+            'foto_pengujian.extensions' => 'Dokumen foto pengujian harus berformat PDF, JPG, JPEG, atau PNG.',
+        ]);
+
+        $catatanRevisi = trim((string) $request->input('catatan_revisi'));
+
+        DB::transaction(function () use ($request, $suket, $catatanRevisi, $user) {
+            // Handle LHU jika pemohon mengunggah revisi LHU
+            if ($request->hasFile('lhu_file')) {
+                $file = $request->file('lhu_file');
+                $ext = strtolower($file->getClientOriginalExtension());
+                $suket->lhu_source = 'manual';
+                $suket->lhu_file_name = $file->getClientOriginalName();
+                $suket->lhu_file_path = $file->storeAs('suket_docs/lhu', 'lhu_rev_' . time() . '_' . uniqid() . '.' . $ext, self::PRIVATE_DISK);
+            }
+
+            // Handle Denah Lokasi jika pemohon mengunggah denah baru
+            if ($request->hasFile('denah_lokasi')) {
+                $file = $request->file('denah_lokasi');
+                $ext = strtolower($file->getClientOriginalExtension());
+                $suket->denah_lokasi_name = $file->getClientOriginalName();
+                $suket->denah_lokasi_path = $file->storeAs('suket_docs/denah', 'denah_rev_' . time() . '_' . uniqid() . '.' . $ext, self::PRIVATE_DISK);
+            }
+
+            // Handle Foto Pengujian jika pemohon mengunggah foto baru
+            if ($request->hasFile('foto_pengujian')) {
+                $file = $request->file('foto_pengujian');
+                $ext = strtolower($file->getClientOriginalExtension());
+                $suket->foto_pengujian_name = $file->getClientOriginalName();
+                $suket->foto_pengujian_path = $file->storeAs('suket_docs/foto', 'foto_rev_' . time() . '_' . uniqid() . '.' . $ext, self::PRIVATE_DISK);
+            }
+
+            // Simpan catatan tanggapan & penjelasan revisi pemohon ke kolom dedicated
+            $suket->catatan_revisi_pemohon = $catatanRevisi;
+            $suket->revisi_pemohon_at = now();
+
+            // Reset evaluasi_status ke pending agar kembali dievaluasi oleh Penguji K3
+            $suket->evaluasi_status = 'pending';
+            $suket->updated_by = $user->id;
+            $suket->save();
+
+            // Catat ke log histori suket
+            $suket->recordHistory(
+                action: 'user_revised',
+                stageBefore: 2,
+                stageAfter: 2,
+                catatan: 'Pemohon mengirimkan tanggapan dan berkas revisi evaluasi: ' . Str::limit($catatanRevisi, 120),
+                userId: $user->id
+            );
+        });
+
+        return redirect()->route('user.suket.index')
+            ->with('success', 'Tanggapan dan berkas revisi evaluasi berhasil dikirimkan ke Penguji K3 untuk ditelaah ulang.');
+    }
+
+    /**
      * Halaman Utama Internal Petugas: Monitoring Tahap 2 s/d Tahap 6
      */
     public function index(Request $request)
@@ -217,7 +295,7 @@ class PenerbitanSuketController extends Controller
         $search = $request->query('search');
 
         // Query Suket K3 untuk Internal
-        $suketQuery = SuketK3::with(['permohonan.company', 'user', 'creator', 'signer', 'publisher', 'qcUser', 'comments.user', 'evaluator', 'histories.user'])
+        $suketQuery = SuketK3::with(['permohonan.company', 'user', 'creator', 'signer', 'publisher', 'qcUser', 'comments.user', 'lhuComments.user', 'suketComments.user', 'evaluator', 'histories.user'])
             ->latest('updated_at');
 
         // Filter berdasarkan Stage aktif
@@ -386,23 +464,24 @@ class PenerbitanSuketController extends Controller
         $this->ensureAccess();
 
         $user = auth()->user();
-        if ($user && $user->role === 'user') {
+        $userRole = $user?->role;
+        if ($userRole === 'user') {
             if ($suket->user_id !== $user->id && $suket->permohonan?->user_id !== $user->id) {
-                abort(403, 'Akses ditolak ke dokumen permohonan ini.');
+                abort(403, 'Akses ditolak ke permohonan suket ini.');
             }
-            if (in_array($type, ['signed', 'final', 'draft'], true) && empty($suket->sent_to_customer_at)) {
+            if (in_array($type, ['signed', 'final', 'draft', 'draft_pdf'], true) && empty($suket->sent_to_customer_at)) {
                 abort(403, 'Dokumen Surat Keterangan K3 belum resmi diserahkan ke akun Anda. Mohon menunggu proses verifikasi dan penyerahan oleh Balai K3.');
             }
         }
 
-        if (in_array($type, ['signed', 'final', 'draft'], true)) {
+        if (in_array($type, ['signed', 'final', 'draft', 'draft_pdf'], true)) {
             $path = match ($type) {
                 'signed', 'final' => $suket->signed_file_path ?: $suket->draft_file_path,
-                'draft' => $suket->draft_file_path,
+                'draft', 'draft_pdf' => $suket->draft_file_path,
             };
 
             // Jika belum ada file draft tapi diminta draft, generate terlebih dahulu
-            if (!$path && $type === 'draft') {
+            if (!$path && in_array($type, ['draft', 'draft_pdf'], true)) {
                 $this->saveAutoGeneratedDraft($suket);
                 $path = $suket->draft_file_path;
             }
@@ -426,7 +505,27 @@ class PenerbitanSuketController extends Controller
                 ]);
             }
 
-            // 3. Jika berkas adalah .doc / .docx atau template bawaan:
+            // 3. Jika diminta output PDF (untuk PDF.js Annotator Review QC / Draf PDF preview)
+            if ($type === 'draft_pdf' || ($type === 'draft' && $request->query('format') === 'pdf')) {
+                $logoAsset = $this->resolveWordHeaderLogoAsset();
+                $logoAssetBase64 = $logoAsset ? base64_encode($logoAsset['binary']) : null;
+                $kepalaBalai = User::whereIn('role', ['kepala_balai', 'mp'])->first();
+
+                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.word.suket_k3_permenaker', [
+                    'suket' => $suket,
+                    'logoAssetBase64' => $logoAssetBase64,
+                    'kepalaBalaiNama' => $kepalaBalai?->name ?? 'Dr. H. Agus Triyono, S.T., M.Kes.',
+                    'kepalaBalaiNip' => $kepalaBalai?->nip ?? '19750812 200212 1 001',
+                    'isPreviewMode' => true,
+                ])->setPaper('a4', 'portrait');
+
+                return response($pdf->output(), 200, [
+                    'Content-Type' => 'application/pdf',
+                    'Content-Disposition' => 'inline; filename="Draft_Suket_' . $suket->nomor_order . '.pdf"',
+                ]);
+            }
+
+            // 4. Jika berkas adalah .doc / .docx atau template bawaan:
             // Render view HTML A4 resmi dengan format Permenaker 05/2018 beresolusi tinggi dan jelas
             $logoAsset = $this->resolveWordHeaderLogoAsset();
             $logoAssetBase64 = $logoAsset ? base64_encode($logoAsset['binary']) : null;
@@ -470,7 +569,7 @@ class PenerbitanSuketController extends Controller
     }
 
     /**
-     * Tambah Sorotan Kesalahan / Catatan Evaluasi Dokumen LHU (Highlight & Feedback)
+     * Tambah Sorotan Kesalahan / Catatan Evaluasi Dokumen LHU atau Draf Suket K3 (QC)
      */
     public function addComment(Request $request, SuketK3 $suket)
     {
@@ -482,45 +581,52 @@ class PenerbitanSuketController extends Controller
             'comment' => ['required', 'string', 'max:2000'],
             'target' => ['nullable', 'in:internal,pemohon'],
             'tipe' => ['nullable', 'in:kesalahan,saran,catatan'],
+            'document_type' => ['nullable', 'in:lhu,suket'],
         ], [
             'comment.required' => 'Catatan / penjelasan koreksi wajib diisi.',
         ]);
 
         $user = auth()->user();
+        $docType = $request->input('document_type', 'lhu');
+        $target = $request->input('target', ($docType === 'suket' ? 'internal' : 'pemohon'));
 
         $commentModel = $suket->comments()->create([
             'user_id' => $user?->id,
-            'target' => $request->input('target', 'pemohon'),
+            'target' => $target,
             'bagian' => $request->filled('bagian') ? trim((string) $request->input('bagian')) : null,
             'highlight_text' => $request->filled('highlight_text') ? trim((string) $request->input('highlight_text')) : null,
             'tipe' => $request->input('tipe', 'kesalahan'),
+            'document_type' => $docType,
             'comment' => trim((string) $request->input('comment')),
         ]);
+
+        $docLabel = $docType === 'suket' ? 'Draf Suket K3 (QC)' : 'LHU';
 
         $suket->recordHistory(
             action: 'comment_added',
             stageBefore: $suket->status_tahap,
             stageAfter: $suket->status_tahap,
-            catatan: 'Catatan / sorotan evaluasi ditambahkan: ' . Str::limit($commentModel->comment, 80),
+            catatan: "Catatan / sorotan evaluasi {$docLabel} ditambahkan: " . Str::limit($commentModel->comment, 80),
             userId: $user?->id
         );
 
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
-                'message' => 'Sorotan kesalahan / catatan evaluasi LHU berhasil ditambahkan.',
+                'message' => "Sorotan kesalahan / catatan evaluasi {$docLabel} berhasil ditambahkan.",
                 'comment' => [
                     'id' => $commentModel->id,
                     'bagian' => $commentModel->bagian,
                     'highlight_text' => $commentModel->highlight_text,
                     'comment' => $commentModel->comment,
+                    'document_type' => $commentModel->document_type,
                     'created_at_human' => $commentModel->created_at?->diffForHumans() ?? 'Baru saja',
                     'delete_url' => route('suket.comment.delete', [$suket->id, $commentModel->id]),
                 ],
             ]);
         }
 
-        return redirect()->back()->with('success', 'Sorotan kesalahan / catatan evaluasi LHU berhasil ditambahkan.');
+        return redirect()->back()->with('success', "Sorotan kesalahan / catatan evaluasi {$docLabel} berhasil ditambahkan.");
     }
 
     /**
@@ -587,7 +693,7 @@ class PenerbitanSuketController extends Controller
         if ($request->action === 'reject_evaluasi' && $currentStage === 2) {
             $catatanTolak = trim((string) $request->input('catatan'));
             if ($catatanTolak === '') {
-                return redirect()->back()->with('error', 'Alasan penolakan / instruksi revisi LHU wajib dituliskan.');
+                return redirect()->back()->with('error', 'Alasan / instruksi permintaan revisi ke pemohon wajib dituliskan.');
             }
 
             DB::transaction(function () use ($suket, $catatanTolak, $user) {
@@ -598,24 +704,17 @@ class PenerbitanSuketController extends Controller
                 $suket->updated_by = $user->id;
                 $suket->save();
 
-                // Simpan juga ke thread komentar pemohon agar tampil langsung di portal pemohon
-                $suket->comments()->create([
-                    'user_id' => $user->id,
-                    'target' => 'pemohon',
-                    'comment' => "[Ditolak / Minta Revisi LHU]: {$catatanTolak}",
-                ]);
-
                 $suket->recordHistory(
                     action: 'evaluasi_rejected',
                     stageBefore: 2,
                     stageAfter: 2,
-                    catatan: $catatanTolak,
+                    catatan: 'Evaluator meminta revisi ke pemohon: ' . $catatanTolak,
                     userId: $user->id
                 );
             });
 
             return redirect()->route('suket.index', ['stage' => 2])
-                ->with('warning', "Evaluasi Dokumen Suket {$suket->nomor_order} DITOLAK / Diminta Revisi ke Pemohon.");
+                ->with('warning', "Permintaan revisi berhasil dikirimkan ke pemohon untuk Suket {$suket->nomor_order}.");
         }
 
         // AKSI KHUSUS TAHAP 3: Kirim draf ke Tim QC (bukan langsung ke Penandatanganan Kepala Balai)
@@ -871,10 +970,11 @@ class PenerbitanSuketController extends Controller
                 $suket->updated_by = $user->id;
                 $suket->save();
 
-                // Simpan juga ke komentar internal
+                // Simpan juga ke komentar internal dokumen suket
                 $suket->comments()->create([
                     'user_id' => $user->id,
                     'target' => 'internal',
+                    'document_type' => 'suket',
                     'comment' => "[QC Mengembalikan Berkas ke Penyusunan]: {$catatanRevisi}",
                 ]);
 
