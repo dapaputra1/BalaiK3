@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class SuketK3WorkflowTest extends TestCase
@@ -132,7 +133,8 @@ class SuketK3WorkflowTest extends TestCase
         $previewResponse->assertSee('SURAT KETERANGAN');
 
         // 9. Tahap 3: Penguji K3 uploads revised draft
-        $revisedFile = UploadedFile::fake()->create('revisi_draf_suket.docx', 100, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        $docxBinary = app(\App\Services\SuketDocxService::class)->generateDocx($suket);
+        $revisedFile = UploadedFile::fake()->createWithContent('revisi_draf_suket.docx', $docxBinary);
         $this->actingAs($pcu)->post("/suket-k3/{$suket->id}/advance", [
             'action' => 'upload_draft',
             'revised_draft' => $revisedFile,
@@ -202,17 +204,86 @@ class SuketK3WorkflowTest extends TestCase
         $this->assertEquals('566/SK-LK/BK3-SBY/IX/2026', $suket->nomor_surat);
         $this->assertNotNull($suket->published_at);
 
-        // 13. Tahap 6: Admin menyerahkan langsung ke portal web pelanggan (tanpa resi fisik)
+        // 13. Tahap 6: Admin / Bendahara mengirim surat tagihan
+        $tagihanFile = UploadedFile::fake()->create('surat_tagihan.pdf', 100, 'application/pdf');
+        $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_tagihan',
+            'surat_tagihan_nominal' => '1.500.000',
+            'surat_tagihan_file' => $tagihanFile,
+            'catatan' => 'Surat tagihan telah diterbitkan',
+        ])->assertRedirect(route('suket.index', ['stage' => 6]));
+
+        $suket->refresh();
+        $this->assertNotNull($suket->surat_tagihan_sent_at);
+        $this->assertEquals(1500000, $suket->surat_tagihan_nominal);
+
+        // Pemohon melakukan ACC Surat Tagihan (Melangkah ke Tahap 7)
+        $this->actingAs($regularUser)->post("/permohonan-suket/{$suket->id}/acc-tagihan", [
+            'catatan' => 'Surat tagihan disetujui oleh pemohon',
+        ])->assertRedirect(route('user.suket.index'));
+
+        $suket->refresh();
+        $this->assertEquals(7, $suket->status_tahap);
+        $this->assertNotNull($suket->surat_tagihan_acc_at);
+
+        // 14. Tahap 7: Admin / Bendahara menerbitkan Kode Billing SIMPONI & Pemohon mengunggah bukti bayar
+        $billingFile = UploadedFile::fake()->create('billing_simponi.pdf', 100, 'application/pdf');
+        $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_billing',
+            'billing_kode' => 'SIMPONI-82736481',
+            'billing_expires_at' => now()->addDays(7)->toDateString(),
+            'billing_file' => $billingFile,
+        ])->assertRedirect(route('suket.index', ['stage' => 7]));
+
+        $suket->refresh();
+        $this->assertEquals('SIMPONI-82736481', $suket->billing_kode);
+        $this->assertNotNull($suket->billing_sent_at);
+
+        // Pemohon mengunggah bukti transfer / bayar
+        $proofFile = UploadedFile::fake()->create('bukti_bayar.pdf', 100, 'application/pdf');
+        $this->actingAs($regularUser)->post("/permohonan-suket/{$suket->id}/upload-payment-proof", [
+            'payment_proof' => $proofFile,
+            'catatan' => 'Bukti pembayaran SIMPONI telah diunggah',
+        ])->assertRedirect(route('user.suket.index'));
+
+        $suket->refresh();
+        $this->assertNotNull($suket->billing_proof_path);
+        $this->assertNotNull($suket->billing_paid_at);
+
+        // Bendahara / Admin memverifikasi bukti bayar (Melangkah ke Tahap 8)
+        $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'verify_payment',
+            'catatan' => 'Pembayaran telah divalidasi lunas',
+        ])->assertRedirect(route('suket.index', ['stage' => 8]));
+
+        $suket->refresh();
+        $this->assertEquals(8, $suket->status_tahap);
+        $this->assertNotNull($suket->billing_verified_at);
+
+        // 15. Tahap 8: Bendahara / Admin menerbitkan Kuitansi Resmi (Melangkah ke Tahap 9)
+        $kuitansiFile = UploadedFile::fake()->create('kuitansi_lunas.pdf', 100, 'application/pdf');
+        $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_kuitansi',
+            'kuitansi_nomor' => 'KWT/BK3/2026/09/001',
+            'kuitansi_file' => $kuitansiFile,
+        ])->assertRedirect(route('suket.index', ['stage' => 9]));
+
+        $suket->refresh();
+        $this->assertEquals(9, $suket->status_tahap);
+        $this->assertEquals('KWT/BK3/2026/09/001', $suket->kuitansi_nomor);
+        $this->assertNotNull($suket->kuitansi_sent_at);
+
+        // 16. Tahap 9: Admin menyerahkan langsung ke portal web pelanggan (tanpa resi fisik)
         $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
             'action' => 'next',
             'catatan' => 'Suket resmi telah tersedia di portal web Balai K3',
-        ])->assertRedirect(route('suket.index', ['stage' => 6]));
+        ])->assertRedirect(route('suket.index', ['stage' => 9]));
 
         $suket->refresh();
         $this->assertNotNull($suket->sent_to_customer_at);
         $this->assertEquals('Portal Digital Web Balai K3', $suket->metode_pengiriman);
 
-        // 14. Pemohon mengecek portal dan dapat melihat & preview suket yang sudah terbit
+        // 17. Pemohon mengecek portal dan dapat melihat & preview suket yang sudah terbit & diserahkan
         $userCheckResponse = $this->actingAs($regularUser)->get('/permohonan-suket');
         $userCheckResponse->assertStatus(200);
         $userCheckResponse->assertSee('566/SK-LK/BK3-SBY/IX/2026');
@@ -474,7 +545,7 @@ class SuketK3WorkflowTest extends TestCase
         $this->assertEquals($admin->id, $suket->signed_by);
     }
 
-    public function test_user_cannot_view_or_download_unreleased_stage_6_suket()
+    public function test_user_cannot_view_or_download_unreleased_stage_9_suket()
     {
         $this->withoutMiddleware(ValidateCsrfToken::class);
 
@@ -496,8 +567,8 @@ class SuketK3WorkflowTest extends TestCase
 
         $suket = SuketK3::create([
             'user_id' => $user->id,
-            'nomor_order' => 'ORD-STAGE6-TEST',
-            'status_tahap' => 6, // Di tahap 6
+            'nomor_order' => 'ORD-STAGE9-TEST',
+            'status_tahap' => 9, // Di tahap 9 (Penyerahan Suket)
             'nomor_surat' => '566/SK-LK/BK3-SBY/09/2026',
             'signed_file_path' => $signedPath,
             'signed_file_name' => 'Suket_Resmi_TTD.pdf',
@@ -941,6 +1012,586 @@ class SuketK3WorkflowTest extends TestCase
         $stage3ViewRes->assertSee('Sorotan QC');
         $stage3ViewRes->assertSee('Perbaiki penulisan nomor dasar hukum Permenaker 05/2018 pasal 5');
         $stage3ViewRes->assertSee('Format tabel faktor bahaya kurang rapi dan belum mencantumkan NAB');
+
+        // 6. Verifikasi bahwa komentar dan arahan QC HANYA berada di penyusun dan TIDAK masuk ke pemohon
+        $pemohonViewRes = $this->actingAs($companyUser)->get('/permohonan-suket');
+        $pemohonViewRes->assertStatus(200);
+        $pemohonViewRes->assertDontSee('Perbaiki penulisan nomor dasar hukum Permenaker 05/2018 pasal 5');
+        $pemohonViewRes->assertDontSee('Format tabel faktor bahaya kurang rapi dan belum mencantumkan NAB');
+        $pemohonViewRes->assertDontSee('QC Mengembalikan Berkas ke Penyusunan');
+        $pemohonViewRes->assertDontSee('Mohon sesuaikan klausul menimbang dan perbaiki format tabel faktor bahaya sesuai poin sorotan QC.');
+        $this->assertEquals(1, $suket->pemohonComments()->count());
+        $this->assertEquals('Koreksi penulisan satuan desibel', $suket->pemohonComments->first()->comment);
+    }
+
+    public function test_qc_rejected_draft_replacement_and_docx_format()
+    {
+        Storage::fake('local');
+
+        $user = User::create([
+            'name' => 'User Testing Docx',
+            'email' => 'user.docx@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+        $penguji = User::create([
+            'name' => 'Penguji Testing Docx',
+            'email' => 'penguji.docx@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'pcu',
+        ]);
+        $qc = User::create([
+            'name' => 'QC Testing Docx',
+            'email' => 'qc.docx@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'qc',
+        ]);
+
+        $suket = SuketK3::create([
+            'user_id' => $user->id,
+            'status_tahap' => 3,
+            'qc_status' => 'revision',
+            'qc_note' => 'Perbaiki klausul menimbang dan faktor K3.',
+            'nomor_order' => 'ORD-TEST-DOCX-001',
+            'perusahaan_nama' => 'PT Testing Docx Indonesia',
+            'faktor_k3' => ['fisika', 'kimia'],
+        ]);
+
+        // 1. Generate Draft endpoint generates genuine .docx
+        $genResponse = $this->actingAs($penguji)->get("/suket-k3/{$suket->id}/generate-draft");
+        $genResponse->assertStatus(200);
+        $genResponse->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        $this->assertStringContainsString('.docx', (string) $genResponse->headers->get('content-disposition'));
+
+        $suket->refresh();
+        $initialDraftPath = $suket->draft_file_path;
+        $this->assertNotNull($initialDraftPath);
+        $this->assertStringEndsWith('.docx', $initialDraftPath);
+        $this->assertTrue(Storage::disk('local')->exists($initialDraftPath));
+
+        // 2. Penguji uploads revised .docx via upload_draft action
+        $revisedDocxBinary = app(\App\Services\SuketDocxService::class)->generateDocx($suket);
+        $revisedUpload = UploadedFile::fake()->createWithContent('Draf_Suket_Revisi_Final.docx', $revisedDocxBinary);
+
+        $uploadRes = $this->actingAs($penguji)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'upload_draft',
+            'revised_draft' => $revisedUpload,
+            'catatan' => 'Draf revisi sudah diperbaiki sesuai catatan QC',
+        ]);
+        $uploadRes->assertRedirect(route('suket.index', ['stage' => 3]));
+        $uploadRes->assertSessionHas('success');
+
+        $suket->refresh();
+        $newDraftPath = $suket->draft_file_path;
+        $this->assertNotNull($newDraftPath);
+        $this->assertNotEquals($initialDraftPath, $newDraftPath);
+        $this->assertEquals('Draf_Suket_Revisi_Final.docx', $suket->draft_file_name);
+        // The old file must be replaced/deleted from disk
+        $this->assertFalse(Storage::disk('local')->exists($initialDraftPath));
+        // The new file must exist on disk
+        $this->assertTrue(Storage::disk('local')->exists($newDraftPath));
+
+        // 3. Preview Draft endpoint works with the new .docx
+        $previewRes = $this->actingAs($penguji)->get("/suket-k3/{$suket->id}/preview/draft");
+        $previewRes->assertStatus(200);
+
+        // 4. Penguji sends to QC with send_to_qc action (and no file upload)
+        $sendRes = $this->actingAs($penguji)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_to_qc',
+            'catatan' => 'Draf revisi diajukan kembali untuk verifikasi QC',
+        ]);
+        $sendRes->assertRedirect(route('suket.index', ['stage' => 3]));
+
+        $suket->refresh();
+        $this->assertEquals('pending', $suket->qc_status);
+        // Ensure revised file was NOT clobbered by send_to_qc
+        $this->assertEquals($newDraftPath, $suket->draft_file_path);
+        $this->assertEquals('Draf_Suket_Revisi_Final.docx', $suket->draft_file_name);
+
+        // 5. QC approves the revised draft
+        $approveRes = $this->actingAs($qc)->post("/suket-k3/{$suket->id}/qc-review", [
+            'action' => 'approve',
+            'nomor_surat' => '566/SK-LK/BK3-SBY/09/2026',
+            'tanggal_surat' => '2026-09-21',
+            'catatan' => 'Draf revisi disetujui.',
+        ]);
+        $approveRes->assertRedirect(route('suket.index', ['stage' => 4]));
+
+        $suket->refresh();
+        $this->assertEquals(4, $suket->status_tahap);
+        $this->assertEquals('approved', $suket->qc_status);
+        // Ensure revised file was NOT overwritten by auto-generated raw template
+        $this->assertEquals($newDraftPath, $suket->draft_file_path);
+        $this->assertEquals('Draf_Suket_Revisi_Final.docx', $suket->draft_file_name);
+
+        // Verify that the revised .docx XML physically contains the new nomor_surat assigned by QC
+        $docxFullPath = Storage::disk('local')->path($newDraftPath);
+        $zip = new \ZipArchive();
+        $this->assertTrue($zip->open($docxFullPath) === true);
+        $documentXml = $zip->getFromName('word/document.xml');
+        $this->assertStringContainsString('566/SK-LK/BK3-SBY/09/2026', $documentXml);
+        $zip->close();
+
+        // 6. Preview endpoint now renders with the QC approved nomor surat
+        $previewAfterQc = $this->actingAs($penguji)->get("/suket-k3/{$suket->id}/preview/draft");
+        $previewAfterQc->assertStatus(200);
+        $previewAfterQc->assertSee('566/SK-LK/BK3-SBY/09/2026');
+
+        // 7. Download endpoint downloads the revised .docx
+        $downloadRes = $this->actingAs($penguji)->get("/suket-k3/{$suket->id}/download/draft");
+        $downloadRes->assertStatus(200);
+        $this->assertStringContainsString('Draf_Suket_Revisi_Final.docx', (string) $downloadRes->headers->get('content-disposition'));
+    }
+
+    public function test_bendahara_role_permissions_and_financial_workflow(): void
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $bendahara = User::create([
+            'name' => 'Bendahara Suket',
+            'email' => 'bendahara.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'bendahara',
+        ]);
+
+        $user = User::create([
+            'name' => 'Pemohon Fin',
+            'email' => 'pemohon.fin.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+
+        $suket = SuketK3::create([
+            'user_id' => $user->id,
+            'nomor_order' => 'ORD-FIN-001',
+            'status_tahap' => 6,
+            'nomor_surat' => '566/SK-LK/BK3-SBY/09/2026',
+            'perusahaan_nama' => 'PT Keuangan Sukses',
+            'lokasi' => 'Gresik',
+        ]);
+
+        // 1. Bendahara access to index defaults to stage 6
+        $resIndex = $this->actingAs($bendahara)->get('/suket-k3');
+        $resIndex->assertStatus(200);
+        $resIndex->assertSee('Surat Tagihan');
+
+        // 2. Bendahara cannot access unauthorized stages (e.g., stage 4) -> defaults to allowed stage 6
+        $resStage4 = $this->actingAs($bendahara)->get('/suket-k3?stage=4');
+        $resStage4->assertStatus(200);
+        $resStage4->assertSee('Surat Tagihan');
+
+        // 3. Bendahara can access stages 6, 7, 8
+        $this->actingAs($bendahara)->get('/suket-k3?stage=6')->assertStatus(200)->assertSee('Surat Tagihan');
+        $this->actingAs($bendahara)->get('/suket-k3?stage=7')->assertStatus(200)->assertSee('Kode Billing');
+        $this->actingAs($bendahara)->get('/suket-k3?stage=8')->assertStatus(200)->assertSee('Kuitansi');
+
+        // 4. Bendahara cannot advance stage 4
+        $suketStage4 = SuketK3::create([
+            'user_id' => $user->id,
+            'nomor_order' => 'ORD-FIN-ST4',
+            'status_tahap' => 4,
+            'perusahaan_nama' => 'PT Penandatanganan',
+        ]);
+        $failAdvance = $this->actingAs($bendahara)->post("/suket-k3/{$suketStage4->id}/advance", [
+            'action' => 'next',
+        ]);
+        $failAdvance->assertSessionHas('error');
+
+        // 5. Bendahara can send Surat Tagihan in Stage 6
+        $tagihanFile = UploadedFile::fake()->create('Tagihan_Resmi.pdf', 100, 'application/pdf');
+        $this->actingAs($bendahara)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_tagihan',
+            'surat_tagihan_nominal' => '2.500.000',
+            'surat_tagihan_file' => $tagihanFile,
+            'catatan' => 'Surat tagihan diunggah oleh bendahara',
+        ])->assertRedirect(route('suket.index', ['stage' => 6]));
+
+        $suket->refresh();
+        $this->assertTrue($suket->isTagihanSent());
+        $this->assertEquals(2500000, $suket->surat_tagihan_nominal);
+        $this->assertEquals($bendahara->id, $suket->surat_tagihan_sent_by);
+
+        // 6. User Pemohon ACC Tagihan -> stage becomes 7
+        $this->actingAs($user)->post("/permohonan-suket/{$suket->id}/acc-tagihan")
+            ->assertRedirect(route('user.suket.index'));
+        $suket->refresh();
+        $this->assertEquals(7, $suket->status_tahap);
+        $this->assertTrue($suket->isTagihanAcc());
+
+        // 7. Bendahara sends Billing Code in Stage 7
+        $billingFile = UploadedFile::fake()->create('SIMPONI_BILLING.pdf', 80, 'application/pdf');
+        $this->actingAs($bendahara)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_billing',
+            'billing_kode' => '827361928374',
+            'billing_expires_at' => now()->addDays(5)->toDateString(),
+            'billing_file' => $billingFile,
+        ])->assertRedirect(route('suket.index', ['stage' => 7]));
+
+        $suket->refresh();
+        $this->assertTrue($suket->isBillingSent());
+        $this->assertEquals('827361928374', $suket->billing_kode);
+
+        // 8. User Pemohon uploads payment proof
+        $proof = UploadedFile::fake()->create('Bukti_Transfer.jpg', 150, 'image/jpeg');
+        $this->actingAs($user)->post("/permohonan-suket/{$suket->id}/upload-payment-proof", [
+            'payment_proof' => $proof,
+            'catatan' => 'Sudah bayar via Teller BNI',
+        ])->assertRedirect(route('user.suket.index'));
+
+        $suket->refresh();
+        $this->assertTrue($suket->isBillingPaid());
+
+        // 9. Bendahara verifies payment -> stage becomes 8
+        $this->actingAs($bendahara)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'verify_payment',
+            'catatan' => 'Dana PNBP telah masuk rekening kas negara',
+        ])->assertRedirect(route('suket.index', ['stage' => 8]));
+
+        $suket->refresh();
+        $this->assertEquals(8, $suket->status_tahap);
+        $this->assertTrue($suket->isBillingVerified());
+        $this->assertEquals($bendahara->id, $suket->billing_verified_by);
+
+        // 10. Bendahara sends Kuitansi -> stage becomes 9
+        $kuitansiFile = UploadedFile::fake()->create('Kuitansi_Lunas.pdf', 90, 'application/pdf');
+        $this->actingAs($bendahara)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_kuitansi',
+            'kuitansi_nomor' => 'KWT/BK3/2026/09/0099',
+            'kuitansi_file' => $kuitansiFile,
+        ])->assertRedirect(route('suket.index', ['stage' => 9]));
+
+        $suket->refresh();
+        $this->assertEquals(9, $suket->status_tahap);
+        $this->assertTrue($suket->isKuitansiSent());
+        $this->assertEquals('KWT/BK3/2026/09/0099', $suket->kuitansi_nomor);
+    }
+
+    public function test_admin_can_sync_financial_stages_from_permohonan_draft_lhu(): void
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $admin = User::create([
+            'name' => 'Admin Sync',
+            'email' => 'admin.sync.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
+        ]);
+
+        $user = User::create([
+            'name' => 'Pemohon Sync',
+            'email' => 'pemohon.sync.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+
+        $permohonan = Permohonan::create([
+            'user_id' => $user->id,
+            'kode' => 'PERM-SYNC-001',
+            'status_global' => 'kode_billing',
+        ]);
+
+        DraftLhu::create([
+            'permohonan_id' => $permohonan->id,
+            'surat_tagihan_file_path' => 'tagihan_test.pdf',
+            'surat_tagihan_file_name' => 'tagihan_test.pdf',
+            'surat_tagihan_generated_at' => now()->subDay(),
+            'surat_tagihan_generated_by' => $admin->id,
+            'billing_file_path' => 'billing_test.pdf',
+            'billing_file_name' => 'SIMPONI-SYNC-999.pdf',
+            'billing_sent_at' => now()->subHours(12),
+            'billing_sent_by' => $admin->id,
+            'billing_payment_proof_path' => 'proof_test.pdf',
+            'billing_payment_proof_name' => 'proof_test.pdf',
+            'billing_paid_at' => now()->subHours(6),
+            'billing_verified_at' => now()->subHours(2),
+            'billing_verified_by' => $admin->id,
+            'invoice_file_path' => 'kuitansi_test.pdf',
+            'invoice_file_name' => 'kuitansi_test.pdf',
+            'invoice_generated_at' => now()->subHour(),
+            'invoice_generated_by' => $admin->id,
+        ]);
+
+        $suket = SuketK3::create([
+            'user_id' => $user->id,
+            'permohonan_id' => $permohonan->id,
+            'nomor_order' => 'ORD-SYNC-001',
+            'status_tahap' => 6,
+            'nomor_surat' => '566/SK-LK/BK3-SBY/09/2026',
+            'perusahaan_nama' => 'PT Sinkronisasi Sukses',
+        ]);
+
+        $res = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'sync_from_permohonan',
+        ]);
+        $res->assertRedirect(route('suket.index', ['stage' => 9]));
+
+        $suket->refresh();
+        $this->assertEquals(9, $suket->status_tahap);
+        $this->assertEquals('SIMPONI-SYNC-999.pdf', $suket->billing_kode);
+        $this->assertTrue($suket->isTagihanSent());
+        $this->assertTrue($suket->isBillingSent());
+        $this->assertTrue($suket->isBillingVerified());
+        $this->assertTrue($suket->isKuitansiSent());
+    }
+
+    public function test_billing_stage_payment_guide_upload_and_proof_rejection_and_acc_workflow(): void
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $admin = User::create([
+            'name' => 'Admin Keuangan',
+            'email' => 'admin.keuangan.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
+        ]);
+
+        $pemohon = User::create([
+            'name' => 'PT Mitra Sejahtera',
+            'email' => 'mitra.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+
+        $suket = SuketK3::create([
+            'user_id' => $pemohon->id,
+            'nomor_order' => 'ORD-GUIDE-001',
+            'status_tahap' => 6,
+            'nomor_surat' => '566/SK-LK/BK3-SBY/09/2026',
+            'perusahaan_nama' => 'PT Mitra Sejahtera',
+            'lokasi' => 'Surabaya',
+        ]);
+
+        // 1. Admin sends Surat Tagihan
+        $tagihanFile = UploadedFile::fake()->create('Tagihan_Mitra.pdf', 100, 'application/pdf');
+        $resTagihan = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_tagihan',
+            'surat_tagihan_nominal' => '3.500.000',
+            'surat_tagihan_file' => $tagihanFile,
+        ]);
+        $resTagihan->assertRedirect(route('suket.index', ['stage' => 6]));
+
+        $suket->refresh();
+        $this->assertTrue($suket->isTagihanSent());
+        $this->assertFalse($suket->isTagihanAcc());
+        $this->assertEquals(6, $suket->status_tahap);
+
+        // Admin sees "Menunggu ACC"
+        $adminView6 = $this->actingAs($admin)->get('/suket-k3?stage=6');
+        $adminView6->assertStatus(200);
+        $adminView6->assertSee('Menunggu ACC');
+
+        // 2. Pemohon sees "ACC Surat Tagihan" button on portal
+        $userView6 = $this->actingAs($pemohon)->get('/permohonan-suket');
+        $userView6->assertStatus(200);
+        $userView6->assertSee('Menunggu Konfirmasi ACC Anda');
+        $userView6->assertSee('Rp 3.500.000');
+        $userView6->assertSee('ACC Surat Tagihan');
+
+        // 3. Pemohon clicks "ACC Surat Tagihan" -> otomatis beralih ke Tahap 7 (Kode Billing)
+        $accRes = $this->actingAs($pemohon)->post("/permohonan-suket/{$suket->id}/acc-tagihan");
+        $accRes->assertRedirect(route('user.suket.index'));
+
+        $suket->refresh();
+        $this->assertTrue($suket->isTagihanAcc());
+        $this->assertEquals(7, $suket->status_tahap);
+
+        // 4. Admin Stage 7: Uploads Panduan Pembayaran & Kode Billing SIMPONI, then sends to pemohon
+        $guideFile = UploadedFile::fake()->create('Panduan_Bayar_Mandiri.pdf', 200, 'application/pdf');
+        $billingFile = UploadedFile::fake()->create('Penetapan_Billing.pdf', 150, 'application/pdf');
+
+        $sendBillingRes = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_billing',
+            'billing_kode' => '82024092100088',
+            'billing_expires_at' => now()->addDays(3)->toDateString(),
+            'billing_file' => $billingFile,
+            'billing_guide_file' => $guideFile,
+        ]);
+        $sendBillingRes->assertRedirect(route('suket.index', ['stage' => 7]));
+
+        $suket->refresh();
+        $this->assertTrue($suket->isBillingSent());
+        $this->assertTrue($suket->hasBillingGuide());
+        $this->assertEquals('82024092100088', $suket->billing_kode);
+        $this->assertNotNull($suket->billing_guide_path);
+
+        // 5. Pemohon downloads Panduan Pembayaran & Billing Document
+        $dlGuide = $this->actingAs($pemohon)->get("/permohonan-suket/{$suket->id}/download/guide");
+        $dlGuide->assertStatus(200);
+
+        $dlBilling = $this->actingAs($pemohon)->get("/permohonan-suket/{$suket->id}/download/billing");
+        $dlBilling->assertStatus(200);
+
+        // Pemohon portal displays "Unduh Panduan Pembayaran"
+        $userView7 = $this->actingAs($pemohon)->get('/permohonan-suket');
+        $userView7->assertStatus(200);
+        $userView7->assertSee('82024092100088');
+        $userView7->assertSee('Unduh Panduan Pembayaran');
+        $userView7->assertSee('Unduh Salinan Billing');
+
+        // 6. Pemohon uploads Bukti Pembayaran / Transfer
+        $proofFile1 = UploadedFile::fake()->create('Bukti_Transfer_Buram.jpg', 120, 'image/jpeg');
+        $uploadProofRes = $this->actingAs($pemohon)->post("/permohonan-suket/{$suket->id}/upload-payment-proof", [
+            'payment_proof' => $proofFile1,
+            'catatan' => 'Transfer via m-banking',
+        ]);
+        $uploadProofRes->assertRedirect(route('user.suket.index'));
+
+        $suket->refresh();
+        $this->assertTrue($suket->isBillingPaid());
+        $this->assertTrue($suket->isBillingProofPending());
+        $this->assertFalse($suket->isBillingProofRejected());
+
+        // 7. Admin reviews proof and TOLAK karena salah / buram (reject_payment)
+        $rejectRes = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'reject_payment',
+            'reject_proof_note' => 'Foto bukti transfer buram dan nominal tidak terbaca. Mohon unggah ulang.',
+        ]);
+        $rejectRes->assertRedirect(route('suket.index', ['stage' => 7]));
+
+        $suket->refresh();
+        $this->assertEquals(7, $suket->status_tahap); // Remains in Stage 7
+        $this->assertTrue($suket->isBillingProofRejected());
+        $this->assertEquals('Foto bukti transfer buram dan nominal tidak terbaca. Mohon unggah ulang.', $suket->billing_proof_reject_note);
+        $this->assertNotNull($suket->billing_proof_rejected_at);
+        $this->assertEquals($admin->id, $suket->billing_proof_rejected_by);
+
+        // Admin table reflects "Bukti Ditolak"
+        $adminViewRejected = $this->actingAs($admin)->get('/suket-k3?stage=7');
+        $adminViewRejected->assertStatus(200);
+        $adminViewRejected->assertSee('Bukti Ditolak');
+
+        // 8. Pemohon sees rejection alert and "Upload Ulang Bukti Pembayaran"
+        $userViewRejected = $this->actingAs($pemohon)->get('/permohonan-suket');
+        $userViewRejected->assertStatus(200);
+        $userViewRejected->assertSee('Bukti Pembayaran Anda Ditolak oleh Bendahara/Admin');
+        $userViewRejected->assertSee('Foto bukti transfer buram dan nominal tidak terbaca');
+        $userViewRejected->assertSee('Upload Ulang Bukti Pembayaran');
+
+        // 9. Pemohon uploads corrected proof
+        $proofFile2 = UploadedFile::fake()->create('Bukti_Transfer_Jelas.pdf', 180, 'application/pdf');
+        $reuploadProofRes = $this->actingAs($pemohon)->post("/permohonan-suket/{$suket->id}/upload-payment-proof", [
+            'payment_proof' => $proofFile2,
+            'catatan' => 'Bukti resmi struk ATM hasil scan jelas',
+        ]);
+        $reuploadProofRes->assertRedirect(route('user.suket.index'));
+
+        $suket->refresh();
+        $this->assertFalse($suket->isBillingProofRejected());
+        $this->assertTrue($suket->isBillingProofPending());
+        $this->assertNull($suket->billing_proof_reject_note);
+
+        // 10. Admin verifies & ACCs the corrected proof (verify_payment) -> advances to Stage 8 (Kuitansi)
+        $verifyRes = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'verify_payment',
+            'catatan' => 'Bukti transfer valid dan dana terkonfirmasi di rekening kas negara.',
+        ]);
+        $verifyRes->assertRedirect(route('suket.index', ['stage' => 8]));
+
+        $suket->refresh();
+        $this->assertEquals(8, $suket->status_tahap);
+        $this->assertTrue($suket->isBillingVerified());
+        $this->assertEquals('approved', $suket->billing_proof_status);
+        $this->assertEquals($admin->id, $suket->billing_verified_by);
+    }
+
+    public function test_stage_6_and_7_button_labels_and_gradual_advancement(): void
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $admin = User::create([
+            'name' => 'Admin Button Test',
+            'email' => 'admin.btn.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
+        ]);
+        $pemohon = User::create([
+            'name' => 'Pemohon Button Test',
+            'email' => 'pemohon.btn.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+
+        $suket = SuketK3::create([
+            'user_id' => $pemohon->id,
+            'nomor_order' => 'ORD-BTN-001',
+            'status_tahap' => 6,
+            'perusahaan_nama' => 'PT Uji Tombol',
+            'lokasi' => 'Gresik',
+            'created_by' => $pemohon->id,
+            'nomor_surat' => '566/SK-K3/IX/2026',
+        ]);
+
+        // Verifikasi tombol di halaman admin tahap 6
+        $resStage6 = $this->actingAs($admin)->get('/suket-k3?stage=6');
+        $resStage6->assertStatus(200);
+        $resStage6->assertSee('Simpan & Kirim Tagihan ke Pemohon', false);
+
+        // Klik Simpan & Kirim Tagihan: status_tahap tetap 6
+        $postTagihan = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_tagihan',
+            'surat_tagihan_nominal' => '2500000',
+        ]);
+        $postTagihan->assertRedirect(route('suket.index', ['stage' => 6]));
+
+        $suket->refresh();
+        $this->assertEquals(6, $suket->status_tahap);
+        $this->assertTrue($suket->isTagihanSent());
+        $this->assertFalse($suket->isTagihanAcc());
+
+        // Pemohon ACC tagihan -> otomatis beralih ke Tahap 7
+        $this->actingAs($pemohon)->post("/permohonan-suket/{$suket->id}/acc-tagihan")
+            ->assertRedirect(route('user.suket.index'));
+
+        $suket->refresh();
+        $this->assertEquals(7, $suket->status_tahap);
+        $this->assertTrue($suket->isTagihanAcc());
+
+        // Verifikasi tombol di halaman admin tahap 7
+        $resStage7 = $this->actingAs($admin)->get('/suket-k3?stage=7');
+        $resStage7->assertStatus(200);
+        $resStage7->assertSee('Simpan & Kirim Kode Billing + Panduan ke Pemohon', false);
+
+        // Admin kirim billing & panduan: status_tahap tetap 7 (menunggu pemohon bayar)
+        $postBilling = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_billing',
+            'billing_kode' => '82024092199999',
+        ]);
+        $postBilling->assertRedirect(route('suket.index', ['stage' => 7]));
+
+        $suket->refresh();
+        $this->assertEquals(7, $suket->status_tahap);
+        $this->assertTrue($suket->isBillingSent());
+
+        // Pemohon upload bukti bayar
+        $proof = UploadedFile::fake()->create('Bukti_Transfer_Asli.pdf', 100, 'application/pdf');
+        $this->actingAs($pemohon)->post("/permohonan-suket/{$suket->id}/upload-payment-proof", [
+            'payment_proof' => $proof,
+        ])->assertRedirect(route('user.suket.index'));
+
+        $suket->refresh();
+        $this->assertTrue($suket->isBillingProofPending());
+
+        // Admin verifikasi bukti bayar (ACC) -> baru lanjut ke Tahap 8 (Kuitansi)
+        $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'verify_payment',
+        ])->assertRedirect(route('suket.index', ['stage' => 8]));
+
+        $suket->refresh();
+        $this->assertEquals(8, $suket->status_tahap);
+
+        // Verifikasi tombol di halaman admin tahap 8
+        $resStage8 = $this->actingAs($admin)->get('/suket-k3?stage=8');
+        $resStage8->assertStatus(200);
+        $resStage8->assertSee('Simpan & Kirim Kuitansi ke Pemohon', false);
+
+        // Admin kirim kuitansi -> otomatis lanjut ke Tahap 9 (Penyerahan Suket)
+        $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_kuitansi',
+            'kuitansi_nomor' => 'KWT/BK3-SBY/20260921/999',
+        ])->assertRedirect(route('suket.index', ['stage' => 9]));
+
+        $suket->refresh();
+        $this->assertEquals(9, $suket->status_tahap);
     }
 }
 

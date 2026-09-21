@@ -311,15 +311,17 @@
                 $labelTahap = \App\Models\SuketK3::STAGES[$stageNumber]['label'] ?? "Tahap {$stageNumber}";
                 $fList = is_array($suket->faktor_k3) ? $suket->faktor_k3 : [];
 
-                // Tentukan status stepper untuk 6 tahapan
-                // 1: Permohonan, 2: Evaluasi Dokumen, 3: Penyusunan Suket, 4: Penandatanganan Suket, 5: Penerbitan Suket, 6: Penyerahan Suket
+                // Tentukan status stepper untuk 9 tahapan
                 $steps = [
                     1 => 'Permohonan',
                     2 => 'Evaluasi Dokumen',
                     3 => 'Penyusunan Suket',
                     4 => 'Penandatanganan Suket',
                     5 => 'Penerbitan Suket',
-                    6 => 'Penyerahan Suket',
+                    6 => 'Surat Tagihan',
+                    7 => 'Kode Billing',
+                    8 => 'Kuitansi',
+                    9 => 'Penyerahan Suket',
                 ];
             @endphp
             <div class="col-12 user-suket-card-item" 
@@ -363,7 +365,7 @@
                                     <i class="bi bi-x-circle me-1"></i>Evaluasi Perlu Revisi
                                 </span>
                                 <div class="small text-danger fw-semibold" style="font-size: 11px;">
-                                    Terdapat {{ $suket->comments ? $suket->comments->count() : 0 }} Poin Catatan Penguji K3 (Klik untuk lihat)
+                                    Terdapat {{ $suket->pemohonComments ? $suket->pemohonComments->count() : 0 }} Poin Catatan Penguji K3 (Klik untuk lihat)
                                 </div>
                             @else
                                 <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 rounded-pill fw-semibold mb-1 d-inline-block"
@@ -397,7 +399,7 @@
                                 @if($isDelivered)
                                     <span class="text-success fw-bold"><i class="bi bi-check-circle-fill me-1"></i>Tuntas 100%</span>
                                 @else
-                                    <span>Tahap {{ $stageNumber }} dari 6</span>
+                                    <span>Tahap {{ $stageNumber }} dari 9</span>
                                 @endif
                             </div>
                         </div>
@@ -479,7 +481,7 @@
                                 >
                                     <i class="bi bi-file-earmark-check me-1"></i>
                                     @if($suket->isEvaluasiRejected())
-                                        Lihat Hasil Evaluasi ({{ $suket->comments ? $suket->comments->count() : 0 }})
+                                        Lihat Hasil Evaluasi ({{ $suket->pemohonComments ? $suket->pemohonComments->count() : 0 }})
                                     @else
                                         Evaluasi Dokumen LHU
                                     @endif
@@ -497,7 +499,7 @@
                                     </button>
                                 @endif
 
-                                {{-- GATE KEAMANAN TAHAP 6: HANYA TAMPIL JIKA SUKET SUDAH DISERAHKAN (sent_to_customer_at) --}}
+                                {{-- GATE KEAMANAN TAHAP 9: HANYA TAMPIL JIKA SUKET SUDAH DISERAHKAN (sent_to_customer_at) --}}
                                 @if($isDelivered && ($suket->signed_file_path || $suket->draft_file_path))
                                     <button 
                                         type="button" 
@@ -510,11 +512,36 @@
                                         href="{{ route('user.suket.download-doc', [$suket->id, 'signed']) }}" 
                                         class="btn btn-outline-success btn-sm rounded-pill px-3 fw-semibold"
                                         title="Unduh Berkas Suket Resmi"
+                                        download
                                     >
-                                        <i class="bi bi-download me-1"></i>Unduh
+                                        <i class="bi bi-download me-1"></i>Unduh Suket
+                                    </a>
+                                @elseif($stageNumber === 6 && !$suket->isTagihanAcc())
+                                    <form action="{{ route('user.suket.acc-tagihan', $suket->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda menyetujui (ACC) Surat Tagihan ini?')">
+                                        @csrf
+                                        <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm">
+                                            <i class="bi bi-check-circle-fill me-1"></i>ACC Tagihan
+                                        </button>
+                                    </form>
+                                @elseif($stageNumber === 7 && !$suket->isBillingPaid())
+                                    <button 
+                                        type="button" 
+                                        class="btn btn-sm btn-warning rounded-pill px-3 fw-semibold shadow-sm text-dark"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modalUploadBukti{{ $suket->id }}"
+                                    >
+                                        <i class="bi bi-upload me-1"></i>Upload Bukti Bayar
+                                    </button>
+                                @elseif($stageNumber === 8 && $suket->kuitansi_file_path)
+                                    <a 
+                                        href="{{ route('user.suket.download-doc', [$suket->id, 'kuitansi']) }}" 
+                                        class="btn btn-sm btn-info rounded-pill px-3 text-white fw-semibold shadow-sm"
+                                        download
+                                    >
+                                        <i class="bi bi-download me-1"></i>Unduh Kuitansi
                                     </a>
                                 @else
-                                    {{-- JIKA BELUM DISERAHKAN: TOMBOL TERKUNCI DENGAN INDIKATOR DALAM PROSES --}}
+                                    {{-- JIKA BELUM DISERAHKAN: INDIKATOR DALAM PROSES --}}
                                     <button 
                                         type="button" 
                                         class="btn btn-outline-secondary btn-sm rounded-pill px-3" 
@@ -537,7 +564,7 @@
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="badge bg-danger text-white rounded-pill px-2 py-1 small">
-                                        {{ $suket->comments ? $suket->comments->count() : 0 }} Poin Sorotan Kesalahan
+                                        {{ $suket->pemohonComments ? $suket->pemohonComments->count() : 0 }} Poin Sorotan Kesalahan
                                     </span>
                                     <button type="button" class="btn btn-sm btn-outline-danger bg-white rounded-pill px-3 shadow-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}">
                                         <i class="bi bi-eye-fill me-1"></i>Lihat Sorotan Dokumen
@@ -562,13 +589,13 @@
                             @endif
 
                             {{-- DAFTAR HIGHLIGHT / SOROTAN KESALAHAN LHU DARI PENGUJI --}}
-                            @if($suket->comments && $suket->comments->count() > 0)
+                            @if($suket->pemohonComments && $suket->pemohonComments->count() > 0)
                                 <div class="mb-1">
                                     <div class="small fw-bold text-dark mb-2">
                                         <i class="bi bi-highlighter text-danger me-1"></i>Daftar Bagian LHU yang Disorot Salah oleh Penguji K3:
                                     </div>
                                     <div class="d-flex flex-column gap-2">
-                                        @foreach($suket->comments as $cm)
+                                        @foreach($suket->pemohonComments as $cm)
                                             <div class="card border rounded-3 p-3 bg-white shadow-xs border-danger-subtle" id="user-comment-card-{{ $suket->id }}-{{ $cm->id }}">
                                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                                     <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -645,10 +672,208 @@
                                 @elseif($stageNumber === 4)
                                     Permohonan Anda berada pada <strong>Tahap 4: Penandatanganan Suket</strong>. Dokumen Surat Keterangan resmi (No: <strong>{{ $suket->nomor_surat }}</strong>) sedang dalam proses penandatanganan dan pengesahan oleh Kepala Balai K3 Surabaya.
                                 @elseif($stageNumber === 5)
-                                    Permohonan Anda berada pada <strong>Tahap 5: Penerbitan Suket</strong>. Dokumen resmi telah disahkan oleh Kepala Balai dan sedang dalam proses finalisasi penerbitan surat.
+                                    Permohonan Anda berada pada <strong>Tahap 5: Penerbitan Suket</strong>. Dokumen resmi telah disahkan oleh Kepala Balai dan sedang dalam proses finalisasi penerbitan surat sebelum surat tagihan diterbitkan.
+                                @elseif($stageNumber === 6)
+                                    Permohonan Anda berada pada <strong>Tahap 6: Surat Tagihan</strong>. Silakan periksa rincian tagihan di bawah dan klik tombol <strong>ACC Surat Tagihan</strong> untuk melanjutkan ke penerbitan Kode Billing SIMPONI.
+                                @elseif($stageNumber === 7)
+                                    Permohonan Anda berada pada <strong>Tahap 7: Kode Billing</strong>. Silakan lakukan pembayaran PNBP menggunakan Kode Billing SIMPONI resmi sebelum batas waktu kedaluwarsa, lalu unggah bukti pembayaran di bawah.
+                                @elseif($stageNumber === 8)
+                                    Permohonan Anda berada pada <strong>Tahap 8: Kuitansi</strong>. Pembayaran Anda telah terverifikasi dan kuitansi lunas telah diterbitkan. Berkas sedang dalam persiapan penyerahan digital.
+                                @elseif($stageNumber === 9)
+                                    Permohonan Anda berada pada <strong>Tahap 9: Penyerahan Suket</strong>. @if($isDelivered) Surat Keterangan K3 resmi Anda telah diserahkan dan dapat diunduh di atas. @else Berkas sedang diserahkan oleh Administrator ke portal akun Anda. @endif
                                 @else
                                     Permohonan Anda saat ini berada pada <strong>Tahap {{ $stageNumber }}: {{ $labelTahap }}</strong>. Berkas resmi Suket akan otomatis dapat dilihat dan diunduh di sini setelah tuntas diserahkan oleh tim Balai K3.
                                 @endif
+                            </div>
+                        </div>
+
+                        {{-- INTERACTIVE CARD TAHAP 6: SURAT TAGIHAN --}}
+                        @if($stageNumber === 6 || $suket->isTagihanSent())
+                            <div class="card border-primary border-opacity-25 bg-primary bg-opacity-10 rounded-3 p-3 mt-3">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                    <div class="fw-bold text-navy">
+                                        <i class="bi bi-envelope-paper me-1"></i> Surat Tagihan Suket K3
+                                    </div>
+                                    <span class="badge {{ $suket->isTagihanAcc() ? 'bg-success' : 'bg-warning text-dark' }} rounded-pill">
+                                        {{ $suket->isTagihanAcc() ? 'Tagihan Telah Di-ACC' : 'Menunggu Konfirmasi ACC Anda' }}
+                                    </span>
+                                </div>
+                                <div class="small text-dark mb-2">
+                                    Nominal Tagihan: <strong class="fs-6 text-navy">{{ $suket->surat_tagihan_nominal ? ('Rp ' . number_format($suket->surat_tagihan_nominal, 0, ',', '.')) : 'Sesuai tarif PNBP resmi' }}</strong>
+                                </div>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    @if($suket->surat_tagihan_file_path)
+                                        <a href="{{ route('user.suket.download-doc', [$suket->id, 'tagihan']) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3" download>
+                                            <i class="bi bi-file-earmark-pdf me-1"></i> Unduh Berkas Surat Tagihan
+                                        </a>
+                                    @endif
+                                    @if(!$suket->isTagihanAcc())
+                                        <form action="{{ route('user.suket.acc-tagihan', $suket->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda menyetujui (ACC) Surat Tagihan ini untuk diterbitkan Kode Billing SIMPONI?')">
+                                            @csrf
+                                            <button type="submit" class="btn btn-sm btn-success rounded-pill px-4 shadow-sm fw-semibold">
+                                                <i class="bi bi-check-circle-fill me-1"></i> ACC Surat Tagihan
+                                            </button>
+                                        </form>
+                                    @else
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill small">
+                                            <i class="bi bi-check2-circle me-1"></i> Disetujui pada: {{ \Carbon\Carbon::parse($suket->surat_tagihan_acc_at)->format('d/m/Y H:i') }}
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- INTERACTIVE CARD TAHAP 7: KODE BILLING --}}
+                        @if($stageNumber === 7 || $suket->isBillingSent())
+                            <div class="card border-warning border-opacity-50 bg-warning bg-opacity-10 rounded-3 p-3 mt-3">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                    <div class="fw-bold text-dark">
+                                        <i class="bi bi-upc me-1"></i> Kode Billing SIMPONI / PNBP
+                                    </div>
+                                    @if($suket->isBillingProofRejected())
+                                        <span class="badge bg-danger rounded-pill">
+                                            <i class="bi bi-exclamation-octagon me-1"></i> Bukti Ditolak
+                                        </span>
+                                    @elseif($suket->isBillingVerified())
+                                        <span class="badge bg-success rounded-pill">
+                                            <i class="bi bi-check-circle-fill me-1"></i> Pembayaran Terverifikasi
+                                        </span>
+                                    @elseif($suket->isBillingProofPending())
+                                        <span class="badge bg-info text-white rounded-pill">
+                                            <i class="bi bi-clock-history me-1"></i> Menunggu Verifikasi Bendahara
+                                        </span>
+                                    @else
+                                        <span class="badge bg-warning text-dark rounded-pill">
+                                            <i class="bi bi-hourglass-split me-1"></i> Menunggu Pembayaran
+                                        </span>
+                                    @endif
+                                </div>
+
+                                {{-- Notifikasi Penolakan Bukti jika ada --}}
+                                @if($suket->isBillingProofRejected())
+                                    <div class="alert alert-danger border-danger-subtle rounded-3 p-3 mb-3 small">
+                                        <div class="fw-bold text-danger mb-1">
+                                            <i class="bi bi-exclamation-triangle-fill me-1"></i> Bukti Pembayaran Anda Ditolak oleh Bendahara/Admin
+                                        </div>
+                                        <div>Alasan Penolakan: <strong>{{ $suket->billing_proof_reject_note }}</strong></div>
+                                        <div class="mt-1 text-muted">
+                                            Silakan periksa kembali bukti transfer Anda dan klik tombol <strong>"Upload Ulang Bukti Pembayaran"</strong> di bawah untuk mengirimkan bukti yang benar.
+                                        </div>
+                                    </div>
+                                @endif
+
+                                <div class="row g-2 mb-2 small">
+                                    <div class="col-sm-6">
+                                        <span class="text-muted">Kode Billing:</span><br>
+                                        <strong class="fs-5 text-dark font-monospace">{{ $suket->billing_kode ?: 'Sedang Diproses Bendahara' }}</strong>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <span class="text-muted">Batas Waktu Pembayaran:</span><br>
+                                        <strong class="text-danger">{{ $suket->billing_expires_at ? \Carbon\Carbon::parse($suket->billing_expires_at)->format('d M Y, H:i') : 'Sesuai masa aktif billing' }}</strong>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                                    @if($suket->billing_file_path)
+                                        <a href="{{ route('user.suket.download-doc', [$suket->id, 'billing']) }}" class="btn btn-sm btn-outline-dark rounded-pill px-3" download>
+                                            <i class="bi bi-file-earmark-pdf me-1"></i> Unduh Salinan Billing
+                                        </a>
+                                    @endif
+
+                                    @if($suket->hasBillingGuide())
+                                        <a href="{{ route('user.suket.download-doc', [$suket->id, 'guide']) }}" class="btn btn-sm btn-outline-info rounded-pill px-3" target="_blank" download>
+                                            <i class="bi bi-book me-1"></i> Unduh Panduan Pembayaran
+                                        </a>
+                                    @endif
+
+                                    @if($suket->isBillingProofRejected())
+                                        <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#modalUploadBukti{{ $suket->id }}">
+                                            <i class="bi bi-cloud-arrow-up-fill me-1"></i> Upload Ulang Bukti Pembayaran
+                                        </button>
+                                    @elseif(!$suket->isBillingPaid())
+                                        <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalUploadBukti{{ $suket->id }}">
+                                            <i class="bi bi-upload me-1"></i> Upload Bukti Pembayaran
+                                        </button>
+                                    @elseif($suket->isBillingProofPending())
+                                        <span class="badge bg-warning-subtle text-dark border border-warning-subtle px-3 py-2 rounded-pill small">
+                                            <i class="bi bi-clock-history me-1"></i> Bukti terunggah ({{ $suket->billing_proof_name ?? 'Bukti_Bayar' }}) &bull; Menunggu verifikasi bendahara
+                                        </span>
+                                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-1" data-bs-toggle="modal" data-bs-target="#modalUploadBukti{{ $suket->id }}" title="Upload Ulang Bukti Bayar">
+                                            <i class="bi bi-pencil me-1"></i> Ganti Bukti
+                                        </button>
+                                    @else
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill small">
+                                            <i class="bi bi-check2-circle me-1"></i> Bukti bayar terverifikasi sah
+                                        </span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- INTERACTIVE CARD TAHAP 8: KUITANSI --}}
+                        @if($stageNumber >= 8 && ($suket->kuitansi_nomor || $suket->kuitansi_file_path))
+                            <div class="card border-info border-opacity-50 bg-info bg-opacity-10 rounded-3 p-3 mt-3">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                    <div class="fw-bold text-navy">
+                                        <i class="bi bi-receipt me-1"></i> Kuitansi Lunas Resmi
+                                    </div>
+                                    <span class="badge bg-success rounded-pill">
+                                        <i class="bi bi-patch-check-fill me-1"></i> Lunas
+                                    </span>
+                                </div>
+                                <div class="small text-dark mb-2">
+                                    Nomor Kuitansi: <strong class="text-navy">{{ $suket->kuitansi_nomor ?: '-' }}</strong> &bull;
+                                    Tanggal: {{ $suket->kuitansi_generated_at ? \Carbon\Carbon::parse($suket->kuitansi_generated_at)->format('d M Y') : '-' }}
+                                </div>
+                                @if($suket->kuitansi_file_path)
+                                    <div>
+                                        <a href="{{ route('user.suket.download-doc', [$suket->id, 'kuitansi']) }}" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm" download>
+                                            <i class="bi bi-download me-1"></i> Unduh Berkas Kuitansi Resmi
+                                        </a>
+                                    </div>
+                                @endif
+                            </div>
+                        @endif
+
+                        {{-- MODAL UPLOAD BUKTI BAYAR TAHAP 7 --}}
+                        <div class="modal fade modal-upload-bukti-user" id="modalUploadBukti{{ $suket->id }}" tabindex="-1" aria-hidden="true">
+                            <div class="modal-dialog modal-dialog-centered">
+                                <div class="modal-content border-0 shadow rounded-4">
+                                    <form action="{{ route('user.suket.upload-payment-proof', $suket->id) }}" method="POST" enctype="multipart/form-data">
+                                        @csrf
+                                        <div class="modal-header border-0 pb-0">
+                                            <h5 class="modal-title fw-bold text-dark">
+                                                <i class="bi bi-upload text-primary me-2"></i>{{ $suket->isBillingProofRejected() ? 'Upload Ulang Bukti Pembayaran' : 'Upload Bukti Pembayaran SIMPONI' }}
+                                            </h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body py-3">
+                                            @if($suket->isBillingProofRejected())
+                                                <div class="alert alert-danger py-2 px-3 small rounded-3 mb-3">
+                                                    <i class="bi bi-exclamation-triangle me-1"></i> <strong>Catatan Penolakan Sebelumnya:</strong><br>
+                                                    {{ $suket->billing_proof_reject_note }}
+                                                </div>
+                                            @endif
+                                            <p class="small text-muted mb-3">
+                                                Unggah bukti setoran / transaksi pembayaran NTPN SIMPONI untuk nomor order <strong>{{ $suket->nomor_order }}</strong>.
+                                            </p>
+                                            <div class="mb-3">
+                                                <label class="form-label small fw-semibold text-dark">Pilih Berkas Bukti Pembayaran (PDF / JPG / PNG, Maks 10MB) <span class="text-danger">*</span></label>
+                                                <input type="file" name="payment_proof" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required>
+                                            </div>
+                                            <div class="mb-2">
+                                                <label class="form-label small fw-semibold text-dark">Catatan / Keterangan Pembayaran (Opsional)</label>
+                                                <textarea name="catatan" rows="2" class="form-control form-control-sm" placeholder="Contoh: Pembayaran melalui teller Bank Mandiri NTPN: ..."></textarea>
+                                            </div>
+                                        </div>
+                                        <div class="modal-footer border-0 pt-0">
+                                            <button type="button" class="btn btn-light rounded-pill px-3" data-bs-dismiss="modal">Batal</button>
+                                            <button type="submit" class="btn btn-primary rounded-pill px-4">
+                                                <i class="bi bi-cloud-arrow-up me-1"></i> Kirim Bukti Pembayaran
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
                             </div>
                         </div>
                     @endif
@@ -694,7 +919,7 @@
                                             <i class="bi bi-file-earmark-pdf text-danger me-1"></i>Dokumen LHU (Disorot Bagian yang Memerlukan Revisi)
                                         </span>
                                         <span class="badge bg-warning text-dark" style="font-size: 10px;">
-                                            <i class="bi bi-highlighter me-1"></i>{{ $suket->comments ? $suket->comments->count() : 0 }} Titik Sorotan
+                                            <i class="bi bi-highlighter me-1"></i>{{ $suket->pemohonComments ? $suket->pemohonComments->count() : 0 }} Titik Sorotan
                                         </span>
                                     </div>
 
@@ -731,9 +956,9 @@
                                             </div>
                                         @endif
 
-                                        @if($suket->comments && $suket->comments->count() > 0)
+                                        @if($suket->pemohonComments && $suket->pemohonComments->count() > 0)
                                             <div class="d-flex flex-column gap-2">
-                                                @foreach($suket->comments as $cm)
+                                                @foreach($suket->pemohonComments as $cm)
                                                     <div class="card border rounded-3 p-3 bg-white shadow-xs border-danger-subtle" id="user-modal-comment-card-{{ $suket->id }}-{{ $cm->id }}">
                                                         <div class="d-flex justify-content-between align-items-center mb-1">
                                                             <div class="d-flex align-items-center gap-1 flex-wrap">
@@ -822,18 +1047,18 @@
                                 @endif
 
                                 {{-- DAFTAR TITIK SOROTAN KESALAHAN LHU / SCAN DARI PENGUJI K3 --}}
-                                @if($suket->comments && $suket->comments->count() > 0)
+                                @if($suket->pemohonComments && $suket->pemohonComments->count() > 0)
                                     <div class="mb-3">
                                         <div class="d-flex justify-content-between align-items-center mb-2">
                                             <div class="small fw-bold text-dark">
-                                                <i class="bi bi-highlighter text-danger me-1"></i>Daftar Poin Sorotan Kesalahan LHU ({{ $suket->comments->count() }} Poin):
+                                                <i class="bi bi-highlighter text-danger me-1"></i>Daftar Poin Sorotan Kesalahan LHU ({{ $suket->pemohonComments->count() }} Poin):
                                             </div>
                                             <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-1" style="font-size: 11px;" data-bs-toggle="modal" data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}">
                                                 <i class="bi bi-eye-fill me-1"></i>Buka & Lihat di Dokumen LHU
                                             </button>
                                         </div>
                                         <div class="d-flex flex-column gap-2 overflow-y-auto pe-1" style="max-height: 220px;">
-                                            @foreach($suket->comments as $cm)
+                                            @foreach($suket->pemohonComments as $cm)
                                                 <div class="card border rounded-3 p-2 px-3 bg-white shadow-xs border-danger-subtle">
                                                     <div class="d-flex justify-content-between align-items-center mb-1">
                                                         <div class="d-flex align-items-center gap-1 flex-wrap">
@@ -1246,6 +1471,11 @@
                 document.body.appendChild(m);
             }
         });
+        document.querySelectorAll('.modal-upload-bukti-user').forEach(function(m) {
+            if (m.parentElement !== document.body) {
+                document.body.appendChild(m);
+            }
+        });
 
         const filterBtns = document.querySelectorAll('[data-user-filter]');
         const searchInput = document.getElementById('userSearchInput');
@@ -1313,7 +1543,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         suketId: {{ $suketItem->id }},
                         containerId: 'evalUserPdfContainer{{ $suketItem->id }}',
                         pdfUrl: '{{ route('user.suket.preview-doc', [$suketItem->id, 'lhu']) }}',
-                        comments: @json($suketItem->comments ?? []),
+                        comments: @json($suketItem->pemohonComments ?? []),
                         readOnly: true,
                     });
                 });

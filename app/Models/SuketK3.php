@@ -48,6 +48,37 @@ class SuketK3 extends Model
         'signed_by',
         'published_at',
         'published_by',
+        'surat_tagihan_file_path',
+        'surat_tagihan_file_name',
+        'surat_tagihan_nominal',
+        'surat_tagihan_sent_at',
+        'surat_tagihan_sent_by',
+        'surat_tagihan_acc_at',
+        'surat_tagihan_acc_by',
+        'billing_kode',
+        'billing_file_path',
+        'billing_file_name',
+        'billing_sent_at',
+        'billing_sent_by',
+        'billing_expires_at',
+        'billing_guide_path',
+        'billing_guide_name',
+        'billing_proof_path',
+        'billing_proof_name',
+        'billing_proof_status',
+        'billing_proof_rejected_at',
+        'billing_proof_rejected_by',
+        'billing_proof_reject_note',
+        'billing_paid_at',
+        'billing_verified_at',
+        'billing_verified_by',
+        'kuitansi_nomor',
+        'kuitansi_file_path',
+        'kuitansi_file_name',
+        'kuitansi_generated_at',
+        'kuitansi_generated_by',
+        'kuitansi_sent_at',
+        'kuitansi_sent_by',
         'sent_to_customer_at',
         'sent_to_customer_by',
         'resi_pengiriman',
@@ -65,6 +96,16 @@ class SuketK3 extends Model
         'qc_at' => 'datetime',
         'signed_at' => 'datetime',
         'published_at' => 'datetime',
+        'surat_tagihan_nominal' => 'decimal:2',
+        'surat_tagihan_sent_at' => 'datetime',
+        'surat_tagihan_acc_at' => 'datetime',
+        'billing_sent_at' => 'datetime',
+        'billing_expires_at' => 'datetime',
+        'billing_proof_rejected_at' => 'datetime',
+        'billing_paid_at' => 'datetime',
+        'billing_verified_at' => 'datetime',
+        'kuitansi_generated_at' => 'datetime',
+        'kuitansi_sent_at' => 'datetime',
         'sent_to_customer_at' => 'datetime',
     ];
 
@@ -118,9 +159,33 @@ class SuketK3 extends Model
             'icon' => 'bi-award',
         ],
         6 => [
+            'code' => 'surat_tagihan',
+            'label' => 'Surat Tagihan',
+            'desc' => 'Penerbitan surat tagihan resmi suket K3 dan konfirmasi ACC oleh pemohon.',
+            'roles' => ['bendahara', 'admin', 'superadmin'],
+            'badge' => 'primary',
+            'icon' => 'bi-envelope-paper',
+        ],
+        7 => [
+            'code' => 'kode_billing',
+            'label' => 'Kode Billing',
+            'desc' => 'Penerbitan kode billing Simponi/PNBP, pembayaran pemohon, & verifikasi bendahara.',
+            'roles' => ['bendahara', 'admin', 'superadmin'],
+            'badge' => 'warning',
+            'icon' => 'bi-upc',
+        ],
+        8 => [
+            'code' => 'kuitansi',
+            'label' => 'Kuitansi',
+            'desc' => 'Penerbitan dan penerusan berkas kuitansi lunas resmi ke akun pemohon.',
+            'roles' => ['bendahara', 'admin', 'superadmin'],
+            'badge' => 'info',
+            'icon' => 'bi-receipt',
+        ],
+        9 => [
             'code' => 'penyerahan_suket',
             'label' => 'Penyerahan Suket',
-            'desc' => 'Penyerahan digital ke akun pemohon melalui portal web Balai K3.',
+            'desc' => 'Penyerahan digital Surat Keterangan K3 resmi ke akun pemohon melalui portal web Balai K3.',
             'roles' => ['admin', 'superadmin'],
             'badge' => 'success',
             'icon' => 'bi-send-check',
@@ -217,6 +282,19 @@ class SuketK3 extends Model
             ->latest();
     }
 
+    public function pemohonComments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(SuketK3Comment::class, 'suket_id')
+            ->where(function ($q) {
+                $q->where('target', '!=', 'internal')->orWhereNull('target');
+            })
+            ->where(function ($q) {
+                $q->where('document_type', 'lhu')->orWhereNull('document_type');
+            })
+            ->where('document_type', '!=', 'suket')
+            ->latest();
+    }
+
     public function evaluator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'evaluasi_by');
@@ -240,6 +318,106 @@ class SuketK3 extends Model
     public function publisher(): BelongsTo
     {
         return $this->belongsTo(User::class, 'published_by');
+    }
+
+    public function tagihanSender(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'surat_tagihan_sent_by');
+    }
+
+    public function tagihanAccUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'surat_tagihan_acc_by');
+    }
+
+    public function billingSender(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'billing_sent_by');
+    }
+
+    public function billingVerifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'billing_verified_by');
+    }
+
+    public function billingProofRejecter(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'billing_proof_rejected_by');
+    }
+
+    public function kuitansiGenerator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'kuitansi_generated_by');
+    }
+
+    public function kuitansiSender(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'kuitansi_sent_by');
+    }
+
+    public function isTagihanSent(): bool
+    {
+        return !empty($this->surat_tagihan_sent_at);
+    }
+
+    public function isTagihanAcc(): bool
+    {
+        return !empty($this->surat_tagihan_acc_at);
+    }
+
+    public function isBillingSent(): bool
+    {
+        return !empty($this->billing_sent_at);
+    }
+
+    public function isBillingPaid(): bool
+    {
+        return !empty($this->billing_paid_at) || !empty($this->billing_proof_path);
+    }
+
+    public function isBillingVerified(): bool
+    {
+        return !empty($this->billing_verified_at);
+    }
+
+    public function isBillingProofRejected(): bool
+    {
+        return $this->billing_proof_status === 'rejected';
+    }
+
+    public function isBillingProofPending(): bool
+    {
+        return $this->isBillingPaid() && !$this->isBillingVerified() && $this->billing_proof_status !== 'rejected';
+    }
+
+    public function effectiveBillingGuidePath(): ?string
+    {
+        if (!empty($this->billing_guide_path) && \Illuminate\Support\Facades\Storage::disk('local')->exists($this->billing_guide_path)) {
+            return $this->billing_guide_path;
+        }
+
+        $activeGuide = app(\App\Services\BillingGuideService::class)->getActiveGuide();
+        return $activeGuide?->file_path;
+    }
+
+    public function effectiveBillingGuideName(): ?string
+    {
+        if (!empty($this->billing_guide_name)) {
+            return $this->billing_guide_name;
+        }
+
+        $activeGuide = app(\App\Services\BillingGuideService::class)->getActiveGuide();
+        return $activeGuide?->file_name ?: 'Panduan_Pembayaran_SIMPONI.pdf';
+    }
+
+    public function hasBillingGuide(): bool
+    {
+        return !empty($this->effectiveBillingGuidePath());
+    }
+
+    public function isKuitansiSent(): bool
+    {
+        return !empty($this->kuitansi_sent_at);
     }
 
     public function histories(): \Illuminate\Database\Eloquent\Relations\HasMany

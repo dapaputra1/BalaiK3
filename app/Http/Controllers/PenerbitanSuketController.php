@@ -33,8 +33,8 @@ class PenerbitanSuketController extends Controller
         $user = auth()->user();
         $search = $request->query('search');
 
-        // Ambil riwayat permohonan Suket milik user yang sedang login
-        $suketQuery = SuketK3::with(['permohonan.company', 'qcUser', 'comments.user', 'evaluator', 'histories.user'])
+        // Ambil riwayat permohonan Suket milik user yang sedang login (hanya muat komentar khusus pemohon)
+        $suketQuery = SuketK3::with(['permohonan.company', 'qcUser', 'pemohonComments.user', 'evaluator', 'histories.user', 'tagihanSender', 'billingSender', 'kuitansiGenerator'])
             ->where('user_id', $user->id)
             ->latest('updated_at');
 
@@ -262,6 +262,104 @@ class PenerbitanSuketController extends Controller
     }
 
     /**
+     * User Pemohon: ACC / Konfirmasi Surat Tagihan (Tahap 6 ke Tahap 7)
+     */
+    public function userAccTagihan(Request $request, SuketK3 $suket)
+    {
+        $user = auth()->user();
+        if ($user->role !== 'user' && $user->role !== 'superadmin') {
+            abort(403, 'Hanya pemohon yang dapat menyetujui Surat Tagihan.');
+        }
+
+        if ($suket->user_id !== $user->id && $suket->permohonan?->user_id !== $user->id && $user->role !== 'superadmin') {
+            abort(403, 'Akses ditolak ke permohonan suket ini.');
+        }
+
+        if ((int) $suket->status_tahap !== 6) {
+            return redirect()->back()->with('error', 'Status berkas suket saat ini bukan pada tahap Surat Tagihan.');
+        }
+
+        DB::transaction(function () use ($suket, $user, $request) {
+            $suket->surat_tagihan_acc_at = now();
+            $suket->surat_tagihan_acc_by = $user->id;
+            $suket->status_tahap = 7; // Otomatis berlanjut ke Tahap 7 (Kode Billing)
+            $suket->updated_by = $user->id;
+            $suket->save();
+
+            $suket->recordHistory(
+                action: 'tagihan_acced',
+                stageBefore: 6,
+                stageAfter: 7,
+                catatan: $request->input('catatan', 'Pemohon menyetujui (ACC) Surat Tagihan. Lanjut ke proses penerbitan Kode Billing SIMPONI.'),
+                userId: $user->id
+            );
+        });
+
+        return redirect()->route('user.suket.index')
+            ->with('success', 'Surat Tagihan berhasil disetujui (ACC). Berkas diteruskan ke Bendahara untuk penerbitan Kode Billing SIMPONI.');
+    }
+
+    /**
+     * User Pemohon: Mengunggah Bukti Pembayaran SIMPONI / PNBP (Tahap 7)
+     */
+    public function userUploadPaymentProof(Request $request, SuketK3 $suket)
+    {
+        $user = auth()->user();
+        if ($user->role !== 'user' && $user->role !== 'superadmin') {
+            abort(403, 'Hanya pemohon yang dapat mengunggah bukti pembayaran.');
+        }
+
+        if ($suket->user_id !== $user->id && $suket->permohonan?->user_id !== $user->id && $user->role !== 'superadmin') {
+            abort(403, 'Akses ditolak ke permohonan suket ini.');
+        }
+
+        if ((int) $suket->status_tahap !== 7) {
+            return redirect()->back()->with('error', 'Status berkas suket saat ini bukan pada tahap Kode Billing.');
+        }
+
+        $request->validate([
+            'payment_proof' => ['required', 'file', 'extensions:pdf,jpg,jpeg,png', 'max:10240'],
+            'catatan' => ['nullable', 'string', 'max:500'],
+        ], [
+            'payment_proof.required' => 'Silakan pilih berkas bukti pembayaran.',
+            'payment_proof.extensions' => 'Berkas bukti pembayaran harus berformat PDF, JPG, JPEG, atau PNG.',
+            'payment_proof.max' => 'Ukuran berkas bukti pembayaran maksimal 10MB.',
+        ]);
+
+        $file = $request->file('payment_proof');
+        $ext = strtolower($file->getClientOriginalExtension());
+        $filename = 'Bukti_Bayar_' . time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $ext;
+        $path = $file->storeAs('suket_docs/' . $suket->id, $filename, self::PRIVATE_DISK);
+
+        DB::transaction(function () use ($suket, $path, $file, $user, $request) {
+            if ($suket->billing_proof_path && Storage::disk(self::PRIVATE_DISK)->exists($suket->billing_proof_path)) {
+                Storage::disk(self::PRIVATE_DISK)->delete($suket->billing_proof_path);
+            }
+
+            $suket->billing_proof_path = $path;
+            $suket->billing_proof_name = $file->getClientOriginalName();
+            $suket->billing_paid_at = now();
+            $suket->billing_proof_status = 'pending';
+            $suket->billing_proof_rejected_at = null;
+            $suket->billing_proof_rejected_by = null;
+            $suket->billing_proof_reject_note = null;
+            $suket->updated_by = $user->id;
+            $suket->save();
+
+            $suket->recordHistory(
+                action: 'payment_proof_uploaded',
+                stageBefore: 7,
+                stageAfter: 7,
+                catatan: $request->input('catatan', 'Pemohon mengunggah bukti pembayaran SIMPONI/PNBP: ' . $file->getClientOriginalName()),
+                userId: $user->id
+            );
+        });
+
+        return redirect()->route('user.suket.index')
+            ->with('success', 'Bukti pembayaran berhasil diunggah. Menunggu verifikasi pembayaran oleh Bendahara Balai K3.');
+    }
+
+    /**
      * Halaman Utama Internal Petugas: Monitoring Tahap 2 s/d Tahap 6
      */
     public function index(Request $request)
@@ -277,12 +375,14 @@ class PenerbitanSuketController extends Controller
         }
 
         // Tentukan tahap yang diizinkan untuk role saat ini
+        // Tentukan tahap yang diizinkan untuk role saat ini
         $roleAllowedStages = match ($currentRole) {
             'pcu', 'penguji_k3' => [2, 3],
             'qc' => ['qc'],
             'mp', 'kepala_balai' => [4],
-            'admin' => [2, 3, 4, 5, 6, 'all'],
-            default => [2, 3, 'qc', 4, 5, 6, 'all'], // superadmin
+            'bendahara' => [6, 7, 8],
+            'admin' => [2, 3, 4, 5, 6, 7, 8, 9, 'all'],
+            default => [2, 3, 'qc', 4, 5, 6, 7, 8, 9, 'all'], // superadmin
         };
 
         $requestedStage = $request->query('stage');
@@ -295,7 +395,7 @@ class PenerbitanSuketController extends Controller
         $search = $request->query('search');
 
         // Query Suket K3 untuk Internal
-        $suketQuery = SuketK3::with(['permohonan.company', 'user', 'creator', 'signer', 'publisher', 'qcUser', 'comments.user', 'lhuComments.user', 'suketComments.user', 'evaluator', 'histories.user'])
+        $suketQuery = SuketK3::with(['permohonan.company', 'user', 'creator', 'signer', 'publisher', 'qcUser', 'comments.user', 'lhuComments.user', 'suketComments.user', 'evaluator', 'histories.user', 'tagihanSender', 'tagihanAccUser', 'billingSender', 'billingVerifier', 'kuitansiGenerator', 'kuitansiSender'])
             ->latest('updated_at');
 
         // Filter berdasarkan Stage aktif
@@ -313,6 +413,12 @@ class PenerbitanSuketController extends Controller
             $suketQuery->where('status_tahap', 5);
         } elseif ($activeStage === '6') {
             $suketQuery->where('status_tahap', 6);
+        } elseif ($activeStage === '7') {
+            $suketQuery->where('status_tahap', 7);
+        } elseif ($activeStage === '8') {
+            $suketQuery->where('status_tahap', 8);
+        } elseif ($activeStage === '9') {
+            $suketQuery->where('status_tahap', 9);
         }
 
         if ($search) {
@@ -336,11 +442,14 @@ class PenerbitanSuketController extends Controller
             4 => SuketK3::where('status_tahap', 4)->count(),
             5 => SuketK3::where('status_tahap', 5)->count(),
             6 => SuketK3::where('status_tahap', 6)->count(),
+            7 => SuketK3::where('status_tahap', 7)->count(),
+            8 => SuketK3::where('status_tahap', 8)->count(),
+            9 => SuketK3::where('status_tahap', 9)->count(),
             'all' => SuketK3::count(),
         ];
 
-        $totalActive = SuketK3::where('status_tahap', '<', 6)->count();
-        $totalDone = SuketK3::where('status_tahap', 6)->count();
+        $totalActive = SuketK3::where('status_tahap', '<', 9)->count();
+        $totalDone = SuketK3::where('status_tahap', 9)->count();
 
         return view('admin.suket.index', [
             'sukets' => $sukets,
@@ -480,10 +589,12 @@ class PenerbitanSuketController extends Controller
                 'draft', 'draft_pdf' => $suket->draft_file_path,
             };
 
-            // Jika belum ada file draft tapi diminta draft, generate terlebih dahulu
+            // Jika belum ada file draft tapi diminta draft, generate terlebih dahulu (.docx)
             if (!$path && in_array($type, ['draft', 'draft_pdf'], true)) {
                 $this->saveAutoGeneratedDraft($suket);
                 $path = $suket->draft_file_path;
+            } elseif ($path && !empty($suket->nomor_surat) && str_ends_with(strtolower($path), '.docx')) {
+                app(\App\Services\SuketDocxService::class)->syncDocxMetadata($suket);
             }
 
             // 1. Jika berkas fisik adalah PDF: stream sebagai PDF inline
@@ -505,7 +616,31 @@ class PenerbitanSuketController extends Controller
                 ]);
             }
 
-            // 3. Jika diminta output PDF (untuk PDF.js Annotator Review QC / Draf PDF preview)
+            // 3. Jika berkas fisik adalah DOCX hasil unggahan revisi penguji (Draft_Revisi_...)
+            $isCustomUploadedRevision = $path && (str_contains($path, 'Draft_Revisi_') || str_contains($path, 'suket_draft_'));
+            if ($isCustomUploadedRevision && Storage::disk(self::PRIVATE_DISK)->exists($path) && str_ends_with(strtolower($path), '.docx')) {
+                $fullPath = Storage::disk(self::PRIVATE_DISK)->path($path);
+                $docxService = app(\App\Services\SuketDocxService::class);
+
+                if ($type === 'draft_pdf' || ($type === 'draft' && $request->query('format') === 'pdf')) {
+                    $pdfBinary = $docxService->renderDocxToPdf($fullPath, $suket);
+                    if ($pdfBinary) {
+                        return response($pdfBinary, 200, [
+                            'Content-Type' => 'application/pdf',
+                            'Content-Disposition' => 'inline; filename="Draft_Suket_' . $suket->nomor_order . '.pdf"',
+                        ]);
+                    }
+                } else {
+                    $htmlOutput = $docxService->renderDocxToHtmlPreview($fullPath, $suket);
+                    if ($htmlOutput) {
+                        return response($htmlOutput, 200, [
+                            'Content-Type' => 'text/html; charset=UTF-8',
+                        ]);
+                    }
+                }
+            }
+
+            // 4. Jika diminta output PDF (untuk PDF.js Annotator Review QC / Draf PDF preview fallback)
             if ($type === 'draft_pdf' || ($type === 'draft' && $request->query('format') === 'pdf')) {
                 $logoAsset = $this->resolveWordHeaderLogoAsset();
                 $logoAssetBase64 = $logoAsset ? base64_encode($logoAsset['binary']) : null;
@@ -525,8 +660,7 @@ class PenerbitanSuketController extends Controller
                 ]);
             }
 
-            // 4. Jika berkas adalah .doc / .docx atau template bawaan:
-            // Render view HTML A4 resmi dengan format Permenaker 05/2018 beresolusi tinggi dan jelas
+            // 5. Fallback template HTML bawaan jika format Word HTML lama atau file belum ada
             $logoAsset = $this->resolveWordHeaderLogoAsset();
             $logoAssetBase64 = $logoAsset ? base64_encode($logoAsset['binary']) : null;
             $kepalaBalai = User::whereIn('role', ['kepala_balai', 'mp'])->first();
@@ -546,6 +680,11 @@ class PenerbitanSuketController extends Controller
             'lhu' => $suket->effective_lhu_path ?: $suket->lhu_file_path,
             'foto' => $suket->foto_pengujian_path,
             'denah' => $suket->denah_lokasi_path,
+            'tagihan' => $suket->surat_tagihan_file_path,
+            'billing' => $suket->billing_file_path,
+            'guide', 'panduan', 'billing_guide' => $suket->effectiveBillingGuidePath(),
+            'proof', 'payment_proof' => $suket->billing_proof_path,
+            'kuitansi' => $suket->kuitansi_file_path,
             default => null,
         };
 
@@ -667,13 +806,23 @@ class PenerbitanSuketController extends Controller
         $this->ensureAccess();
 
         $request->validate([
-            'action' => ['required', 'in:next,revision,upload_draft,reject_evaluasi,send_to_qc'],
+            'action' => ['required', 'in:next,revision,upload_draft,reject_evaluasi,send_to_qc,send_tagihan,acc_tagihan,send_billing,upload_guide,upload_payment_proof,verify_payment,reject_payment,send_kuitansi,sync_from_permohonan'],
             'catatan' => ['nullable', 'string', 'max:1000'],
             'nomor_surat' => ['nullable', 'string', 'max:100'],
             'tanggal_surat' => ['nullable', 'date'],
             'signed_document' => ['nullable', 'file', 'extensions:pdf,doc,docx,jpg,jpeg,png', 'max:20480'],
             'revised_draft' => ['nullable', 'file', 'extensions:doc,docx,pdf', 'max:20480'],
+            'surat_tagihan_nominal' => ['nullable'],
+            'surat_tagihan_file' => ['nullable', 'file', 'max:20480'],
+            'billing_kode' => ['nullable', 'string', 'max:100'],
+            'billing_expires_at' => ['nullable', 'date'],
+            'billing_file' => ['nullable', 'file', 'max:20480'],
+            'billing_guide_file' => ['nullable', 'file', 'extensions:pdf', 'max:20480'],
+            'payment_proof' => ['nullable', 'file', 'max:20480'],
+            'kuitansi_nomor' => ['nullable', 'string', 'max:100'],
+            'kuitansi_file' => ['nullable', 'file', 'max:20480'],
         ], [
+            'billing_guide_file.extensions' => 'Dokumen panduan pembayaran harus berupa berkas PDF.',
             'signed_document.extensions' => 'Dokumen tanda tangan harus berupa file bertipe: PDF, DOC, DOCX, JPG, JPEG, atau PNG.',
             'signed_document.max' => 'Ukuran berkas tanda tangan tidak boleh lebih dari 20MB.',
             'revised_draft.extensions' => 'Dokumen draf revisi harus berupa file bertipe: DOC, DOCX, atau PDF.',
@@ -724,18 +873,25 @@ class PenerbitanSuketController extends Controller
                 : 'Draf dokumen Suket K3 telah disusun dan diajukan ke Tim QC untuk peninjauan kelayakan.';
 
             DB::transaction(function () use ($suket, $catatanPengantar, $user, $request) {
-                // Pastikan draf file sudah tersimpan
-                if (!$suket->draft_file_path) {
-                    $this->saveAutoGeneratedDraft($suket);
-                }
-
                 // Cek jika penguji mengunggah revisi draf sekaligus
                 if ($request->hasFile('revised_draft')) {
                     $file = $request->file('revised_draft');
+                    \App\Support\SafeDocumentUpload::validateOrFail($file, 'revised_draft');
                     $ext = strtolower($file->getClientOriginalExtension());
-                    $path = $file->storeAs('suket_docs/' . $suket->id, 'Draft_Revisi_' . time() . '.' . $ext, self::PRIVATE_DISK);
+                    $filename = 'Draft_Revisi_' . time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $ext;
+                    $path = $file->storeAs('suket_docs/' . $suket->id, $filename, self::PRIVATE_DISK);
+
+                    if ($suket->draft_file_path && $suket->draft_file_path !== $path && Storage::disk(self::PRIVATE_DISK)->exists($suket->draft_file_path)) {
+                        Storage::disk(self::PRIVATE_DISK)->delete($suket->draft_file_path);
+                    }
+
                     $suket->draft_file_path = $path;
                     $suket->draft_file_name = $file->getClientOriginalName();
+                }
+
+                // Pastikan draf file sudah tersimpan jika belum ada
+                if (!$suket->draft_file_path || !Storage::disk(self::PRIVATE_DISK)->exists($suket->draft_file_path)) {
+                    $this->saveAutoGeneratedDraft($suket);
                 }
 
                 $suket->qc_status = 'pending';
@@ -765,9 +921,11 @@ class PenerbitanSuketController extends Controller
         }
 
         DB::transaction(function () use ($request, $suket, $currentStage, $user) {
-            if ($request->action === 'next' && $currentStage < 6) {
-                $nextStage = $currentStage + 1;
-                $suket->status_tahap = $nextStage;
+            if ($request->action === 'next' && $currentStage <= 9) {
+                if (!in_array($currentStage, [6, 7], true)) {
+                    $nextStage = min(9, $currentStage + 1);
+                    $suket->status_tahap = $nextStage;
+                }
 
                 // Hook spesifik per tahapan
                 if ($currentStage === 1) {
@@ -810,7 +968,7 @@ class PenerbitanSuketController extends Controller
                         userId: $user->id
                     );
                 } elseif ($currentStage === 5) {
-                    // Finalisasi Penerbitan Suket Resmi
+                    // Finalisasi Penerbitan Suket Resmi -> Lanjut ke Tahap 6 (Surat Tagihan)
                     if ($request->filled('nomor_surat')) {
                         $suket->nomor_surat = trim((string) $request->input('nomor_surat'));
                     }
@@ -819,14 +977,114 @@ class PenerbitanSuketController extends Controller
                     }
                     $suket->published_at = now();
                     $suket->published_by = $user->id;
+                    $suket->status_tahap = 6; // Lanjut ke Tahap 6: Surat Tagihan
 
-                    $this->saveAutoGeneratedDraft($suket);
+                    // Simpan draf otomatis jika belum ada berkas draf, atau sinkronkan jika sudah ada
+                    if (empty($suket->draft_file_path) || !Storage::disk(self::PRIVATE_DISK)->exists($suket->draft_file_path)) {
+                        $this->saveAutoGeneratedDraft($suket);
+                    } else {
+                        app(\App\Services\SuketDocxService::class)->syncDocxMetadata($suket);
+                    }
 
                     $suket->recordHistory(
                         action: 'published',
                         stageBefore: 5,
                         stageAfter: 6,
-                        catatan: $request->input('catatan', 'Surat Keterangan K3 resmi diterbitkan.'),
+                        catatan: $request->input('catatan', 'Surat Keterangan K3 resmi diterbitkan. Lanjut ke Tahap 6 (Surat Tagihan).'),
+                        nomorSurat: $suket->nomor_surat,
+                        userId: $user->id
+                    );
+                } elseif ($currentStage === 6) {
+                    // Simpan Surat Tagihan & Kirim ke Pemohon (Tetap di Tahap 6 menunggu ACC pemohon)
+                    if ($request->filled('surat_tagihan_nominal')) {
+                        $rawNominal = str_replace(['.', ','], ['', '.'], (string) $request->input('surat_tagihan_nominal'));
+                        $suket->surat_tagihan_nominal = (float) $rawNominal;
+                    }
+                    if ($request->hasFile('surat_tagihan_file')) {
+                        $file = $request->file('surat_tagihan_file');
+                        $ext = strtolower($file->getClientOriginalExtension());
+                        $filename = 'Tagihan_' . time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $ext;
+                        $path = $file->storeAs('suket_docs/' . $suket->id, $filename, self::PRIVATE_DISK);
+                        $suket->surat_tagihan_file_path = $path;
+                        $suket->surat_tagihan_file_name = $file->getClientOriginalName();
+                    }
+                    $suket->surat_tagihan_sent_at = now();
+                    $suket->surat_tagihan_sent_by = $user->id;
+                    $suket->status_tahap = 6; // Tetap di Tahap 6: Menunggu ACC pemohon
+
+                    $suket->recordHistory(
+                        action: 'tagihan_sent',
+                        stageBefore: 6,
+                        stageAfter: 6,
+                        catatan: $request->input('catatan', 'Surat tagihan suket diterbitkan dan dikirimkan ke pemohon. Menunggu persetujuan (ACC) pemohon.'),
+                        userId: $user->id
+                    );
+                } elseif ($currentStage === 7) {
+                    // Simpan Kode Billing & Panduan Pembayaran (Tetap di Tahap 7 menunggu pembayaran pemohon)
+                    if ($request->filled('billing_kode')) {
+                        $suket->billing_kode = trim((string) $request->input('billing_kode'));
+                    }
+                    if ($request->filled('billing_expires_at')) {
+                        $suket->billing_expires_at = $request->input('billing_expires_at');
+                    } elseif (!$suket->billing_expires_at) {
+                        $suket->billing_expires_at = now()->addHours(24);
+                    }
+                    if ($request->hasFile('billing_file')) {
+                        $file = $request->file('billing_file');
+                        $ext = strtolower($file->getClientOriginalExtension());
+                        $filename = 'Billing_' . time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $ext;
+                        $path = $file->storeAs('suket_docs/' . $suket->id, $filename, self::PRIVATE_DISK);
+                        $suket->billing_file_path = $path;
+                        $suket->billing_file_name = $file->getClientOriginalName();
+                    }
+                    if ($request->hasFile('billing_guide_file')) {
+                        $gfile = $request->file('billing_guide_file');
+                        $gext = strtolower($gfile->getClientOriginalExtension());
+                        $gfilename = 'Panduan_' . time() . '_' . Str::slug(pathinfo($gfile->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $gext;
+                        $gpath = $gfile->storeAs('suket_docs/' . $suket->id, $gfilename, self::PRIVATE_DISK);
+                        $suket->billing_guide_path = $gpath;
+                        $suket->billing_guide_name = $gfile->getClientOriginalName();
+                    }
+                    $suket->billing_sent_at = now();
+                    $suket->billing_sent_by = $user->id;
+                    $suket->status_tahap = 7; // Tetap di Tahap 7: Menunggu pembayaran pemohon
+
+                    $suket->recordHistory(
+                        action: 'billing_sent',
+                        stageBefore: 7,
+                        stageAfter: 7,
+                        catatan: 'Kode billing [' . $suket->billing_kode . '] dan Panduan Pembayaran dikirim ke pemohon.',
+                        userId: $user->id
+                    );
+                } elseif ($currentStage === 8) {
+                    // Manual advance dari Tahap 8 ke Tahap 9 (Penyerahan Suket)
+                    if (!$suket->kuitansi_generated_at) {
+                        $suket->kuitansi_nomor = $suket->kuitansi_nomor ?: ('KWT/BK3-SBY/' . now()->format('Ymd') . '/' . $suket->id);
+                        $suket->kuitansi_generated_at = now();
+                        $suket->kuitansi_generated_by = $user->id;
+                        $suket->kuitansi_sent_at = now();
+                        $suket->kuitansi_sent_by = $user->id;
+                    }
+                    $suket->status_tahap = 9;
+
+                    $suket->recordHistory(
+                        action: 'kuitansi_sent',
+                        stageBefore: 8,
+                        stageAfter: 9,
+                        catatan: $request->input('catatan', 'Kuitansi resmi diterbitkan. Lanjut ke Tahap 9 (Penyerahan Suket).'),
+                        userId: $user->id
+                    );
+                } elseif ($currentStage === 9) {
+                    // Konfirmasi penyerahan ke pemohon (Final)
+                    $suket->sent_to_customer_at = now();
+                    $suket->sent_to_customer_by = $user->id;
+                    $suket->metode_pengiriman = 'Portal Digital Web Balai K3';
+
+                    $suket->recordHistory(
+                        action: 'sent_to_customer',
+                        stageBefore: 9,
+                        stageAfter: 9,
+                        catatan: $request->input('catatan', 'Surat Keterangan K3 resmi diserahkan ke akun pemohon via Portal Web Balai K3.'),
                         nomorSurat: $suket->nomor_surat,
                         userId: $user->id
                     );
@@ -834,49 +1092,251 @@ class PenerbitanSuketController extends Controller
             } elseif ($request->action === 'upload_draft') {
                 if ($request->hasFile('revised_draft')) {
                     $file = $request->file('revised_draft');
+                    \App\Support\SafeDocumentUpload::validateOrFail($file, 'revised_draft');
                     $ext = strtolower($file->getClientOriginalExtension());
-                    $path = $file->storeAs('suket_docs/' . $suket->id, 'Draft_Revisi_' . time() . '.' . $ext, self::PRIVATE_DISK);
+                    $filename = 'Draft_Revisi_' . time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $ext;
+                    $path = $file->storeAs('suket_docs/' . $suket->id, $filename, self::PRIVATE_DISK);
+
+                    if ($suket->draft_file_path && $suket->draft_file_path !== $path && Storage::disk(self::PRIVATE_DISK)->exists($suket->draft_file_path)) {
+                        Storage::disk(self::PRIVATE_DISK)->delete($suket->draft_file_path);
+                    }
+
                     $suket->draft_file_path = $path;
                     $suket->draft_file_name = $file->getClientOriginalName();
 
+                    if ($ext === 'docx' && !empty($suket->nomor_surat)) {
+                        app(\App\Services\SuketDocxService::class)->syncDocxMetadata($suket);
+                    }
+
                     $suket->recordHistory(
                         action: 'upload_draft',
-                        stageBefore: $currentStage,
-                        stageAfter: $currentStage,
-                        catatan: 'Mengunggah draf revisi: ' . $file->getClientOriginalName(),
+                        stageBefore: 3,
+                        stageAfter: 3,
+                        catatan: $request->input('catatan', 'Penguji mengunggah berkas draf revisi: ' . $file->getClientOriginalName()),
                         userId: $user->id
                     );
                 }
             } elseif ($request->action === 'revision' && $currentStage > 1) {
-                $stageBefore = $suket->status_tahap;
                 $suket->status_tahap = $currentStage - 1;
                 if ($currentStage === 4) {
                     $suket->qc_status = 'pending';
                 }
-
                 $suket->recordHistory(
-                    action: 'qc_returned',
-                    stageBefore: $stageBefore,
+                    action: 'stage_returned',
+                    stageBefore: $currentStage,
                     stageAfter: $suket->status_tahap,
-                    catatan: $request->input('catatan', 'Status berkas dikembalikan ke tahap sebelumnya.'),
+                    catatan: $request->input('catatan', 'Tahapan dikembalikan ke tahap sebelumnya.'),
                     userId: $user->id
                 );
-            }
-
-            if ($currentStage === 6 && $request->action === 'next') {
-                // Konfirmasi pengiriman ke pelanggan (langsung via web Balai K3 tanpa nomor resi)
-                $suket->sent_to_customer_at = now();
-                $suket->sent_to_customer_by = $user->id;
-                $suket->metode_pengiriman = 'Portal Digital Web Balai K3';
+            } elseif ($request->action === 'send_tagihan') {
+                if ($request->filled('surat_tagihan_nominal')) {
+                    $rawNominal = str_replace(['.', ','], ['', '.'], (string) $request->input('surat_tagihan_nominal'));
+                    $suket->surat_tagihan_nominal = (float) $rawNominal;
+                }
+                if ($request->hasFile('surat_tagihan_file')) {
+                    $file = $request->file('surat_tagihan_file');
+                    $ext = strtolower($file->getClientOriginalExtension());
+                    $filename = 'Tagihan_' . time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $ext;
+                    $path = $file->storeAs('suket_docs/' . $suket->id, $filename, self::PRIVATE_DISK);
+                    $suket->surat_tagihan_file_path = $path;
+                    $suket->surat_tagihan_file_name = $file->getClientOriginalName();
+                }
+                $suket->surat_tagihan_sent_at = now();
+                $suket->surat_tagihan_sent_by = $user->id;
 
                 $suket->recordHistory(
-                    action: 'sent_to_customer',
+                    action: 'tagihan_sent',
                     stageBefore: 6,
                     stageAfter: 6,
-                    catatan: $request->input('catatan', 'Surat Keterangan K3 resmi diserahkan ke akun pemohon via Portal Web Balai K3.'),
-                    nomorSurat: $suket->nomor_surat,
+                    catatan: $request->input('catatan', 'Surat tagihan suket diterbitkan dan dikirim ke pemohon.'),
                     userId: $user->id
                 );
+            } elseif ($request->action === 'acc_tagihan') {
+                $suket->surat_tagihan_acc_at = now();
+                $suket->surat_tagihan_acc_by = $user->id;
+                $suket->status_tahap = 7;
+
+                $suket->recordHistory(
+                    action: 'tagihan_acced',
+                    stageBefore: 6,
+                    stageAfter: 7,
+                    catatan: $request->input('catatan', 'Surat tagihan disetujui (ACC). Lanjut ke Tahap 7 (Kode Billing).'),
+                    userId: $user->id
+                );
+            } elseif ($request->action === 'send_billing') {
+                $suket->billing_kode = trim((string) $request->input('billing_kode'));
+                if ($request->filled('billing_expires_at')) {
+                    $suket->billing_expires_at = $request->input('billing_expires_at');
+                } elseif (!$suket->billing_expires_at) {
+                    $suket->billing_expires_at = now()->addHours(24);
+                }
+                if ($request->hasFile('billing_file')) {
+                    $file = $request->file('billing_file');
+                    $ext = strtolower($file->getClientOriginalExtension());
+                    $filename = 'Billing_' . time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $ext;
+                    $path = $file->storeAs('suket_docs/' . $suket->id, $filename, self::PRIVATE_DISK);
+                    $suket->billing_file_path = $path;
+                    $suket->billing_file_name = $file->getClientOriginalName();
+                }
+                if ($request->hasFile('billing_guide_file')) {
+                    $gfile = $request->file('billing_guide_file');
+                    $gext = strtolower($gfile->getClientOriginalExtension());
+                    $gfilename = 'Panduan_' . time() . '_' . Str::slug(pathinfo($gfile->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $gext;
+                    $gpath = $gfile->storeAs('suket_docs/' . $suket->id, $gfilename, self::PRIVATE_DISK);
+                    $suket->billing_guide_path = $gpath;
+                    $suket->billing_guide_name = $gfile->getClientOriginalName();
+                }
+                $suket->billing_sent_at = now();
+                $suket->billing_sent_by = $user->id;
+                $suket->billing_proof_status = 'pending';
+                $suket->billing_proof_rejected_at = null;
+                $suket->billing_proof_rejected_by = null;
+                $suket->billing_proof_reject_note = null;
+
+                $suket->recordHistory(
+                    action: 'billing_sent',
+                    stageBefore: 7,
+                    stageAfter: 7,
+                    catatan: 'Kode billing [' . $suket->billing_kode . '] dan Panduan Pembayaran dikirim ke pemohon.',
+                    userId: $user->id
+                );
+            } elseif ($request->action === 'upload_guide') {
+                if ($request->hasFile('billing_guide_file')) {
+                    $gfile = $request->file('billing_guide_file');
+                    $gext = strtolower($gfile->getClientOriginalExtension());
+                    $gfilename = 'Panduan_' . time() . '_' . Str::slug(pathinfo($gfile->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $gext;
+                    $gpath = $gfile->storeAs('suket_docs/' . $suket->id, $gfilename, self::PRIVATE_DISK);
+                    $suket->billing_guide_path = $gpath;
+                    $suket->billing_guide_name = $gfile->getClientOriginalName();
+
+                    $suket->recordHistory(
+                        action: 'guide_uploaded',
+                        stageBefore: 7,
+                        stageAfter: 7,
+                        catatan: 'Petugas mengunggah berkas panduan pembayaran: ' . $gfile->getClientOriginalName(),
+                        userId: $user->id
+                    );
+                }
+            } elseif ($request->action === 'upload_payment_proof') {
+                if ($request->hasFile('payment_proof')) {
+                    $file = $request->file('payment_proof');
+                    $ext = strtolower($file->getClientOriginalExtension());
+                    $filename = 'Bukti_Bayar_' . time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $ext;
+                    $path = $file->storeAs('suket_docs/' . $suket->id, $filename, self::PRIVATE_DISK);
+                    $suket->billing_proof_path = $path;
+                    $suket->billing_proof_name = $file->getClientOriginalName();
+                    $suket->billing_paid_at = now();
+                    $suket->billing_proof_status = 'pending';
+                    $suket->billing_proof_rejected_at = null;
+                    $suket->billing_proof_rejected_by = null;
+                    $suket->billing_proof_reject_note = null;
+                }
+                $suket->recordHistory(
+                    action: 'payment_proof_uploaded',
+                    stageBefore: 7,
+                    stageAfter: 7,
+                    catatan: $request->input('catatan', 'Bukti pembayaran diunggah.'),
+                    userId: $user->id
+                );
+            } elseif ($request->action === 'verify_payment') {
+                $suket->billing_verified_at = now();
+                $suket->billing_verified_by = $user->id;
+                $suket->billing_proof_status = 'approved';
+                $suket->status_tahap = 8;
+
+                $suket->recordHistory(
+                    action: 'payment_verified',
+                    stageBefore: 7,
+                    stageAfter: 8,
+                    catatan: $request->input('catatan', 'Pembayaran diverifikasi oleh Bendahara/Admin. Lanjut ke Tahap 8 (Kuitansi).'),
+                    userId: $user->id
+                );
+            } elseif ($request->action === 'reject_payment') {
+                $alasanTolak = trim((string) ($request->input('reject_proof_note') ?: $request->input('catatan')));
+                if ($alasanTolak === '') {
+                    $alasanTolak = 'Bukti pembayaran tidak sesuai atau tidak valid. Silakan upload ulang.';
+                }
+                $suket->billing_proof_status = 'rejected';
+                $suket->billing_proof_rejected_at = now();
+                $suket->billing_proof_rejected_by = $user->id;
+                $suket->billing_proof_reject_note = $alasanTolak;
+                $suket->billing_verified_at = null;
+                $suket->billing_verified_by = null;
+
+                $suket->recordHistory(
+                    action: 'payment_rejected',
+                    stageBefore: 7,
+                    stageAfter: 7,
+                    catatan: 'Bukti pembayaran DITOLAK oleh Bendahara/Admin: ' . $alasanTolak,
+                    userId: $user->id
+                );
+            } elseif ($request->action === 'send_kuitansi') {
+                $kwtNo = $request->filled('kuitansi_nomor')
+                    ? trim((string) $request->input('kuitansi_nomor'))
+                    : ('KWT/BK3-SBY/' . now()->format('Ymd') . '/' . $suket->id);
+                $suket->kuitansi_nomor = $kwtNo;
+
+                if ($request->hasFile('kuitansi_file')) {
+                    $file = $request->file('kuitansi_file');
+                    $ext = strtolower($file->getClientOriginalExtension());
+                    $filename = 'Kuitansi_' . time() . '_' . Str::slug(pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)) . '.' . $ext;
+                    $path = $file->storeAs('suket_docs/' . $suket->id, $filename, self::PRIVATE_DISK);
+                    $suket->kuitansi_file_path = $path;
+                    $suket->kuitansi_file_name = $file->getClientOriginalName();
+                }
+                $suket->kuitansi_generated_at = now();
+                $suket->kuitansi_generated_by = $user->id;
+                $suket->kuitansi_sent_at = now();
+                $suket->kuitansi_sent_by = $user->id;
+                $suket->status_tahap = 9;
+
+                $suket->recordHistory(
+                    action: 'kuitansi_sent',
+                    stageBefore: 8,
+                    stageAfter: 9,
+                    catatan: 'Kuitansi resmi [' . $kwtNo . '] diterbitkan dan diteruskan ke pelanggan. Lanjut ke Tahap 9 (Penyerahan Suket).',
+                    userId: $user->id
+                );
+            } elseif ($request->action === 'sync_from_permohonan') {
+                $draft = $suket->permohonan?->draftLhu;
+                if ($draft) {
+                    if ($draft->surat_tagihan_generated_at) {
+                        $suket->surat_tagihan_sent_at = $draft->surat_tagihan_generated_at;
+                        $suket->surat_tagihan_sent_by = $draft->surat_tagihan_generated_by ?: $user->id;
+                        $suket->surat_tagihan_acc_at = $draft->surat_tagihan_generated_at;
+                        $suket->surat_tagihan_acc_by = $user->id;
+                    }
+                    if ($draft->billing_sent_at || $draft->billing_file_path) {
+                        $suket->billing_kode = $draft->billing_kode ?: ($draft->billing_file_name ?? 'SIMPONI-PNBP');
+                        $suket->billing_file_path = $draft->billing_file_path;
+                        $suket->billing_file_name = $draft->billing_file_name;
+                        $suket->billing_sent_at = $draft->billing_sent_at ?: now();
+                        $suket->billing_sent_by = $draft->billing_sent_by ?: $user->id;
+                        $suket->billing_expires_at = $draft->billing_expires_at;
+                        $suket->billing_proof_path = $draft->billing_payment_proof_path;
+                        $suket->billing_proof_name = $draft->billing_payment_proof_name;
+                        $suket->billing_paid_at = $draft->billing_paid_at;
+                        $suket->billing_verified_at = $draft->billing_verified_at ?: now();
+                        $suket->billing_verified_by = $draft->billing_verified_by ?: $user->id;
+                    }
+                    if ($draft->invoice_generated_at || $draft->invoice_file_path) {
+                        $suket->kuitansi_nomor = 'KWT/BK3-SBY/' . ($suket->nomor_order);
+                        $suket->kuitansi_file_path = $draft->invoice_file_path;
+                        $suket->kuitansi_file_name = $draft->invoice_file_name;
+                        $suket->kuitansi_generated_at = $draft->invoice_generated_at ?: now();
+                        $suket->kuitansi_generated_by = $draft->invoice_generated_by ?: $user->id;
+                        $suket->kuitansi_sent_at = $draft->invoice_generated_at ?: now();
+                        $suket->kuitansi_sent_by = $user->id;
+                    }
+                    $suket->status_tahap = 9;
+                    $suket->recordHistory(
+                        action: 'synced_financial',
+                        stageBefore: $currentStage,
+                        stageAfter: 9,
+                        catatan: 'Data administrasi keuangan (Surat Tagihan, Billing, Kuitansi) disinkronkan dari Alur Kerja Permohonan ' . $suket->nomor_order . '. Berkas siap diserahkan.',
+                        userId: $user->id
+                    );
+                }
             }
 
             if ($request->filled('catatan')) {
@@ -886,6 +1346,31 @@ class PenerbitanSuketController extends Controller
             $suket->updated_by = $user->id;
             $suket->save();
         });
+
+        if ($request->action === 'upload_draft') {
+            return redirect()->route('suket.index', ['stage' => 3])
+                ->with('success', "Berkas draf revisi Suket ({$suket->draft_file_name}) berhasil diunggah dan menggantikan draf sebelumnya.");
+        }
+
+        if ($request->action === 'upload_guide') {
+            return redirect()->route('suket.index', ['stage' => 7])
+                ->with('success', "Berkas Panduan Pembayaran ({$suket->billing_guide_name}) berhasil disimpan.");
+        }
+
+        if ($request->action === 'reject_payment') {
+            return redirect()->route('suket.index', ['stage' => 7])
+                ->with('warning', "Bukti transfer permohonan {$suket->nomor_order} DITOLAK. Pemohon telah diminta mengunggah ulang bukti transfer yang benar.");
+        }
+
+        if ($request->action === 'send_tagihan' || ($currentStage === 6 && $suket->status_tahap === 6)) {
+            return redirect()->route('suket.index', ['stage' => 6])
+                ->with('success', "Surat Tagihan untuk nomor order {$suket->nomor_order} berhasil dikirim ke pemohon. Menunggu persetujuan (ACC) pemohon.");
+        }
+
+        if ($request->action === 'send_billing' || ($currentStage === 7 && $suket->status_tahap === 7 && $request->action !== 'reject_payment')) {
+            return redirect()->route('suket.index', ['stage' => 7])
+                ->with('success', "Kode Billing dan Panduan Pembayaran untuk {$suket->nomor_order} berhasil dikirim ke pemohon. Menunggu pembayaran pemohon.");
+        }
 
         $stageLabel = SuketK3::STAGES[$suket->status_tahap]['label'] ?? "Tahap {$suket->status_tahap}";
         return redirect()->route('suket.index', ['stage' => $suket->status_tahap])
@@ -929,8 +1414,21 @@ class PenerbitanSuketController extends Controller
                     $suket->tanggal_surat = now()->toDateString();
                 }
 
-                // Perbarui dokumen draf dengan nomor surat resmi yang ditetapkan QC
-                $this->saveAutoGeneratedDraft($suket);
+                // Kelola berkas draf fisik: jika belum ada dibuat otomatis, jika sudah ada disinkronkan nomor suratnya
+                $isCustomUploaded = !empty($suket->draft_file_path) && (
+                    str_contains($suket->draft_file_path, 'Draft_Revisi_') ||
+                    str_contains($suket->draft_file_path, 'suket_draft_')
+                );
+
+                if (empty($suket->draft_file_path) || !Storage::disk(self::PRIVATE_DISK)->exists($suket->draft_file_path)) {
+                    $this->saveAutoGeneratedDraft($suket);
+                } elseif ($isCustomUploaded) {
+                    // Dokumen draf revisi hasil upload penguji: auto-replace Nomor & Tanggal Surat in-place tanpa merusak format Word
+                    app(\App\Services\SuketDocxService::class)->syncDocxMetadata($suket);
+                } else {
+                    // Dokumen draf otomatis standar: generate ulang agar nomor & tanggal terpasang rapi
+                    $this->saveAutoGeneratedDraft($suket);
+                }
 
                 $qcNote = $request->filled('catatan')
                     ? trim((string) $request->input('catatan'))
@@ -994,36 +1492,29 @@ class PenerbitanSuketController extends Controller
     }
 
     /**
-     * Auto Generate Draf Suket K3 Standar Permenaker 05/2018 (Word Document)
+     * Auto Generate Draf Suket K3 Standar Permenaker 05/2018 (Word DOCX Document)
      */
     public function generateDraft(SuketK3 $suket)
     {
         $this->ensureAccess();
 
-        $logoAsset = $this->resolveWordHeaderLogoAsset();
-        $logoAssetBase64 = $logoAsset ? base64_encode($logoAsset['binary']) : null;
-
-        // Ambil data pejabat Kepala Balai
-        $kepalaBalai = User::whereIn('role', ['kepala_balai', 'mp'])->first();
-
-        $html = view('admin.word.suket_k3_permenaker', [
-            'suket' => $suket,
-            'logoAssetBase64' => $logoAssetBase64,
-            'kepalaBalaiNama' => $kepalaBalai?->name ?? 'Dr. H. Agus Triyono, S.T., M.Kes.',
-            'kepalaBalaiNip' => $kepalaBalai?->nip ?? '19750812 200212 1 001',
-        ])->render();
-
-        // Simpan file draf ke private disk agar otomatis terlampir
-        $filename = 'Suket_Permenaker_05_2018_' . preg_replace('/[^A-Za-z0-9\-]+/', '_', $suket->nomor_order) . '.doc';
+        $docxBinary = app(\App\Services\SuketDocxService::class)->generateDocx($suket);
+        $filename = 'Suket_Permenaker_05_2018_' . preg_replace('/[^A-Za-z0-9\-]+/', '_', $suket->nomor_order) . '.docx';
         $path = 'suket_docs/' . $suket->id . '/' . $filename;
-        Storage::disk(self::PRIVATE_DISK)->put($path, "\xEF\xBB\xBF" . $html);
+
+        // Bersihkan draf lama jika ada
+        if ($suket->draft_file_path && $suket->draft_file_path !== $path && Storage::disk(self::PRIVATE_DISK)->exists($suket->draft_file_path)) {
+            Storage::disk(self::PRIVATE_DISK)->delete($suket->draft_file_path);
+        }
+
+        Storage::disk(self::PRIVATE_DISK)->put($path, $docxBinary);
 
         $suket->draft_file_path = $path;
         $suket->draft_file_name = $filename;
         $suket->save();
 
-        return response("\xEF\xBB\xBF" . $html, 200, [
-            'Content-Type' => 'application/msword; charset=UTF-8',
+        return response($docxBinary, 200, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
     }
@@ -1041,14 +1532,32 @@ class PenerbitanSuketController extends Controller
         ]);
 
         $file = $request->file('document_file');
+
+        if ($request->type === 'draft') {
+            \App\Support\SafeDocumentUpload::validateOrFail($file, 'document_file');
+        } elseif (in_array($request->type, ['signed', 'final', 'foto', 'denah'], true)) {
+            \App\Support\SafeDocumentUpload::validatePengujianOrFail($file, 'document_file');
+        } elseif ($request->type === 'lhu') {
+            \App\Support\SafeDocumentUpload::validatePdfOrFail($file, 'document_file');
+        }
+
         $ext = strtolower($file->getClientOriginalExtension());
         $filename = 'suket_' . $request->type . '_' . $suket->id . '_' . time() . '.' . $ext;
         $path = $file->storeAs('suket_docs/' . $suket->id, $filename, self::PRIVATE_DISK);
 
         if ($request->type === 'draft') {
+            if ($suket->draft_file_path && $suket->draft_file_path !== $path && Storage::disk(self::PRIVATE_DISK)->exists($suket->draft_file_path)) {
+                Storage::disk(self::PRIVATE_DISK)->delete($suket->draft_file_path);
+            }
             $suket->draft_file_path = $path;
             $suket->draft_file_name = $file->getClientOriginalName();
+            if ($ext === 'docx' && !empty($suket->nomor_surat)) {
+                app(\App\Services\SuketDocxService::class)->syncDocxMetadata($suket);
+            }
         } elseif ($request->type === 'signed' || $request->type === 'final') {
+            if ($suket->signed_file_path && $suket->signed_file_path !== $path && Storage::disk(self::PRIVATE_DISK)->exists($suket->signed_file_path)) {
+                Storage::disk(self::PRIVATE_DISK)->delete($suket->signed_file_path);
+            }
             $suket->signed_file_path = $path;
             $suket->signed_file_name = $file->getClientOriginalName();
             if (!$suket->signed_at) {
@@ -1096,8 +1605,21 @@ class PenerbitanSuketController extends Controller
             'lhu' => $suket->effective_lhu_path ?: $suket->lhu_file_path,
             'foto' => $suket->foto_pengujian_path,
             'denah' => $suket->denah_lokasi_path,
+            'tagihan' => $suket->surat_tagihan_file_path,
+            'billing' => $suket->billing_file_path,
+            'guide', 'panduan', 'billing_guide' => $suket->effectiveBillingGuidePath(),
+            'proof', 'payment_proof' => $suket->billing_proof_path,
+            'kuitansi' => $suket->kuitansi_file_path,
             default => null,
         };
+
+        // Jika unduh draft dan berkas fisik belum ada, generate .docx standar otomatis
+        if ($type === 'draft' && (!$path || !Storage::disk(self::PRIVATE_DISK)->exists($path))) {
+            $this->saveAutoGeneratedDraft($suket);
+            $path = $suket->draft_file_path;
+        } elseif ($type === 'draft' && $path && !empty($suket->nomor_surat) && str_ends_with(strtolower($path), '.docx')) {
+            app(\App\Services\SuketDocxService::class)->syncDocxMetadata($suket);
+        }
 
         $name = match ($type) {
             'draft' => $suket->draft_file_name,
@@ -1105,6 +1627,11 @@ class PenerbitanSuketController extends Controller
             'lhu' => $suket->lhu_file_name ?: basename($path ?? 'LHU.pdf'),
             'foto' => $suket->foto_pengujian_name,
             'denah' => $suket->denah_lokasi_name,
+            'tagihan' => $suket->surat_tagihan_file_name ?: ('Surat_Tagihan_' . $suket->nomor_order . '.pdf'),
+            'billing' => $suket->billing_file_name ?: ('Kode_Billing_' . $suket->nomor_order . '.pdf'),
+            'guide', 'panduan', 'billing_guide' => $suket->effectiveBillingGuideName() ?: ('Panduan_Pembayaran_' . $suket->nomor_order . '.pdf'),
+            'proof', 'payment_proof' => $suket->billing_proof_name ?: ('Bukti_Pembayaran_' . $suket->nomor_order . '.pdf'),
+            'kuitansi' => $suket->kuitansi_file_name ?: ('Kuitansi_' . $suket->nomor_order . '.pdf'),
             default => null,
         };
 
@@ -1125,20 +1652,16 @@ class PenerbitanSuketController extends Controller
      */
     private function saveAutoGeneratedDraft(SuketK3 $suket): void
     {
-        $logoAsset = $this->resolveWordHeaderLogoAsset();
-        $logoAssetBase64 = $logoAsset ? base64_encode($logoAsset['binary']) : null;
-        $kepalaBalai = User::whereIn('role', ['kepala_balai', 'mp'])->first();
-
-        $html = view('admin.word.suket_k3_permenaker', [
-            'suket' => $suket,
-            'logoAssetBase64' => $logoAssetBase64,
-            'kepalaBalaiNama' => $kepalaBalai?->name ?? 'Dr. H. Agus Triyono, S.T., M.Kes.',
-            'kepalaBalaiNip' => $kepalaBalai?->nip ?? '19750812 200212 1 001',
-        ])->render();
-
-        $filename = 'Draft_Suket_' . preg_replace('/[^A-Za-z0-9\-]+/', '_', $suket->nomor_order) . '.doc';
+        $docxBinary = app(\App\Services\SuketDocxService::class)->generateDocx($suket);
+        $filename = 'Draft_Suket_' . preg_replace('/[^A-Za-z0-9\-]+/', '_', $suket->nomor_order) . '.docx';
         $path = 'suket_docs/' . $suket->id . '/' . $filename;
-        Storage::disk(self::PRIVATE_DISK)->put($path, "\xEF\xBB\xBF" . $html);
+
+        // Bersihkan draf lama jika ada
+        if ($suket->draft_file_path && $suket->draft_file_path !== $path && Storage::disk(self::PRIVATE_DISK)->exists($suket->draft_file_path)) {
+            Storage::disk(self::PRIVATE_DISK)->delete($suket->draft_file_path);
+        }
+
+        Storage::disk(self::PRIVATE_DISK)->put($path, $docxBinary);
 
         $suket->draft_file_path = $path;
         $suket->draft_file_name = $filename;
@@ -1191,7 +1714,7 @@ class PenerbitanSuketController extends Controller
     private function ensureAccess(): void
     {
         $role = auth()->user()?->role;
-        $allowed = ['admin', 'superadmin', 'mp', 'pcu', 'kepala_balai', 'penguji_k3', 'qc', 'user'];
+        $allowed = ['admin', 'superadmin', 'mp', 'pcu', 'kepala_balai', 'penguji_k3', 'qc', 'bendahara', 'user'];
 
         if (!in_array($role, $allowed, true)) {
             abort(403, 'Akses ditolak. Silakan login dengan akun yang memiliki hak akses.');
@@ -1226,6 +1749,11 @@ class PenerbitanSuketController extends Controller
     public function updateAvailability(Request $request)
     {
         abort_unless(auth()->user()?->role === 'superadmin', 403);
-        return response()->json(['message' => 'Availability updated', 'enabled' => true]);
+        $enabled = $request->boolean('enabled');
+        \App\Models\AppSetting::query()->updateOrCreate(
+            ['key' => 'suket_penerbitan_enabled'],
+            ['value' => $enabled ? '1' : '0']
+        );
+        return response()->json(['message' => 'Availability updated', 'enabled' => $enabled]);
     }
 }

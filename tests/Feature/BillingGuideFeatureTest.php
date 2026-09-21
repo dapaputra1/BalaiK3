@@ -38,7 +38,7 @@ class BillingGuideFeatureTest extends TestCase
             'role' => 'superadmin',
         ]);
 
-        $file = UploadedFile::fake()->create('panduan-pembayaran.pdf', 200, 'application/pdf');
+        $file = UploadedFile::fake()->createWithContent('panduan-pembayaran.pdf', "%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF");
 
         $response = $this->actingAs($superadmin)->post(route('billing-guide.upload'), [
             'guide_file' => $file,

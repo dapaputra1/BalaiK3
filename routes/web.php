@@ -180,10 +180,12 @@ Route::middleware(['auth', 'role:user'])
         Route::get('/', [PenerbitanSuketController::class, 'userIndex'])->name('index');
         Route::post('/store', [PenerbitanSuketController::class, 'userStore'])->name('store');
         Route::post('/{suket}/submit-revision', [PenerbitanSuketController::class, 'userSubmitRevision'])->name('submit-revision');
+        Route::post('/{suket}/acc-tagihan', [PenerbitanSuketController::class, 'userAccTagihan'])->name('acc-tagihan');
+        Route::post('/{suket}/upload-payment-proof', [PenerbitanSuketController::class, 'userUploadPaymentProof'])->name('upload-payment-proof');
     });
 
-// Menu Internal Petugas: Penerbitan Suket K3 Lingkungan Kerja (Mulai Tahap 2 s/d 6)
-Route::middleware(['auth', 'role:superadmin,admin,mp,pcu,kepala_balai,penguji_k3,qc,user'])
+// Menu Internal Petugas: Penerbitan Suket K3 Lingkungan Kerja (Mulai Tahap 2 s/d 9)
+Route::middleware(['auth', 'role:superadmin,admin,mp,pcu,kepala_balai,penguji_k3,qc,bendahara,user'])
     ->prefix('suket-k3')
     ->name('suket.')
     ->group(function () {
