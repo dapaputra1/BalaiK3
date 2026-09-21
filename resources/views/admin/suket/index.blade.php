@@ -582,128 +582,242 @@
                                 </div>
                             </td>
                             <td>
-                                <div class="d-flex flex-column gap-1" style="font-size: 11px;">
-                                    {{-- Dokumen LHU --}}
-                                    @if($suket->lhu_file_path)
-                                        <div class="d-flex align-items-center gap-1">
-                                            <button 
-                                                type="button" 
-                                                class="btn btn-xs btn-outline-danger px-2 py-0 rounded"
-                                                onclick="openDocPreview('{{ route('suket.preview-doc', [$suket->id, 'lhu']) }}', 'Dokumen LHU: {{ $suket->nomor_order }}', 'pdf')"
-                                                title="Preview Dokumen LHU"
-                                            >
-                                                <i class="bi bi-eye me-1"></i>LHU ({{ $suket->lhu_source === 'auto' ? 'Auto' : 'Manual' }})
-                                            </button>
-                                            <a href="{{ route('suket.download-doc', [$suket->id, 'lhu']) }}" class="text-secondary" title="Unduh File LHU" download>
-                                                <i class="bi bi-download"></i>
-                                            </a>
-                                        </div>
-                                    @else
-                                        <span class="text-muted">- LHU belum terlampir -</span>
-                                    @endif
+                                @php
+                                    $stg = (int) $suket->status_tahap;
+                                    $allDocs = [];
 
-                                    {{-- Foto & Denah --}}
-                                    <div class="d-flex gap-2">
-                                        @if($suket->foto_pengujian_path)
-                                            <button 
-                                                type="button" 
-                                                class="btn btn-xs btn-outline-info px-2 py-0 rounded text-decoration-none"
-                                                onclick="openDocPreview('{{ route('suket.preview-doc', [$suket->id, 'foto']) }}', 'Foto Pengujian: {{ $suket->nomor_order }}', 'image')"
-                                                title="Preview Foto Pengujian"
-                                            >
-                                                <i class="bi bi-image me-1"></i>Foto
-                                            </button>
-                                        @endif
-                                        @if($suket->denah_lokasi_path)
-                                            <button 
-                                                type="button" 
-                                                class="btn btn-xs btn-outline-warning px-2 py-0 rounded text-decoration-none"
-                                                onclick="openDocPreview('{{ route('suket.preview-doc', [$suket->id, 'denah']) }}', 'Denah Lokasi: {{ $suket->nomor_order }}', 'image')"
-                                                title="Preview Denah Lokasi"
-                                            >
-                                                <i class="bi bi-map me-1"></i>Denah
-                                            </button>
-                                        @endif
-                                    </div>
+                                    // 1. LHU
+                                    if ($suket->lhu_file_path || $suket->effective_lhu_path) {
+                                        $allDocs['lhu'] = [
+                                            'label' => 'LHU (' . ($suket->lhu_source === 'auto' ? 'Auto' : 'Manual') . ')',
+                                            'title' => 'Dokumen LHU: ' . $suket->nomor_order,
+                                            'icon' => 'bi bi-file-earmark-pdf text-danger',
+                                            'btn_class' => 'btn-outline-danger',
+                                            'preview_url' => route('suket.preview-doc', [$suket->id, 'lhu']),
+                                            'download_url' => route('suket.download-doc', [$suket->id, 'lhu']),
+                                            'type' => 'pdf',
+                                        ];
+                                    }
 
-                                    {{-- Draf Suket Permenaker --}}
-                                    @if($suket->draft_file_path || $suket->status_tahap >= 3)
-                                        <div class="d-flex align-items-center gap-1">
-                                            <button 
-                                                type="button" 
-                                                class="btn btn-xs btn-outline-primary px-2 py-0 rounded"
-                                                onclick="openDocPreview('{{ route('suket.preview-doc', [$suket->id, 'draft']) }}', 'Draf Suket Permenaker: {{ $suket->nomor_order }}', 'html')"
-                                                title="Preview Dokumen Draf Suket"
-                                            >
-                                                <i class="bi bi-eye me-1"></i>Draf Suket
-                                            </button>
-                                            <a href="{{ route('suket.download-doc', [$suket->id, 'draft']) }}" class="text-primary" title="Unduh Draf Word (.docx)" download>
-                                                <i class="bi bi-download"></i>
-                                            </a>
-                                        </div>
-                                        @if($suket->draft_file_name)
-                                            <div class="small text-truncate mt-1 text-muted" style="max-width: 150px; font-size: 10px;" title="{{ $suket->draft_file_name }}">
-                                                <i class="bi bi-file-earmark-word text-primary me-1"></i>{{ $suket->draft_file_name }}
-                                                @if(str_contains($suket->draft_file_name, 'Revisi') || str_contains($suket->draft_file_path ?? '', 'Draft_Revisi_'))
-                                                    <span class="badge bg-info-subtle text-info-emphasis ms-1" style="font-size: 8px;">Revisi</span>
-                                                @endif
-                                            </div>
-                                        @endif
-                                    @endif
+                                    // 2. Foto Pengujian
+                                    if ($suket->foto_pengujian_path) {
+                                        $allDocs['foto'] = [
+                                            'label' => 'Foto Uji',
+                                            'title' => 'Foto Pengujian: ' . $suket->nomor_order,
+                                            'icon' => 'bi bi-image text-info',
+                                            'btn_class' => 'btn-outline-info',
+                                            'preview_url' => route('suket.preview-doc', [$suket->id, 'foto']),
+                                            'download_url' => null,
+                                            'type' => 'image',
+                                        ];
+                                    }
 
-                                    {{-- Suket Resmi TTD --}}
-                                    @if($suket->signed_file_path)
-                                        <div class="d-flex align-items-center gap-1">
-                                            <button 
-                                                type="button" 
-                                                class="btn btn-xs btn-success px-2 py-0 rounded text-white"
-                                                onclick="openDocPreview('{{ route('suket.preview-doc', [$suket->id, 'signed']) }}', 'Surat Keterangan K3 Resmi: {{ $suket->nomor_order }}', 'pdf')"
-                                                title="Preview Suket Resmi TTD"
-                                            >
-                                                <i class="bi bi-patch-check-fill me-1"></i>Suket Sah
-                                            </button>
-                                            <a href="{{ route('suket.download-doc', [$suket->id, 'signed']) }}" class="text-success" title="Unduh Suket Resmi" download>
-                                                <i class="bi bi-download"></i>
-                                            </a>
-                                        </div>
-                                    @endif
+                                    // 3. Denah Lokasi
+                                    if ($suket->denah_lokasi_path) {
+                                        $allDocs['denah'] = [
+                                            'label' => 'Denah',
+                                            'title' => 'Denah Lokasi: ' . $suket->nomor_order,
+                                            'icon' => 'bi bi-map text-warning',
+                                            'btn_class' => 'btn-outline-warning',
+                                            'preview_url' => route('suket.preview-doc', [$suket->id, 'denah']),
+                                            'download_url' => null,
+                                            'type' => 'image',
+                                        ];
+                                    }
 
-                                    {{-- Berkas Keuangan (Tagihan, Billing, Kuitansi) --}}
-                                    @if($suket->surat_tagihan_file_path)
-                                        <div class="d-flex align-items-center gap-1 mt-1">
-                                            <a href="{{ route('suket.download-doc', [$suket->id, 'tagihan']) }}" class="btn btn-xs btn-outline-primary px-2 py-0 rounded text-decoration-none" title="Unduh Surat Tagihan" download>
-                                                <i class="bi bi-envelope-paper me-1"></i>Tagihan
-                                            </a>
-                                        </div>
-                                    @endif
-                                    @if($suket->billing_file_path || $suket->billing_kode)
-                                        <div class="d-flex align-items-center gap-1 mt-1">
-                                            <a href="{{ $suket->billing_file_path ? route('suket.download-doc', [$suket->id, 'billing']) : '#' }}" class="btn btn-xs btn-outline-warning px-2 py-0 rounded text-decoration-none" title="Billing: {{ $suket->billing_kode }}" {{ $suket->billing_file_path ? 'download' : '' }}>
-                                                <i class="bi bi-upc me-1"></i>Billing
-                                            </a>
-                                            @if($suket->hasBillingGuide())
-                                                <a href="{{ route('suket.download-doc', [$suket->id, 'guide']) }}" class="btn btn-xs btn-outline-info px-1 py-0 rounded" title="Panduan Pembayaran" download>
-                                                    <i class="bi bi-book"></i>
+                                    // 4. Draf Suket
+                                    if ($suket->draft_file_path || $stg >= 3) {
+                                        $allDocs['draft'] = [
+                                            'label' => 'Draf Suket',
+                                            'title' => 'Draf Suket: ' . $suket->nomor_order,
+                                            'icon' => 'bi bi-file-earmark-word text-primary',
+                                            'btn_class' => 'btn-outline-primary',
+                                            'preview_url' => route('suket.preview-doc', [$suket->id, 'draft']),
+                                            'download_url' => route('suket.download-doc', [$suket->id, 'draft']),
+                                            'type' => 'html',
+                                        ];
+                                    }
+
+                                    // 5. Suket Sah (Signed)
+                                    if ($suket->signed_file_path) {
+                                        $allDocs['signed'] = [
+                                            'label' => 'Suket Sah',
+                                            'title' => 'Surat Keterangan K3 Resmi: ' . $suket->nomor_order,
+                                            'icon' => 'bi bi-patch-check-fill text-success',
+                                            'btn_class' => 'btn-success text-white',
+                                            'preview_url' => route('suket.preview-doc', [$suket->id, 'signed']),
+                                            'download_url' => route('suket.download-doc', [$suket->id, 'signed']),
+                                            'type' => 'pdf',
+                                        ];
+                                    }
+
+                                    // 6. Surat Tagihan
+                                    if ($suket->surat_tagihan_file_path || $suket->isTagihanSent() || $stg >= 6) {
+                                        $allDocs['tagihan'] = [
+                                            'label' => 'Tagihan',
+                                            'title' => 'Surat Tagihan PNBP: ' . $suket->nomor_order,
+                                            'icon' => 'bi bi-envelope-paper text-primary',
+                                            'btn_class' => 'btn-outline-primary',
+                                            'preview_url' => route('suket.preview-doc', [$suket->id, 'tagihan']),
+                                            'download_url' => route('suket.download-doc', [$suket->id, 'tagihan']),
+                                            'type' => 'pdf',
+                                        ];
+                                    }
+
+                                    // 7. Billing
+                                    if ($suket->billing_file_path || $suket->billing_kode) {
+                                        $allDocs['billing'] = [
+                                            'label' => 'Billing',
+                                            'title' => 'Kode Billing: ' . ($suket->billing_kode ?: $suket->nomor_order),
+                                            'icon' => 'bi bi-upc text-warning',
+                                            'btn_class' => 'btn-outline-warning',
+                                            'preview_url' => null,
+                                            'download_url' => $suket->billing_file_path ? route('suket.download-doc', [$suket->id, 'billing']) : null,
+                                            'type' => 'pdf',
+                                        ];
+                                    }
+
+                                    // 8. Panduan Pembayaran
+                                    if ($suket->hasBillingGuide()) {
+                                        $allDocs['guide'] = [
+                                            'label' => 'Panduan',
+                                            'title' => 'Panduan Pembayaran: ' . $suket->nomor_order,
+                                            'icon' => 'bi bi-book text-info',
+                                            'btn_class' => 'btn-outline-info',
+                                            'preview_url' => route('suket.preview-doc', [$suket->id, 'guide']),
+                                            'download_url' => route('suket.download-doc', [$suket->id, 'guide']),
+                                            'type' => 'pdf',
+                                        ];
+                                    }
+
+                                    // 9. Bukti Pembayaran
+                                    if ($suket->billing_proof_path) {
+                                        $isRej = $suket->isBillingProofRejected();
+                                        $allDocs['proof'] = [
+                                            'label' => $isRej ? 'Bukti Ditolak' : 'Bukti Bayar',
+                                            'title' => 'Bukti Bayar: ' . $suket->nomor_order,
+                                            'icon' => $isRej ? 'bi bi-x-circle text-danger' : 'bi bi-check2 text-success',
+                                            'btn_class' => $isRej ? 'btn-danger text-white' : 'btn-success text-white',
+                                            'preview_url' => route('suket.preview-doc', [$suket->id, 'proof']),
+                                            'download_url' => route('suket.download-doc', [$suket->id, 'proof']),
+                                            'type' => 'image',
+                                        ];
+                                    }
+
+                                    // 10. Kuitansi
+                                    if ($suket->kuitansi_file_path || $suket->isKuitansiSent() || $stg >= 8 || $suket->kuitansi_nomor) {
+                                        $allDocs['kuitansi'] = [
+                                            'label' => 'Kuitansi',
+                                            'title' => 'Kuitansi Lunas: ' . $suket->nomor_order,
+                                            'icon' => 'bi bi-receipt text-info',
+                                            'btn_class' => 'btn-outline-info',
+                                            'preview_url' => route('suket.preview-doc', [$suket->id, 'kuitansi']),
+                                            'download_url' => route('suket.download-doc', [$suket->id, 'kuitansi']),
+                                            'type' => 'pdf',
+                                        ];
+                                    }
+
+                                    // Mapping prioritas berkas berdasarkan Tahap Aktif (Context-Aware)
+                                    $primaryKeys = match ($stg) {
+                                        1, 2 => ['lhu', 'foto', 'denah'],
+                                        3 => ['draft', 'lhu'],
+                                        4, 5 => isset($allDocs['signed']) ? ['signed', 'draft'] : ['draft', 'lhu'],
+                                        6 => ['tagihan'],
+                                        7 => ['billing', 'guide', 'proof'],
+                                        8 => ['kuitansi', 'proof'],
+                                        9 => ['signed', 'kuitansi'],
+                                        default => ['lhu'],
+                                    };
+
+                                    $primaryDocs = [];
+                                    $secondaryDocs = [];
+
+                                    foreach ($primaryKeys as $pk) {
+                                        if (isset($allDocs[$pk])) {
+                                            $primaryDocs[$pk] = $allDocs[$pk];
+                                        }
+                                    }
+
+                                    // Fallback jika tidak ada primary tapi ada dokumen lain
+                                    if (empty($primaryDocs) && !empty($allDocs)) {
+                                        $firstK = array_key_first($allDocs);
+                                        $primaryDocs[$firstK] = $allDocs[$firstK];
+                                    }
+
+                                    foreach ($allDocs as $k => $doc) {
+                                        if (!isset($primaryDocs[$k])) {
+                                            $secondaryDocs[$k] = $doc;
+                                        }
+                                    }
+                                @endphp
+
+                                <div class="d-flex align-items-center gap-1 flex-wrap" style="font-size: 11px;">
+                                    @forelse($primaryDocs as $k => $doc)
+                                        <div class="d-flex align-items-center gap-1 bg-white border rounded px-1 py-0 shadow-xs">
+                                            @if(!empty($doc['preview_url']))
+                                                <button 
+                                                    type="button" 
+                                                    class="btn btn-xs {{ $doc['btn_class'] }} px-2 py-0 rounded text-decoration-none"
+                                                    onclick="openDocPreview('{{ $doc['preview_url'] }}', '{{ $doc['title'] }}', '{{ $doc['type'] }}')"
+                                                    title="Lihat {{ $doc['title'] }}"
+                                                >
+                                                    <i class="bi bi-eye me-1"></i>{{ $doc['label'] }}
+                                                </button>
+                                            @else
+                                                <span class="btn btn-xs {{ $doc['btn_class'] }} px-2 py-0 rounded disabled">
+                                                    {{ $doc['label'] }}
+                                                </span>
+                                            @endif
+
+                                            @if(!empty($doc['download_url']))
+                                                <a href="{{ $doc['download_url'] }}" class="text-secondary px-1" title="Unduh {{ $doc['label'] }}" download>
+                                                    <i class="bi bi-download"></i>
                                                 </a>
                                             @endif
-                                            @if($suket->billing_proof_path)
-                                                @if($suket->isBillingProofRejected())
-                                                    <a href="{{ route('suket.download-doc', [$suket->id, 'proof']) }}" class="btn btn-xs btn-danger px-1 py-0 rounded text-white" title="Bukti Ditolak: {{ $suket->billing_proof_reject_note }}" download>
-                                                        <i class="bi bi-x-circle"></i>
-                                                    </a>
-                                                @else
-                                                    <a href="{{ route('suket.download-doc', [$suket->id, 'proof']) }}" class="btn btn-xs btn-success px-1 py-0 rounded text-white" title="Unduh Bukti Pembayaran" download>
-                                                        <i class="bi bi-check2"></i>
-                                                    </a>
-                                                @endif
-                                            @endif
                                         </div>
-                                    @endif
-                                    @if($suket->kuitansi_file_path || $suket->kuitansi_nomor)
-                                        <div class="d-flex align-items-center gap-1 mt-1">
-                                            <a href="{{ $suket->kuitansi_file_path ? route('suket.download-doc', [$suket->id, 'kuitansi']) : '#' }}" class="btn btn-xs btn-outline-info px-2 py-0 rounded text-decoration-none" title="Kuitansi: {{ $suket->kuitansi_nomor }}" {{ $suket->kuitansi_file_path ? 'download' : '' }}>
-                                                <i class="bi bi-receipt me-1"></i>Kuitansi
-                                            </a>
+                                    @empty
+                                        <span class="text-muted" style="font-size: 10px;">- Belum ada berkas -</span>
+                                    @endforelse
+
+                                    {{-- Dropdown Berkas Lainnya (Jika ada) --}}
+                                    @if(count($secondaryDocs) > 0)
+                                        <div class="dropdown d-inline-block">
+                                            <button 
+                                                type="button" 
+                                                class="btn btn-xs btn-light border px-2 py-0 rounded-pill text-secondary d-flex align-items-center gap-1 dropdown-toggle" 
+                                                data-bs-toggle="dropdown" 
+                                                data-bs-boundary="viewport"
+                                                aria-expanded="false" 
+                                                title="Lihat berkas lampiran lainnya"
+                                            >
+                                                <i class="bi bi-folder2-open text-primary"></i>
+                                                <span style="font-size: 10px; font-weight: 600;">+{{ count($secondaryDocs) }}</span>
+                                            </button>
+                                            <ul class="dropdown-menu dropdown-menu-end shadow border rounded-3 p-2" style="min-width: 250px; font-size: 11.5px; z-index: 1050;">
+                                                <li class="dropdown-header text-uppercase px-2 py-1 text-muted" style="font-size: 9.5px; font-weight: 700; letter-spacing: 0.5px;">
+                                                    <i class="bi bi-archive me-1"></i> Berkas Tahap Lainnya
+                                                </li>
+                                                @foreach($secondaryDocs as $doc)
+                                                    <li class="d-flex align-items-center justify-content-between py-1 px-2 rounded mb-1 bg-light bg-opacity-50">
+                                                        <div class="d-flex align-items-center gap-2 text-truncate me-2" style="max-width: 155px;">
+                                                            <i class="{{ $doc['icon'] }}"></i>
+                                                            <span class="text-dark small text-truncate fw-medium" title="{{ $doc['title'] }}">{{ $doc['label'] }}</span>
+                                                        </div>
+                                                        <div class="d-flex align-items-center gap-1">
+                                                            @if(!empty($doc['preview_url']))
+                                                                <button type="button" class="btn btn-xs btn-outline-secondary p-0 px-1 rounded" onclick="openDocPreview('{{ $doc['preview_url'] }}', '{{ $doc['title'] }}', '{{ $doc['type'] }}')" title="Lihat">
+                                                                    <i class="bi bi-eye"></i>
+                                                                </button>
+                                                            @endif
+                                                            @if(!empty($doc['download_url']))
+                                                                <a href="{{ $doc['download_url'] }}" class="btn btn-xs btn-outline-primary p-0 px-1 rounded" title="Unduh" download>
+                                                                    <i class="bi bi-download"></i>
+                                                                </a>
+                                                            @endif
+                                                        </div>
+                                                    </li>
+                                                @endforeach
+                                            </ul>
                                         </div>
                                     @endif
                                 </div>
@@ -1519,14 +1633,19 @@
                                                                 </div>
                                                             @endif
 
-                                                            @if($suket->surat_tagihan_file_path)
+                                                            @if($suket->surat_tagihan_file_path || $suket->isTagihanSent() || $suket->status_tahap >= 6)
                                                                 <div class="d-flex align-items-center gap-2 p-2 bg-white rounded border small mb-3">
                                                                     <i class="bi bi-file-earmark-pdf text-danger"></i>
                                                                     <span class="text-muted">Berkas Surat Tagihan:</span>
-                                                                    <strong class="text-dark">{{ $suket->surat_tagihan_file_name ?? 'Surat_Tagihan.pdf' }}</strong>
-                                                                    <a href="{{ route('suket.download-doc', [$suket->id, 'tagihan']) }}" class="btn btn-xs btn-outline-primary rounded-pill ms-auto" download>
-                                                                        <i class="bi bi-download me-1"></i> Unduh
-                                                                    </a>
+                                                                    <strong class="text-dark">{{ $suket->surat_tagihan_file_name ?? ('Surat_Tagihan_' . $suket->nomor_order . '.pdf') }}</strong>
+                                                                    <div class="ms-auto d-flex gap-1">
+                                                                        <a href="{{ route('suket.preview-doc', [$suket->id, 'tagihan']) }}" target="_blank" class="btn btn-xs btn-outline-secondary rounded-pill px-2">
+                                                                            <i class="bi bi-eye me-1"></i> Lihat PDF
+                                                                        </a>
+                                                                        <a href="{{ route('suket.download-doc', [$suket->id, 'tagihan']) }}" class="btn btn-xs btn-outline-primary rounded-pill px-2" download>
+                                                                            <i class="bi bi-download me-1"></i> Unduh
+                                                                        </a>
+                                                                    </div>
                                                                 </div>
                                                             @endif
 
@@ -1536,8 +1655,11 @@
                                                                     <input type="text" name="surat_tagihan_nominal" class="form-control form-control-sm" placeholder="Contoh: 1.500.000" value="{{ $suket->surat_tagihan_nominal ? number_format($suket->surat_tagihan_nominal, 0, ',', '.') : '' }}">
                                                                 </div>
                                                                 <div class="col-sm-6">
-                                                                    <label class="form-label small fw-semibold text-dark">Upload Berkas Surat Tagihan (PDF, Opsional)</label>
+                                                                    <label class="form-label small fw-semibold text-dark">Upload Berkas Surat Tagihan <span class="text-muted fw-normal">(PDF, Opsional)</span></label>
                                                                     <input type="file" name="surat_tagihan_file" class="form-control form-control-sm" accept=".pdf">
+                                                                    <div class="form-text text-muted small mt-1">
+                                                                        <i class="bi bi-info-circle me-1"></i> Kosongkan jika ingin sistem secara <strong>otomatis membuat PDF Surat Tagihan resmi</strong> (hybrid).
+                                                                    </div>
                                                                 </div>
                                                             </div>
 
@@ -1743,19 +1865,27 @@
                                                                     <input type="text" name="kuitansi_nomor" class="form-control form-control-sm" placeholder="Contoh: KWT/BK3-SBY/{{ date('Ymd') }}/{{ $suket->id }}" value="{{ $suket->kuitansi_nomor ?: ('KWT/BK3-SBY/' . date('Ymd') . '/' . $suket->id) }}">
                                                                 </div>
                                                                 <div class="col-sm-6">
-                                                                    <label class="form-label small fw-semibold text-dark">Upload Berkas Kuitansi Lunas (PDF, Opsional)</label>
+                                                                    <label class="form-label small fw-semibold text-dark">Upload Berkas Kuitansi Lunas <span class="text-muted fw-normal">(PDF, Opsional)</span></label>
                                                                     <input type="file" name="kuitansi_file" class="form-control form-control-sm" accept=".pdf">
+                                                                    <div class="form-text text-muted small mt-1">
+                                                                        <i class="bi bi-info-circle me-1"></i> Kosongkan jika ingin sistem secara <strong>otomatis membuat PDF Kuitansi resmi Balai K3</strong> (hybrid).
+                                                                    </div>
                                                                 </div>
                                                             </div>
 
-                                                            @if($suket->kuitansi_file_path)
+                                                            @if($suket->kuitansi_file_path || $suket->isKuitansiSent() || $suket->status_tahap >= 8)
                                                                 <div class="d-flex align-items-center gap-2 p-2 bg-white rounded border small mb-3">
                                                                     <i class="bi bi-receipt text-primary"></i>
                                                                     <span class="text-muted">Berkas Kuitansi:</span>
-                                                                    <strong class="text-dark">{{ $suket->kuitansi_file_name ?? 'Kuitansi.pdf' }}</strong>
-                                                                    <a href="{{ route('suket.download-doc', [$suket->id, 'kuitansi']) }}" class="btn btn-xs btn-outline-primary rounded-pill ms-auto" download>
-                                                                        <i class="bi bi-download me-1"></i> Unduh
-                                                                    </a>
+                                                                    <strong class="text-dark">{{ $suket->kuitansi_file_name ?? ('Kuitansi_' . $suket->nomor_order . '.pdf') }}</strong>
+                                                                    <div class="ms-auto d-flex gap-1">
+                                                                        <a href="{{ route('suket.preview-doc', [$suket->id, 'kuitansi']) }}" target="_blank" class="btn btn-xs btn-outline-secondary rounded-pill px-2">
+                                                                            <i class="bi bi-eye me-1"></i> Lihat PDF
+                                                                        </a>
+                                                                        <a href="{{ route('suket.download-doc', [$suket->id, 'kuitansi']) }}" class="btn btn-xs btn-outline-primary rounded-pill px-2" download>
+                                                                            <i class="bi bi-download me-1"></i> Unduh
+                                                                        </a>
+                                                                    </div>
                                                                 </div>
                                                             @endif
                                                         </div>

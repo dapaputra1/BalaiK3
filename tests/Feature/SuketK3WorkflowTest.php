@@ -1593,5 +1593,115 @@ class SuketK3WorkflowTest extends TestCase
         $suket->refresh();
         $this->assertEquals(9, $suket->status_tahap);
     }
+
+    public function test_hybrid_auto_generate_tagihan_and_kuitansi_pdf()
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+        Storage::fake('local');
+
+        $admin = User::create([
+            'name' => 'Admin Keuangan',
+            'email' => 'keuangan@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
+        ]);
+        $pemohon = User::create([
+            'name' => 'Pemohon Hybrid',
+            'email' => 'pemohon.hybrid@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+
+        $suket = SuketK3::create([
+            'user_id' => $pemohon->id,
+            'nomor_order' => 'ORD-HYBRID-001',
+            'status_tahap' => 6,
+            'perusahaan_nama' => 'PT Hybrid Indonesia',
+            'lokasi' => 'Surabaya Industrial Estate',
+            'faktor_k3' => ['fisika', 'kimia'],
+        ]);
+
+        // 1. Uji Preview Tagihan on-the-fly ketika berkas belum pernah diunggah/digenerate
+        $previewBeforeSend = $this->actingAs($pemohon)->get("/permohonan-suket/{$suket->id}/preview/tagihan");
+        $previewBeforeSend->assertStatus(200);
+        $previewBeforeSend->assertHeader('Content-Type', 'application/pdf');
+
+        // 2. Admin kirim surat tagihan TANPA upload file manual (Auto-Generate aktif)
+        $postTagihan = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_tagihan',
+            'surat_tagihan_nominal' => '3.500.000',
+        ]);
+        $postTagihan->assertRedirect(route('suket.index', ['stage' => 6]));
+
+        $suket->refresh();
+        $this->assertNotEmpty($suket->surat_tagihan_file_path);
+        $this->assertTrue(Storage::disk('local')->exists($suket->surat_tagihan_file_path));
+        $this->assertEquals(3500000, (float) $suket->surat_tagihan_nominal);
+
+        // 3. Pemohon dapat mengunduh dan melihat PDF Tagihan resmi yang ter-generate otomatis
+        $downloadTagihan = $this->actingAs($pemohon)->get("/permohonan-suket/{$suket->id}/download/tagihan");
+        $downloadTagihan->assertStatus(200);
+
+        $previewTagihan = $this->actingAs($pemohon)->get("/permohonan-suket/{$suket->id}/preview/tagihan");
+        $previewTagihan->assertStatus(200);
+        $previewTagihan->assertHeader('Content-Type', 'application/pdf');
+
+        // 4. Pemohon ACC tagihan -> Lanjut Tahap 7
+        $this->actingAs($pemohon)->post("/permohonan-suket/{$suket->id}/acc-tagihan")
+            ->assertRedirect(route('user.suket.index'));
+        $suket->refresh();
+        $this->assertEquals(7, $suket->status_tahap);
+
+        // 5. Admin kirim billing dan diverifikasi -> Lanjut Tahap 8
+        $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_billing',
+            'billing_kode' => '82024092100001',
+        ]);
+        $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'verify_payment',
+        ]);
+        $suket->refresh();
+        $this->assertEquals(8, $suket->status_tahap);
+
+        // 6. Uji Preview Kuitansi on-the-fly di Tahap 8 sebelum admin upload berkas fisik
+        $previewKuitansiBeforeSend = $this->actingAs($pemohon)->get("/permohonan-suket/{$suket->id}/preview/kuitansi");
+        $previewKuitansiBeforeSend->assertStatus(200);
+        $previewKuitansiBeforeSend->assertHeader('Content-Type', 'application/pdf');
+
+        // 7. Admin kirim kuitansi TANPA upload file manual (Auto-Generate aktif)
+        $postKuitansi = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_kuitansi',
+            'kuitansi_nomor' => 'KWT/BK3-SBY/20260921/001',
+        ]);
+        $postKuitansi->assertRedirect(route('suket.index', ['stage' => 9]));
+
+        $suket->refresh();
+        $this->assertEquals(9, $suket->status_tahap);
+        $this->assertNotEmpty($suket->kuitansi_file_path);
+        $this->assertTrue(Storage::disk('local')->exists($suket->kuitansi_file_path));
+
+        // 8. Pemohon dapat mengunduh dan melihat PDF Kuitansi resmi yang ter-generate otomatis
+        $downloadKuitansi = $this->actingAs($pemohon)->get("/permohonan-suket/{$suket->id}/download/kuitansi");
+        $downloadKuitansi->assertStatus(200);
+
+        $previewKuitansi = $this->actingAs($pemohon)->get("/permohonan-suket/{$suket->id}/preview/kuitansi");
+        $previewKuitansi->assertStatus(200);
+        $previewKuitansi->assertHeader('Content-Type', 'application/pdf');
+
+        // 9. Uji hybrid override: jika admin mengunggah file custom kuitansi manual
+        $customKuitansi = UploadedFile::fake()->create('Kuitansi_Stempel_Basah.pdf', 80, 'application/pdf');
+        $suket->status_tahap = 8;
+        $suket->save();
+
+        $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'send_kuitansi',
+            'kuitansi_nomor' => 'KWT/BK3-SBY/20260921/002',
+            'kuitansi_file' => $customKuitansi,
+        ]);
+
+        $suket->refresh();
+        $this->assertEquals('Kuitansi_Stempel_Basah.pdf', $suket->kuitansi_file_name);
+        $this->assertTrue(Storage::disk('local')->exists($suket->kuitansi_file_path));
+    }
 }
 

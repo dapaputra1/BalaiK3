@@ -532,14 +532,23 @@
                                     >
                                         <i class="bi bi-upload me-1"></i>Upload Bukti Bayar
                                     </button>
-                                @elseif($stageNumber === 8 && $suket->kuitansi_file_path)
-                                    <a 
-                                        href="{{ route('user.suket.download-doc', [$suket->id, 'kuitansi']) }}" 
-                                        class="btn btn-sm btn-info rounded-pill px-3 text-white fw-semibold shadow-sm"
-                                        download
-                                    >
-                                        <i class="bi bi-download me-1"></i>Unduh Kuitansi
-                                    </a>
+                                @elseif($stageNumber === 8 || ($stageNumber >= 8 && ($suket->kuitansi_file_path || $suket->kuitansi_nomor || $suket->isKuitansiSent())))
+                                    <div class="d-flex align-items-center gap-1">
+                                        <a 
+                                            href="{{ route('user.suket.preview-doc', [$suket->id, 'kuitansi']) }}" 
+                                            target="_blank"
+                                            class="btn btn-sm btn-outline-info rounded-pill px-3 fw-semibold shadow-sm"
+                                        >
+                                            <i class="bi bi-eye me-1"></i>Lihat Kuitansi
+                                        </a>
+                                        <a 
+                                            href="{{ route('user.suket.download-doc', [$suket->id, 'kuitansi']) }}" 
+                                            class="btn btn-sm btn-info rounded-pill px-3 text-white fw-semibold shadow-sm"
+                                            download
+                                        >
+                                            <i class="bi bi-download me-1"></i>Unduh
+                                        </a>
+                                    </div>
                                 @else
                                     {{-- JIKA BELUM DISERAHKAN: INDIKATOR DALAM PROSES --}}
                                     <button 
@@ -715,11 +724,16 @@
                                             <strong>{{ \Carbon\Carbon::parse($suket->surat_tagihan_acc_at)->format('d F Y, H:i') }} WIB</strong>
                                         </div>
                                     </div>
-                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 pt-1">
-                                        @if($suket->surat_tagihan_file_path)
-                                            <a href="{{ route('user.suket.download-doc', [$suket->id, 'tagihan']) }}" class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold" download>
-                                                <i class="bi bi-file-earmark-pdf me-1"></i> Unduh Berkas Tagihan (.pdf)
-                                            </a>
+                                     <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 pt-1">
+                                        @if($suket->surat_tagihan_file_path || $suket->isTagihanSent() || $stageNumber >= 6)
+                                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                <a href="{{ route('user.suket.preview-doc', [$suket->id, 'tagihan']) }}" target="_blank" class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold">
+                                                    <i class="bi bi-eye me-1"></i> Lihat PDF Tagihan
+                                                </a>
+                                                <a href="{{ route('user.suket.download-doc', [$suket->id, 'tagihan']) }}" class="btn btn-sm btn-success rounded-pill px-3 fw-semibold" download>
+                                                    <i class="bi bi-file-earmark-pdf me-1"></i> Unduh Berkas (.pdf)
+                                                </a>
+                                            </div>
                                         @endif
                                         <span class="text-muted small ms-auto d-flex align-items-center gap-1">
                                             <i class="bi bi-arrow-right-circle text-success fs-6"></i> Permohonan otomatis beralih ke <strong>Tahap 7 (Kode Billing SIMPONI)</strong>
@@ -752,11 +766,16 @@
                                             <strong>{{ $suket->surat_tagihan_sent_at ? \Carbon\Carbon::parse($suket->surat_tagihan_sent_at)->format('d F Y, H:i') . ' WIB' : 'Hari ini' }}</strong>
                                         </div>
                                     </div>
-                                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-1">
-                                        @if($suket->surat_tagihan_file_path)
-                                            <a href="{{ route('user.suket.download-doc', [$suket->id, 'tagihan']) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold" download>
-                                                <i class="bi bi-file-earmark-pdf me-1"></i> Unduh Berkas Surat Tagihan
-                                            </a>
+                                     <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-1">
+                                        @if($suket->surat_tagihan_file_path || $suket->isTagihanSent() || $stageNumber >= 6)
+                                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                                <a href="{{ route('user.suket.preview-doc', [$suket->id, 'tagihan']) }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold">
+                                                    <i class="bi bi-eye me-1"></i> Lihat Rincian PDF
+                                                </a>
+                                                <a href="{{ route('user.suket.download-doc', [$suket->id, 'tagihan']) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-semibold" download>
+                                                    <i class="bi bi-file-earmark-pdf me-1"></i> Unduh (.pdf)
+                                                </a>
+                                            </div>
                                         @endif
                                         <form id="formAccTagihan{{ $suket->id }}" action="{{ route('user.suket.acc-tagihan', $suket->id) }}" method="POST" class="d-inline ms-auto">
                                             @csrf
@@ -869,15 +888,16 @@
                                 </div>
                                 <div class="small text-dark mb-2">
                                     Nomor Kuitansi: <strong class="text-navy">{{ $suket->kuitansi_nomor ?: '-' }}</strong> &bull;
-                                    Tanggal: {{ $suket->kuitansi_generated_at ? \Carbon\Carbon::parse($suket->kuitansi_generated_at)->format('d M Y') : '-' }}
+                                    Tanggal: {{ $suket->kuitansi_generated_at ? \Carbon\Carbon::parse($suket->kuitansi_generated_at)->format('d M Y') : ($suket->billing_verified_at ? \Carbon\Carbon::parse($suket->billing_verified_at)->format('d M Y') : 'Hari ini') }}
                                 </div>
-                                @if($suket->kuitansi_file_path)
-                                    <div>
-                                        <a href="{{ route('user.suket.download-doc', [$suket->id, 'kuitansi']) }}" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm" download>
-                                            <i class="bi bi-download me-1"></i> Unduh Berkas Kuitansi Resmi
-                                        </a>
-                                    </div>
-                                @endif
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <a href="{{ route('user.suket.preview-doc', [$suket->id, 'kuitansi']) }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-xs">
+                                        <i class="bi bi-eye me-1"></i> Lihat Kuitansi PDF
+                                    </a>
+                                    <a href="{{ route('user.suket.download-doc', [$suket->id, 'kuitansi']) }}" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm" download>
+                                        <i class="bi bi-download me-1"></i> Unduh Berkas Kuitansi Resmi
+                                    </a>
+                                </div>
                             </div>
                         @endif
 
