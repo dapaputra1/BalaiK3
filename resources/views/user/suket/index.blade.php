@@ -517,9 +517,9 @@
                                         <i class="bi bi-download me-1"></i>Unduh Suket
                                     </a>
                                 @elseif($stageNumber === 6 && !$suket->isTagihanAcc())
-                                    <form action="{{ route('user.suket.acc-tagihan', $suket->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda menyetujui (ACC) Surat Tagihan ini?')">
+                                    <form id="formQuickAccTagihan{{ $suket->id }}" action="{{ route('user.suket.acc-tagihan', $suket->id) }}" method="POST" class="d-inline">
                                         @csrf
-                                        <button type="submit" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm">
+                                        <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" onclick="confirmAccTagihan('{{ $suket->id }}', '{{ $suket->nomor_order }}', '{{ $suket->surat_tagihan_nominal ? number_format($suket->surat_tagihan_nominal, 0, ',', '.') : '-' }}', '{{ addslashes($suket->perusahaan_nama) }}')">
                                             <i class="bi bi-check-circle-fill me-1"></i>ACC Tagihan
                                         </button>
                                     </form>
@@ -687,40 +687,86 @@
                             </div>
                         </div>
 
-                        {{-- INTERACTIVE CARD TAHAP 6: SURAT TAGIHAN --}}
+                        {{-- INTERACTIVE CARD TAHAP 6: SURAT TAGIHAN DENGAN DESAIN MODERN --}}
                         @if($stageNumber === 6 || $suket->isTagihanSent())
-                            <div class="card border-primary border-opacity-25 bg-primary bg-opacity-10 rounded-3 p-3 mt-3">
-                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-                                    <div class="fw-bold text-navy">
-                                        <i class="bi bi-envelope-paper me-1"></i> Surat Tagihan Suket K3
+                            @if($suket->isTagihanAcc())
+                                <div class="card border-0 rounded-4 p-3 mt-3 shadow-sm overflow-hidden" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border-left: 5px solid #10b981 !important;">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="d-inline-flex align-items-center justify-content-center bg-success text-white rounded-circle shadow-xs" style="width: 32px; height: 32px; font-size: 1.1rem;">
+                                                <i class="bi bi-check2-circle"></i>
+                                            </span>
+                                            <div>
+                                                <div class="fw-bold text-success-emphasis">Surat Tagihan Suket K3 (Telah Disetujui)</div>
+                                                <small class="text-success text-opacity-75">Konfirmasi persetujuan resmi telah Anda berikan</small>
+                                            </div>
+                                        </div>
+                                        <span class="badge bg-success bg-opacity-90 text-white px-3 py-1 rounded-pill small shadow-xs">
+                                            <i class="bi bi-check-circle-fill me-1"></i> Telah Di-ACC
+                                        </span>
                                     </div>
-                                    <span class="badge {{ $suket->isTagihanAcc() ? 'bg-success' : 'bg-warning text-dark' }} rounded-pill">
-                                        {{ $suket->isTagihanAcc() ? 'Tagihan Telah Di-ACC' : 'Menunggu Konfirmasi ACC Anda' }}
-                                    </span>
+                                    <div class="row g-2 p-2 rounded-3 bg-white bg-opacity-65 border border-success border-opacity-20 small text-dark mb-2">
+                                        <div class="col-sm-6">
+                                            <span class="text-muted"><i class="bi bi-cash-stack text-success me-1"></i> Total Tagihan Resmi:</span><br>
+                                            <strong class="fs-6 text-success-emphasis">{{ $suket->surat_tagihan_nominal ? ('Rp ' . number_format($suket->surat_tagihan_nominal, 0, ',', '.')) : 'Sesuai tarif PNBP resmi' }}</strong>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <span class="text-muted"><i class="bi bi-calendar-check text-success me-1"></i> Waktu Persetujuan (ACC):</span><br>
+                                            <strong>{{ \Carbon\Carbon::parse($suket->surat_tagihan_acc_at)->format('d F Y, H:i') }} WIB</strong>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 pt-1">
+                                        @if($suket->surat_tagihan_file_path)
+                                            <a href="{{ route('user.suket.download-doc', [$suket->id, 'tagihan']) }}" class="btn btn-sm btn-outline-success rounded-pill px-3 fw-semibold" download>
+                                                <i class="bi bi-file-earmark-pdf me-1"></i> Unduh Berkas Tagihan (.pdf)
+                                            </a>
+                                        @endif
+                                        <span class="text-muted small ms-auto d-flex align-items-center gap-1">
+                                            <i class="bi bi-arrow-right-circle text-success fs-6"></i> Permohonan otomatis beralih ke <strong>Tahap 7 (Kode Billing SIMPONI)</strong>
+                                        </span>
+                                    </div>
                                 </div>
-                                <div class="small text-dark mb-2">
-                                    Nominal Tagihan: <strong class="fs-6 text-navy">{{ $suket->surat_tagihan_nominal ? ('Rp ' . number_format($suket->surat_tagihan_nominal, 0, ',', '.')) : 'Sesuai tarif PNBP resmi' }}</strong>
-                                </div>
-                                <div class="d-flex align-items-center gap-2 flex-wrap">
-                                    @if($suket->surat_tagihan_file_path)
-                                        <a href="{{ route('user.suket.download-doc', [$suket->id, 'tagihan']) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3" download>
-                                            <i class="bi bi-file-earmark-pdf me-1"></i> Unduh Berkas Surat Tagihan
-                                        </a>
-                                    @endif
-                                    @if(!$suket->isTagihanAcc())
-                                        <form action="{{ route('user.suket.acc-tagihan', $suket->id) }}" method="POST" class="d-inline" onsubmit="return confirm('Apakah Anda menyetujui (ACC) Surat Tagihan ini untuk diterbitkan Kode Billing SIMPONI?')">
+                            @else
+                                <div class="card border-0 rounded-4 p-3 mt-3 shadow-sm overflow-hidden" style="background: linear-gradient(135deg, #f0f7ff 0%, #e0effe 100%); border-left: 5px solid #2563eb !important;">
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle shadow-xs" style="width: 34px; height: 34px; font-size: 1.1rem;">
+                                                <i class="bi bi-envelope-paper-fill"></i>
+                                            </span>
+                                            <div>
+                                                <div class="fw-bold text-primary-emphasis">Surat Tagihan Suket K3 Menunggu Persetujuan Anda</div>
+                                                <small class="text-primary text-opacity-75">Silakan periksa berkas rincian tagihan dan konfirmasi persetujuan (ACC)</small>
+                                            </div>
+                                        </div>
+                                        <span class="badge bg-warning text-dark px-3 py-1 rounded-pill small fw-semibold shadow-xs">
+                                            <i class="bi bi-hourglass-split me-1"></i> Menunggu Konfirmasi ACC Anda
+                                        </span>
+                                    </div>
+                                    <div class="row g-2 p-2 rounded-3 bg-white bg-opacity-75 border border-primary border-opacity-20 small text-dark mb-2">
+                                        <div class="col-sm-6">
+                                            <span class="text-muted"><i class="bi bi-cash-stack text-primary me-1"></i> Total Tagihan Resmi PNBP:</span><br>
+                                            <strong class="fs-5 text-primary">{{ $suket->surat_tagihan_nominal ? ('Rp ' . number_format($suket->surat_tagihan_nominal, 0, ',', '.')) : 'Sesuai penetapan resmi' }}</strong>
+                                        </div>
+                                        <div class="col-sm-6">
+                                            <span class="text-muted"><i class="bi bi-clock-history text-primary me-1"></i> Tanggal Diterbitkan Petugas:</span><br>
+                                            <strong>{{ $suket->surat_tagihan_sent_at ? \Carbon\Carbon::parse($suket->surat_tagihan_sent_at)->format('d F Y, H:i') . ' WIB' : 'Hari ini' }}</strong>
+                                        </div>
+                                    </div>
+                                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-1">
+                                        @if($suket->surat_tagihan_file_path)
+                                            <a href="{{ route('user.suket.download-doc', [$suket->id, 'tagihan']) }}" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold" download>
+                                                <i class="bi bi-file-earmark-pdf me-1"></i> Unduh Berkas Surat Tagihan
+                                            </a>
+                                        @endif
+                                        <form id="formAccTagihan{{ $suket->id }}" action="{{ route('user.suket.acc-tagihan', $suket->id) }}" method="POST" class="d-inline ms-auto">
                                             @csrf
-                                            <button type="submit" class="btn btn-sm btn-success rounded-pill px-4 shadow-sm fw-semibold">
+                                            <button type="button" class="btn btn-sm btn-success rounded-pill px-4 shadow-sm fw-semibold" onclick="confirmAccTagihan('{{ $suket->id }}', '{{ $suket->nomor_order }}', '{{ $suket->surat_tagihan_nominal ? number_format($suket->surat_tagihan_nominal, 0, ',', '.') : '-' }}', '{{ addslashes($suket->perusahaan_nama) }}')">
                                                 <i class="bi bi-check-circle-fill me-1"></i> ACC Surat Tagihan
                                             </button>
                                         </form>
-                                    @else
-                                        <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2 rounded-pill small">
-                                            <i class="bi bi-check2-circle me-1"></i> Disetujui pada: {{ \Carbon\Carbon::parse($suket->surat_tagihan_acc_at)->format('d/m/Y H:i') }}
-                                        </span>
-                                    @endif
+                                    </div>
                                 </div>
-                            </div>
+                            @endif
                         @endif
 
                         {{-- INTERACTIVE CARD TAHAP 7: KODE BILLING --}}
@@ -1524,7 +1570,94 @@
                 new bootstrap.Modal(modalEl).show();
             }
         @endif
+
+        {{-- SweetAlert2 Notifikasi Sukses ACC Surat Tagihan --}}
+        @if(session('success') && (str_contains(session('success'), 'Surat Tagihan berhasil disetujui') || str_contains(session('success'), 'Kode Billing')))
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'success',
+                    iconColor: '#10b981',
+                    title: '<div class="fw-bold text-dark fs-5 mt-2">Surat Tagihan Berhasil Di-ACC!</div>',
+                    html: `
+                        <div class="text-muted small mt-2 px-2" style="line-height: 1.6;">
+                            <div class="p-2 bg-success bg-opacity-10 rounded-3 border border-success border-opacity-25 text-success-emphasis mb-2">
+                                <i class="bi bi-check2-circle me-1"></i> Konfirmasi persetujuan tagihan telah tercatat resmi di sistem Balai K3.
+                            </div>
+                            Permohonan Anda kini telah <strong>otomatis beralih ke Tahap 7 (Kode Billing SIMPONI)</strong>.<br>
+                            Silakan unduh panduan pembayaran dan tunggu Bendahara menerbitkan kode billing resmi Anda.
+                        </div>
+                    `,
+                    confirmButtonText: '<i class="bi bi-arrow-right-circle me-1"></i> Mengerti & Lanjutkan',
+                    customClass: {
+                        popup: 'rounded-4 shadow-lg border-0',
+                        confirmButton: 'btn btn-primary rounded-pill px-4 py-2'
+                    },
+                    buttonsStyling: false
+                });
+            }
+        @endif
     });
+
+    /**
+     * Konfirmasi ACC Surat Tagihan dengan SweetAlert2 Modern
+     */
+    function confirmAccTagihan(suketId, orderNo, nominal, perusahaan) {
+        if (typeof Swal === 'undefined') {
+            if (confirm('Apakah Anda menyetujui (ACC) Surat Tagihan sebesar Rp ' + nominal + ' untuk nomor order ' + orderNo + '?')) {
+                const form = document.getElementById('formAccTagihan' + suketId) || document.getElementById('formQuickAccTagihan' + suketId);
+                if (form) form.submit();
+            }
+            return;
+        }
+
+        Swal.fire({
+            title: '<div class="fw-bold text-dark mt-2" style="font-size: 20px;">Konfirmasi Persetujuan Surat Tagihan</div>',
+            html: `
+                <div class="text-start mt-3" style="font-size: 13.5px; line-height: 1.6;">
+                    <div class="p-3 rounded-4 mb-3" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #bbf7d0;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted small">Nomor Order:</span>
+                            <span class="badge bg-primary px-2 py-1 rounded-pill fw-semibold">${orderNo}</span>
+                        </div>
+                        ${perusahaan ? `
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted small">Nama Perusahaan:</span>
+                            <strong class="text-dark">${perusahaan}</strong>
+                        </div>` : ''}
+                        <div class="d-flex justify-content-between align-items-center pt-2 border-top border-success border-opacity-25 mt-2">
+                            <span class="text-success-emphasis fw-semibold">Total Tagihan Resmi (PNBP):</span>
+                            <span class="fs-5 fw-bold text-success">Rp ${nominal}</span>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2 text-muted small p-2 rounded-3 bg-light border">
+                        <i class="bi bi-shield-check text-success fs-5 mt-1"></i>
+                        <div>
+                            Dengan menekan <strong>"Ya, Setujui (ACC)"</strong>, berkas Anda akan <strong>otomatis diteruskan ke Tahap 7 (Kode Billing)</strong> untuk pembayaran PNBP SIMPONI.
+                        </div>
+                    </div>
+                </div>
+            `,
+            icon: 'question',
+            iconColor: '#10b981',
+            showCancelButton: true,
+            confirmButtonText: '<i class="bi bi-check-circle-fill me-1"></i> Ya, Setujui (ACC) Tagihan',
+            cancelButtonText: '<i class="bi bi-x me-1"></i> Batal / Periksa Lagi',
+            customClass: {
+                popup: 'rounded-4 shadow-lg border-0',
+                confirmButton: 'btn btn-success rounded-pill px-4 py-2 fw-semibold shadow-sm',
+                cancelButton: 'btn btn-light rounded-pill px-4 py-2 fw-semibold text-secondary'
+            },
+            buttonsStyling: false,
+            reverseButtons: true,
+            showLoaderOnConfirm: true,
+            preConfirm: () => {
+                const form = document.getElementById('formAccTagihan' + suketId) || document.getElementById('formQuickAccTagihan' + suketId);
+                if (form) {
+                    form.submit();
+                }
+            }
+        });
+    }
 </script>
 
 <link rel="stylesheet" href="{{ asset('vendor/pdfjs/pdf_viewer.min.css') }}">

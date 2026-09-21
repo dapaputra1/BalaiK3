@@ -1439,13 +1439,72 @@
                                                                 Penerbitan surat tagihan resmi suket K3 dan konfirmasi persetujuan (ACC) oleh pemohon sebelum penerbitan kode billing PNBP.
                                                             </p>
 
-                                                            @if($suket->isTagihanSent() && !$suket->isTagihanAcc())
-                                                                <div class="alert alert-info py-2 px-3 small rounded-3 mb-3 border-info-subtle">
-                                                                    <div class="d-flex align-items-center gap-2 mb-1">
-                                                                        <i class="bi bi-hourglass-split text-primary fs-6"></i>
-                                                                        <strong class="text-primary">Menunggu Persetujuan (ACC) dari Pemohon</strong>
+                                                             {{-- Modern Premium Status Alert: Saat Tagihan Di-ACC atau Menunggu ACC --}}
+                                                            @if($suket->isTagihanAcc())
+                                                                <div class="card border-0 shadow-sm rounded-4 mb-3 overflow-hidden" style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border-left: 5px solid #10b981 !important;">
+                                                                    <div class="card-body p-3">
+                                                                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                                                                            <div class="d-flex align-items-center gap-2">
+                                                                                <span class="d-inline-flex align-items-center justify-content-center bg-success text-white rounded-circle shadow-sm" style="width: 36px; height: 36px; font-size: 1.15rem;">
+                                                                                    <i class="bi bi-check-circle-fill"></i>
+                                                                                </span>
+                                                                                <div>
+                                                                                    <h6 class="fw-bold text-success-emphasis mb-0">Surat Tagihan Telah Disetujui (ACC) Pemohon</h6>
+                                                                                    <small class="text-success text-opacity-75">Konfirmasi persetujuan resmi tercatat di sistem Balai K3</small>
+                                                                                </div>
+                                                                            </div>
+                                                                            <span class="badge bg-success bg-opacity-90 text-white px-3 py-1 rounded-pill small shadow-xs">
+                                                                                <i class="bi bi-patch-check-fill me-1"></i> STATUS: ACC RESMI
+                                                                            </span>
+                                                                        </div>
+                                                                        <div class="row g-2 pt-2 border-top border-success border-opacity-25 small text-dark">
+                                                                            <div class="col-sm-6">
+                                                                                <span class="text-muted"><i class="bi bi-calendar-check text-success me-1"></i> Waktu ACC Pemohon:</span><br>
+                                                                                <strong class="text-success-emphasis">{{ \Carbon\Carbon::parse($suket->surat_tagihan_acc_at)->format('d F Y, H:i') }} WIB</strong>
+                                                                            </div>
+                                                                            <div class="col-sm-6">
+                                                                                <span class="text-muted"><i class="bi bi-cash-stack text-success me-1"></i> Nominal Disetujui:</span><br>
+                                                                                <strong class="text-success-emphasis fs-6">Rp {{ number_format($suket->surat_tagihan_nominal, 0, ',', '.') }}</strong>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="mt-2 p-2 rounded-3 bg-white bg-opacity-75 border border-success border-opacity-20 small text-muted d-flex align-items-center gap-2">
+                                                                            <i class="bi bi-arrow-right-circle-fill text-success fs-6"></i>
+                                                                            <span>Berkas otomatis dialihkan ke <strong>Tahap 7 (Kode Billing)</strong> untuk penginputan kode billing SIMPONI & panduan pembayaran PNBP.</span>
+                                                                        </div>
                                                                     </div>
-                                                                    <div>Surat tagihan sebesar <strong>Rp {{ number_format($suket->surat_tagihan_nominal, 0, ',', '.') }}</strong> telah dikirimkan ke akun pemohon pada {{ \Carbon\Carbon::parse($suket->surat_tagihan_sent_at)->format('d/m/Y H:i') }}. Saat pemohon menekan tombol <em>"ACC Surat Tagihan"</em> di akun mereka, berkas akan <strong>otomatis beralih ke Tahap 7 (Kode Billing)</strong>.</div>
+                                                                </div>
+                                                            @elseif($suket->isTagihanSent())
+                                                                <div class="card border-0 shadow-sm rounded-4 mb-3 overflow-hidden" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border-left: 5px solid #2563eb !important;">
+                                                                    <div class="card-body p-3">
+                                                                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                                                                            <div class="d-flex align-items-center gap-2">
+                                                                                <span class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle shadow-sm" style="width: 36px; height: 36px; font-size: 1.1rem;">
+                                                                                    <i class="bi bi-hourglass-split"></i>
+                                                                                </span>
+                                                                                <div>
+                                                                                    <h6 class="fw-bold text-primary-emphasis mb-0">Menunggu Persetujuan (ACC) dari Pemohon</h6>
+                                                                                    <small class="text-primary text-opacity-75">Surat tagihan resmi telah terkirim ke portal akun pemohon</small>
+                                                                                </div>
+                                                                            </div>
+                                                                            <button type="submit" name="action" value="acc_tagihan" class="btn btn-xs btn-outline-success rounded-pill px-3 py-1 fw-semibold shadow-xs" title="Bypass ACC manual oleh petugas internal jika pemohon telah konfirmasi langsung">
+                                                                                <i class="bi bi-check2-circle me-1"></i> ACC Manual
+                                                                            </button>
+                                                                        </div>
+                                                                        <div class="row g-2 pt-2 border-top border-primary border-opacity-25 small text-dark">
+                                                                            <div class="col-sm-6">
+                                                                                <span class="text-muted"><i class="bi bi-send-check text-primary me-1"></i> Terkirim pada:</span><br>
+                                                                                <strong>{{ \Carbon\Carbon::parse($suket->surat_tagihan_sent_at)->format('d F Y, H:i') }} WIB</strong>
+                                                                            </div>
+                                                                            <div class="col-sm-6">
+                                                                                <span class="text-muted"><i class="bi bi-tag text-primary me-1"></i> Total Tagihan Resmi:</span><br>
+                                                                                <strong class="text-primary fs-6">Rp {{ number_format($suket->surat_tagihan_nominal, 0, ',', '.') }}</strong>
+                                                                            </div>
+                                                                        </div>
+                                                                        <div class="mt-2 p-2 rounded-3 bg-white bg-opacity-75 border border-primary border-opacity-20 small text-muted d-flex align-items-center gap-2">
+                                                                            <i class="bi bi-info-circle-fill text-primary fs-6"></i>
+                                                                            <span>Saat pemohon menekan tombol <strong>"ACC Surat Tagihan"</strong> di portal mereka, berkas akan <strong>otomatis beralih ke Tahap 7 (Kode Billing)</strong>.</span>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             @endif
 
@@ -1482,19 +1541,8 @@
                                                                 </div>
                                                             </div>
 
-                                                            <div class="d-flex gap-2 flex-wrap mb-2">
-                                                                <button type="submit" name="action" value="send_tagihan" class="btn btn-sm btn-outline-primary rounded-pill px-3">
-                                                                    <i class="bi bi-send me-1"></i> Simpan & Kirim Tagihan ke Pemohon
-                                                                </button>
-                                                                @if($suket->isTagihanSent() && !$suket->isTagihanAcc())
-                                                                    <button type="submit" name="action" value="acc_tagihan" class="btn btn-sm btn-success rounded-pill px-3">
-                                                                        <i class="bi bi-check2-circle me-1"></i> ACC Manual & Lanjut Tahap 7
-                                                                    </button>
-                                                                @endif
-                                                            </div>
-
                                                             @if($suket->isTagihanSent())
-                                                                <div class="p-2 bg-white rounded border small text-muted">
+                                                                <div class="p-2 bg-white rounded border small text-muted mb-2">
                                                                     <i class="bi bi-clock-history me-1"></i> Terkirim ke pemohon pada: <strong>{{ \Carbon\Carbon::parse($suket->surat_tagihan_sent_at)->format('d/m/Y H:i') }}</strong>
                                                                     @if($suket->surat_tagihan_acc_at)
                                                                         <br><i class="bi bi-check2-circle text-success me-1"></i> Disetujui (ACC) oleh pemohon pada: <strong>{{ \Carbon\Carbon::parse($suket->surat_tagihan_acc_at)->format('d/m/Y H:i') }}</strong>
@@ -1600,16 +1648,11 @@
                                                                 @endif
                                                             </div>
 
-                                                            <div class="d-flex gap-2 flex-wrap mb-3">
-                                                                <button type="submit" name="action" value="send_billing" class="btn btn-sm btn-outline-primary rounded-pill px-3">
-                                                                    <i class="bi bi-send me-1"></i> Simpan & Kirim Kode Billing + Panduan ke Pemohon
-                                                                </button>
-                                                                @if($suket->isBillingSent())
-                                                                    <span class="badge bg-light text-muted border px-2 py-1 align-self-center small">
-                                                                        <i class="bi bi-clock-history me-1"></i> Terkirim: {{ \Carbon\Carbon::parse($suket->billing_sent_at)->format('d/m/Y H:i') }}
-                                                                    </span>
-                                                                @endif
-                                                            </div>
+                                                            @if($suket->isBillingSent())
+                                                                <div class="p-2 bg-light rounded border small text-muted mb-3">
+                                                                    <i class="bi bi-clock-history me-1"></i> Kode billing telah dikirim ke pemohon pada: <strong>{{ \Carbon\Carbon::parse($suket->billing_sent_at)->format('d/m/Y H:i') }}</strong>
+                                                                </div>
+                                                            @endif
 
                                                             {{-- Section 3: Status Pembayaran & Verifikasi Bukti Transfer dari Pemohon --}}
                                                             @if($suket->isBillingProofRejected())
@@ -1762,20 +1805,10 @@
                                                             <i class="bi bi-arrow-right-circle me-1"></i> Terbitkan Suket & Lanjut ke Surat Tagihan
                                                         </button>
                                                     @elseif($suket->status_tahap === 6)
-                                                        @if($suket->isTagihanSent() && !$suket->isTagihanAcc())
-                                                            <button type="submit" name="action" value="acc_tagihan" class="btn btn-success rounded-pill px-3">
-                                                                <i class="bi bi-check2-circle me-1"></i> ACC Manual & Lanjut ke Tahap 7
-                                                            </button>
-                                                        @endif
                                                         <button type="submit" name="action" value="send_tagihan" class="btn btn-primary rounded-pill px-4" style="background-color: #15406A; border-color: #15406A;">
                                                             <i class="bi bi-send me-1"></i> Simpan & Kirim Tagihan ke Pemohon
                                                         </button>
                                                     @elseif($suket->status_tahap === 7)
-                                                        @if($suket->billing_proof_path && $suket->isBillingProofPending())
-                                                            <button type="submit" name="action" value="verify_payment" class="btn btn-success rounded-pill px-3">
-                                                                <i class="bi bi-check-circle-fill me-1"></i> ACC Bukti & Lanjut ke Tahap 8
-                                                            </button>
-                                                        @endif
                                                         <button type="submit" name="action" value="send_billing" class="btn btn-primary rounded-pill px-4" style="background-color: #15406A; border-color: #15406A;">
                                                             <i class="bi bi-send me-1"></i> Simpan & Kirim Kode Billing + Panduan ke Pemohon
                                                         </button>
