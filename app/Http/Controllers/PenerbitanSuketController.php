@@ -377,7 +377,6 @@ class PenerbitanSuketController extends Controller
         }
 
         // Tentukan tahap yang diizinkan untuk role saat ini
-        // Tentukan tahap yang diizinkan untuk role saat ini
         $roleAllowedStages = match ($currentRole) {
             'pcu', 'penguji_k3' => [2, 3],
             'qc' => ['qc'],
@@ -389,9 +388,13 @@ class PenerbitanSuketController extends Controller
 
         $requestedStage = $request->query('stage');
         if ($requestedStage && in_array($requestedStage, array_map('strval', $roleAllowedStages), true)) {
-            $activeStage = $requestedStage;
+            $activeStage = $requestedStage === 'all' ? null : $requestedStage;
+        } elseif (in_array('all', $roleAllowedStages, true)) {
+            // Role admin/superadmin yang membuka /suket-k3 tanpa query stage akan menampilkan "Semua Permohonan"
+            $activeStage = null;
         } else {
-            $activeStage = (string) reset($roleAllowedStages);
+            $firstAllowed = reset($roleAllowedStages);
+            $activeStage = $firstAllowed === 'all' ? null : (string) $firstAllowed;
         }
 
         $search = $request->query('search');

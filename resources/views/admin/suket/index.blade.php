@@ -465,6 +465,13 @@
                         <i class="bi bi-x-circle me-1"></i>Tampilkan Semua Permohonan
                     </a>
                 </div>
+            @else
+                <div class="d-flex align-items-center gap-2 mt-3 pt-2 border-top">
+                    <span class="small text-muted">Filter Aktif:</span>
+                    <span class="badge bg-secondary px-3 py-1 rounded-pill small">
+                        <i class="bi bi-grid-fill me-1"></i>Semua Permohonan (Seluruh Tahap 1 s/d 9)
+                    </span>
+                </div>
             @endif
         </div>
     </div>
@@ -474,7 +481,7 @@
         <div class="card-header bg-white border-bottom p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
             <div class="d-flex align-items-center gap-2">
                 <h6 class="fw-bold text-dark mb-0">Daftar Berkas Permohonan Suket K3</h6>
-                <span class="badge bg-light text-secondary border rounded-pill">Total: {{ $sukets->total() }} Berkas</span>
+                <span class="badge bg-light text-secondary border rounded-pill">Total: {{ $sukets->total() }} Berkas {{ $activeStage ? '(' . ($activeStage === 'qc' ? 'Review QC' : ($stages[$activeStage]['label'] ?? "Tahap $activeStage")) . ')' : '(Semua Tahap)' }}</span>
             </div>
         </div>
 
@@ -2547,8 +2554,8 @@
         </div>
 
         @if($sukets->hasPages())
-            <div class="card-footer bg-white border-top p-3 d-flex justify-content-end">
-                {{ $sukets->links() }}
+            <div class="card-footer bg-white border-top p-3">
+                {{ $sukets->links('pagination::bootstrap-5') }}
             </div>
         @endif
     </div>

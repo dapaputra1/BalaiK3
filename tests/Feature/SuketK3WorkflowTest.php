@@ -1703,5 +1703,132 @@ class SuketK3WorkflowTest extends TestCase
         $this->assertEquals('Kuitansi_Stempel_Basah.pdf', $suket->kuitansi_file_name);
         $this->assertTrue(Storage::disk('local')->exists($suket->kuitansi_file_path));
     }
+
+    public function test_all_permohonan_stage_resolution_and_filtering()
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $admin = User::create([
+            'name' => 'Admin All Test',
+            'email' => 'admin.all@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
+        ]);
+
+        $qc = User::create([
+            'name' => 'QC All Test',
+            'email' => 'qc.all@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'qc',
+        ]);
+
+        $user = User::create([
+            'name' => 'Pemohon All Test',
+            'email' => 'pemohon.all@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+
+        $orderA = Permohonan::create([
+            'kode' => 'PMH-STAGE-2',
+            'user_id' => $user->id,
+            'status_global' => 'selesai',
+        ]);
+        $suketA = SuketK3::create([
+            'permohonan_id' => $orderA->id,
+            'user_id' => $user->id,
+            'nomor_order' => $orderA->kode,
+            'nomor_surat' => 'SK3-DOC-002',
+            'status_tahap' => 2,
+            'status' => 'submitted',
+        ]);
+
+        $orderB = Permohonan::create([
+            'kode' => 'PMH-STAGE-6',
+            'user_id' => $user->id,
+            'status_global' => 'selesai',
+        ]);
+        $suketB = SuketK3::create([
+            'permohonan_id' => $orderB->id,
+            'user_id' => $user->id,
+            'nomor_order' => $orderB->kode,
+            'nomor_surat' => 'SK3-DOC-006',
+            'status_tahap' => 6,
+            'status' => 'drafted',
+        ]);
+
+        $orderC = Permohonan::create([
+            'kode' => 'PMH-STAGE-9',
+            'user_id' => $user->id,
+            'status_global' => 'selesai',
+        ]);
+        $suketC = SuketK3::create([
+            'permohonan_id' => $orderC->id,
+            'user_id' => $user->id,
+            'nomor_order' => $orderC->kode,
+            'nomor_surat' => 'SK3-DOC-009',
+            'status_tahap' => 9,
+            'status' => 'released',
+        ]);
+
+        // 1. Admin visits /suket-k3 without query parameter -> displays ALL permohonan across all stages
+        $responseAll = $this->actingAs($admin)->get('/suket-k3');
+        $responseAll->assertStatus(200);
+        $responseAll->assertSee('Semua Permohonan');
+        $responseAll->assertSee('PMH-STAGE-2');
+        $responseAll->assertSee('PMH-STAGE-6');
+        $responseAll->assertSee('PMH-STAGE-9');
+
+        // 2. Admin visits /suket-k3?stage=all -> also displays ALL permohonan
+        $responseExplicitAll = $this->actingAs($admin)->get('/suket-k3?stage=all');
+        $responseExplicitAll->assertStatus(200);
+        $responseExplicitAll->assertSee('PMH-STAGE-2');
+        $responseExplicitAll->assertSee('PMH-STAGE-6');
+        $responseExplicitAll->assertSee('PMH-STAGE-9');
+
+        // 3. Admin visits /suket-k3?stage=2 -> specifically filters to Tahap 2 only
+        $responseStage2 = $this->actingAs($admin)->get('/suket-k3?stage=2');
+        $responseStage2->assertStatus(200);
+        $responseStage2->assertSee('PMH-STAGE-2');
+        $responseStage2->assertDontSee('PMH-STAGE-6');
+        $responseStage2->assertDontSee('PMH-STAGE-9');
+
+        // 4. Admin visits /suket-k3?stage=6 -> specifically filters to Tahap 6 only
+        $responseStage6 = $this->actingAs($admin)->get('/suket-k3?stage=6');
+        $responseStage6->assertStatus(200);
+        $responseStage6->assertDontSee('PMH-STAGE-2');
+        $responseStage6->assertSee('PMH-STAGE-6');
+        $responseStage6->assertDontSee('PMH-STAGE-9');
+
+        // 5. Restricted role (e.g. QC) visiting /suket-k3 defaults to their authorized stage (stage 4)
+        $responseQC = $this->actingAs($qc)->get('/suket-k3');
+        $responseQC->assertStatus(200);
+        $responseQC->assertSee('Tahap 4');
+
+        // 6. Test Pagination: create extra records to trigger > 15 items pagination
+        for ($i = 4; $i <= 18; $i++) {
+            $extraOrder = Permohonan::create([
+                'kode' => "PMH-EXTRA-{$i}",
+                'user_id' => $user->id,
+                'status_global' => 'selesai',
+            ]);
+            SuketK3::create([
+                'permohonan_id' => $extraOrder->id,
+                'user_id' => $user->id,
+                'nomor_order' => $extraOrder->kode,
+                'nomor_surat' => "SK3-DOC-{$i}",
+                'status_tahap' => 2,
+                'status' => 'submitted',
+            ]);
+        }
+
+        $pagedResponse = $this->actingAs($admin)->get('/suket-k3?page=2');
+        $pagedResponse->assertStatus(200);
+        $pagedResponse->assertSee('pagination');
+        $pagedResponse->assertSee('page-item');
+        $pagedResponse->assertSee('page-link');
+        $pagedResponse->assertSee('Menampilkan');
+        $pagedResponse->assertDontSee('w-5 h-5');
+    }
 }
 

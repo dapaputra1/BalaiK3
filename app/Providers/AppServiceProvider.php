@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\Notifikasi;
 use App\Services\KepalaBalaiService;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
@@ -26,6 +27,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Paginator::useBootstrapFive();
+
         if (filter_var(env('FORCE_HTTPS', false), FILTER_VALIDATE_BOOL)) {
             URL::forceScheme('https');
         }

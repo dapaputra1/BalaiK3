@@ -1259,8 +1259,8 @@
     </div>
 
     @if($sukets->hasPages())
-        <div class="mt-4 d-flex justify-content-end">
-            {{ $sukets->links() }}
+        <div class="mt-4 bg-white p-3 rounded-4 shadow-sm border">
+            {{ $sukets->links('pagination::bootstrap-5') }}
         </div>
     @endif
 </div>
