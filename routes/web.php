@@ -47,7 +47,7 @@ use App\Http\Controllers\UlasanPermohonanController;
 use App\Http\Controllers\VerifikasiController;
 use App\Http\Controllers\VerifikasiPengujianController;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Ergo\ErgoAssessmentController;
+use App\Http\Controllers\ErgoAssessmentController;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/sitemap.xml', [HomeController::class, 'sitemap'])
