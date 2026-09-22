@@ -529,7 +529,7 @@ Route::middleware(['auth', 'role:qc'])
         Route::get('/qc-lhu/{permohonan}/revision', [QcLhuController::class, 'showRevision'])->name('qc-lhu.revision.show');
     });
 
-    Route::middleware('auth')
+    Route::middleware(['auth', 'role:superadmin,admin'])
     ->prefix('layanan/pengujian-ergonomi')
     ->name('ergo.')
     ->group(function () {
