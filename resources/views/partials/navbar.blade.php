@@ -51,6 +51,7 @@
                         <li><a class="dropdown-item" href="/daftar_pelayanan">Daftar Pelayanan</a></li>
                         <li><a class="dropdown-item" href="/riwayat_pelayanan">Riwayat Pelayanan</a></li>
                         <li><a class="dropdown-item" href="{{ route('user.suket.index') }}">Penerbitan Suket K3</a></li>
+                        <li><a class="dropdown-item {{ request()->routeIs('ergo.*') ? 'active' : '' }}" href="{{ route('ergo.index') }}">Pengujian Ergonomi (SNI 9011)</a></li>
                     </ul>
                 </li>
 

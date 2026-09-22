@@ -47,6 +47,7 @@ use App\Http\Controllers\UlasanPermohonanController;
 use App\Http\Controllers\VerifikasiController;
 use App\Http\Controllers\VerifikasiPengujianController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Ergo\ErgoAssessmentController;
 
 Route::get('/', [HomeController::class, 'index'])->name('home');
 Route::get('/sitemap.xml', [HomeController::class, 'sitemap'])
@@ -526,4 +527,20 @@ Route::middleware(['auth', 'role:qc'])
         Route::post('/qc-lhu/{permohonan}/submit', [QcLhuController::class, 'submit'])->name('qc-lhu.submit');
         Route::get('/qc-lhu/{permohonan}/final', [QcLhuController::class, 'showFinal'])->name('qc-lhu.final.show');
         Route::get('/qc-lhu/{permohonan}/revision', [QcLhuController::class, 'showRevision'])->name('qc-lhu.revision.show');
+    });
+
+    Route::middleware('auth')
+    ->prefix('layanan/pengujian-ergonomi')
+    ->name('ergo.')
+    ->group(function () {
+        Route::get('/', [ErgoAssessmentController::class, 'index'])->name('index');
+        Route::get('/tambah', [ErgoAssessmentController::class, 'create'])->name('create');
+        Route::post('/simpan', [ErgoAssessmentController::class, 'store'])->name('store');
+        Route::get('/detail/{id}', [ErgoAssessmentController::class, 'show'])->name('result');
+        Route::get('/edit/{id}', [ErgoAssessmentController::class, 'edit'])->name('edit');
+        Route::put('/update/{id}', [ErgoAssessmentController::class, 'update'])->name('update');
+        Route::delete('/hapus/{id}', [ErgoAssessmentController::class, 'destroy'])->name('destroy');
+        Route::get('/cetak-lhu/{id}', [ErgoAssessmentController::class, 'exportPdf'])->name('pdf');
+        Route::get('/edit-lhu/{id}', [ErgoAssessmentController::class, 'editLhu'])->name('lhu.edit');
+        Route::put('/update-lhu/{id}', [ErgoAssessmentController::class, 'updateLhu'])->name('lhu.update');
     });

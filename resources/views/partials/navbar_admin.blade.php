@@ -370,6 +370,7 @@
             ['type' => 'link', 'label' => 'Permohonan', 'icon' => 'bi bi-file-earmark-text', 'route' => 'superadmin.permohonan.index'],
             ['type' => 'link', 'label' => 'Ulasan Permohonan', 'icon' => 'bi bi-clipboard-heart', 'route' => 'superadmin.ulasan-permohonan.index'],
             ['type' => 'link', 'label' => 'Feedback', 'icon' => 'bi bi-chat-dots', 'route' => 'superadmin.feedback.index', 'badge' => $badgeCounts['feedback'] ?? 0],
+            ['type' => 'link', 'label' => 'Pengujian Ergonomi (SNI 9011)', 'icon' => 'bi bi-activity', 'route' => 'ergo.index'],
             [
                 'type' => 'section',
                 'label' => 'Alur Kerja',
@@ -427,9 +428,12 @@
             ['type' => 'link', 'label' => 'Permohonan', 'icon' => 'bi bi-file-earmark-text', 'route' => 'superadmin.permohonan.index'],
             ['type' => 'link', 'label' => 'Ulasan Permohonan', 'icon' => 'bi bi-clipboard-heart', 'route' => 'admin.ulasan-permohonan.index'],
             ['type' => 'link', 'label' => 'Feedback', 'icon' => 'bi bi-chat-dots', 'route' => 'superadmin.feedback.index', 'badge' => $badgeCounts['feedback'] ?? 0],
+            ['type' => 'link', 'label' => 'Pengujian Ergonomi (SNI 9011)', 'icon' => 'bi bi-activity', 'route' => 'ergo.index'],
             [
                 'type' => 'section',
                 'label' => 'Alur Kerja',
+                'id' => 'alurKerjaAdmin',
+                'collapsible' => true,
                 'children' => [
                     ['label' => 'Verifikasi Pesanan', 'icon' => 'bi bi-card-checklist', 'route' => 'superadmin.order-review.index', 'badge' => $badgeCounts['order_review'] ?? 0],
                     ['label' => 'Penawaran', 'icon' => 'bi bi-file-earmark-text', 'route' => 'superadmin.penawaran.index', 'badge' => $badgeCounts['penawaran'] ?? 0],
@@ -869,12 +873,37 @@
                         } elseif (isset($child['href'])) {
                             $hrefValue = $child['href'];
                             $absolute = url($hrefValue);
-                            $isActive = request()->url() === $absolute || request()->fullUrlIs($absolute);
+                            
+                            $reqParsed = parse_url(request()->fullUrl());
+                            $targetParsed = parse_url($absolute);
+
+                            $reqPath = trim($reqParsed['path'] ?? '', '/');
+                            $targetPath = trim($targetParsed['path'] ?? '', '/');
+
+                            parse_str($reqParsed['query'] ?? '', $reqQuery);
+                            parse_str($targetParsed['query'] ?? '', $targetQuery);
+
+                            if ($reqPath !== '' && ($reqPath === $targetPath || request()->is($targetPath . '/*'))) {
+                                if (!empty($targetQuery)) {
+                                    $isActive = true;
+                                    foreach ($targetQuery as $k => $v) {
+                                        if (!isset($reqQuery[$k]) || (string)$reqQuery[$k] !== (string)$v) {
+                                            $isActive = false;
+                                            break;
+                                        }
+                                    }
+                                } else {
+                                    $isActive = empty($reqQuery);
+                                }
+                            }
 
                             if (!$isActive) {
-                                $path = trim(parse_url($absolute, PHP_URL_PATH) ?? '', '/');
-                                if ($path !== '') {
-                                    $isActive = request()->is($path) || request()->is($path . '/*');
+                                $isActive = request()->url() === $absolute || request()->fullUrlIs($absolute);
+                            }
+
+                            if (!$isActive) {
+                                if ($targetPath !== '') {
+                                    $isActive = request()->is($targetPath) || request()->is($targetPath . '/*');
                                 }
                             }
 
@@ -903,7 +932,7 @@
                 @endphp
                 <div class="menu-title">{{ $item['label'] }}</div>
                 @if(!empty($item['collapsible']))
-                    <a class="menu-toggle" data-bs-toggle="collapse" href="#{{ $item['id'] }}" aria-expanded="{{ $isSectionActive ? 'true' : 'false' }}">
+                    <a class="menu-toggle {{ $isSectionActive ? '' : 'collapsed' }}" data-bs-toggle="collapse" data-bs-target="#{{ $item['id'] }}" href="#{{ $item['id'] }}" role="button" aria-expanded="{{ $isSectionActive ? 'true' : 'false' }}" aria-controls="{{ $item['id'] }}">
                         <div class="menu-label">
                             <i class="bi bi-diagram-3"></i>
                             <span class="menu-text">{{ $item['label'] }}</span>
@@ -962,6 +991,20 @@
         };
 
         menu.addEventListener('click', (event) => {
+            const toggle = event.target.closest('.menu-toggle');
+            if (toggle) {
+                event.preventDefault();
+                const targetSelector = toggle.getAttribute('data-bs-target') || toggle.getAttribute('href');
+                if (targetSelector) {
+                    const targetEl = document.querySelector(targetSelector);
+                    if (targetEl && window.bootstrap && window.bootstrap.Collapse) {
+                        const bsCollapse = window.bootstrap.Collapse.getOrCreateInstance(targetEl);
+                        bsCollapse.toggle();
+                    }
+                }
+                return;
+            }
+
             const link = event.target.closest('a[href]');
             if (!link) return;
             saveScroll();
