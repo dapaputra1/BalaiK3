@@ -174,7 +174,7 @@ Route::middleware('auth')->group(function () {
 });
 
 // Portal Pemohon: Permohonan Suket K3 (Tahap 1 Mandiri Khusus Pelanggan)
-Route::middleware(['auth', 'role:user'])
+Route::middleware(['auth'])
     ->prefix('permohonan-suket')
     ->name('user.suket.')
     ->group(function () {
@@ -203,7 +203,7 @@ Route::middleware(['auth', 'role:superadmin,admin,mp,pcu,kepala_balai,penguji_k3
     });
 
 // Akses Download & Preview untuk Pemohon User
-Route::middleware(['auth', 'role:user'])
+Route::middleware(['auth'])
     ->prefix('permohonan-suket')
     ->name('user.suket.')
     ->group(function () {
