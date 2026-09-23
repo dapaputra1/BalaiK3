@@ -127,6 +127,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
+        .swal2-container {
+            z-index: 200000 !important;
+        }
         :root {
             --brand-blue-dark: #15406A;
             --user-page-bg: #f4f7fb;

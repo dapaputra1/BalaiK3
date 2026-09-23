@@ -36,6 +36,9 @@
 
     <!-- Global Style -->
     <style>
+        .swal2-container {
+            z-index: 200000 !important;
+        }
         :root {
             --brand-blue-dark: #15406A;
             --admin-topbar-height: 74px;

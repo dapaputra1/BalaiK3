@@ -51,6 +51,9 @@
     @endif
 
 <style>
+    .swal2-container {
+        z-index: 300000 !important;
+    }
     .btn-primary {
         background-color: #15406A !important;
         border-color: #15406A !important;
@@ -1325,14 +1328,15 @@
                                         </div>
                                     </div>
                                 @endif
-                                <form action="{{ route('suket.advance', $suket->id) }}" method="POST">
+                                <form id="formAdvanceEvaluasi{{ $suket->id }}" action="{{ route('suket.advance', $suket->id) }}" method="POST">
                                     @csrf
+                                    <input type="hidden" name="action" id="actionAdvanceEvaluasi{{ $suket->id }}" value="next">
                                     <label class="form-label small fw-bold text-dark mb-1">
                                         <i class="bi bi-clipboard-check me-1"></i>Kesimpulan Akhir Telaah Teknis K3:
                                     </label>
-                                    <textarea name="catatan" rows="2" class="form-control form-control-sm mb-2" placeholder="Tuliskan kesimpulan evaluasi hasil uji berdasarkan Permenaker No. 5/2018 (atau alasan umum jika ditolak)..." required>{{ $suket->catatan_evaluasi }}</textarea>
+                                    <textarea id="catatanEvaluasi{{ $suket->id }}" name="catatan" rows="2" class="form-control form-control-sm mb-2" placeholder="Tuliskan kesimpulan evaluasi hasil uji berdasarkan Permenaker No. 5/2018 (atau alasan umum jika ditolak)..." required>{{ $suket->catatan_evaluasi }}</textarea>
                                     <div class="d-flex justify-content-between align-items-center gap-2">
-                                        <button type="submit" name="action" value="reject_evaluasi" class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-semibold" style="font-size: 11px;" onclick="return confirm('Apakah Anda yakin ingin meminta revisi dokumen/LHU ke pemohon beserta daftar poin sorotan kesalahan di atas?')">
+                                        <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-semibold" style="font-size: 11px;" onclick="confirmAdminRejectEvaluasi('{{ $suket->id }}', '{{ $suket->nomor_order }}', '{{ addslashes($suket->perusahaan_nama ?? '') }}', {{ $suket->comments ? $suket->comments->count() : 0 }})">
                                             <i class="bi bi-arrow-return-left me-1"></i>{{ $suket->evaluasi_status === 'rejected' ? 'Perbarui Catatan Revisi' : 'Minta Revisi ke Pemohon' }}
                                         </button>
                                         @if($suket->evaluasi_status === 'rejected')
@@ -1340,7 +1344,7 @@
                                                 <i class="bi bi-hourglass-split me-1"></i>Menunggu Respon Pemohon
                                             </button>
                                         @else
-                                            <button type="submit" name="action" value="next" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold" style="font-size: 11px;">
+                                            <button type="submit" onclick="document.getElementById('actionAdvanceEvaluasi{{ $suket->id }}').value='next'" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold" style="font-size: 11px;">
                                                 <i class="bi bi-check-circle me-1"></i>Setujui & Lanjut Tahap 3
                                             </button>
                                         @endif
@@ -2808,5 +2812,91 @@ document.addEventListener('DOMContentLoaded', function() {
         @endif
     @endforeach
 });
+
+/**
+ * Konfirmasi SweetAlert2 Modern: Penguji K3 Mengembalikan Revisi Dokumen LHU ke Pemohon
+ */
+function confirmAdminRejectEvaluasi(suketId, orderNo, perusahaan, commentCount) {
+    const catatanEl = document.getElementById('catatanEvaluasi' + suketId);
+    const catatan = (catatanEl ? catatanEl.value : '').trim();
+
+    if (!catatan) {
+        if (typeof Swal !== 'undefined') {
+            Swal.fire({
+                icon: 'warning',
+                iconColor: '#f59e0b',
+                title: '<div class="fw-bold text-dark fs-5 mt-2">Catatan Evaluasi Wajib Diisi</div>',
+                html: '<div class="text-muted small mt-2">Silakan tuliskan kesimpulan telaah atau instruksi perbaikan pada kolom catatan sebelum mengembalikan berkas ke pemohon.</div>',
+                confirmButtonText: 'Tulis Catatan Sekarang',
+                customClass: {
+                    popup: 'rounded-4 shadow-lg border-0',
+                    confirmButton: 'btn btn-primary rounded-pill px-4 py-2'
+                },
+                buttonsStyling: false
+            }).then(() => {
+                if (catatanEl) catatanEl.focus();
+            });
+        } else {
+            alert('Catatan evaluasi / instruksi perbaikan wajib diisi sebelum meminta revisi!');
+            if (catatanEl) catatanEl.focus();
+        }
+        return;
+    }
+
+    if (typeof Swal === 'undefined') {
+        if (confirm('Apakah Anda yakin ingin meminta revisi dokumen/LHU ke pemohon beserta daftar poin sorotan kesalahan di atas?')) {
+            const form = document.getElementById('formAdvanceEvaluasi' + suketId);
+            const actInput = document.getElementById('actionAdvanceEvaluasi' + suketId);
+            if (actInput) actInput.value = 'reject_evaluasi';
+            if (form) form.submit();
+        }
+        return;
+    }
+
+    Swal.fire({
+        title: '<div class="fw-bold text-danger mt-2" style="font-size: 20px;"><i class="bi bi-arrow-return-left me-2"></i>Kembalikan Revisi ke Pemohon?</div>',
+        html: `
+            <div class="text-start mt-3" style="font-size: 13.5px; line-height: 1.6;">
+                <div class="p-3 rounded-4 mb-3" style="background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%); border: 1px solid #fecaca;">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-muted small">Nomor Order:</span>
+                        <span class="badge bg-danger px-2.5 py-1 rounded-pill fw-semibold">${orderNo}</span>
+                    </div>
+                    ${perusahaan ? `
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="text-muted small">Perusahaan:</span>
+                        <strong class="text-dark">${perusahaan}</strong>
+                    </div>` : ''}
+                    <div class="d-flex justify-content-between align-items-center pt-2 border-top border-danger border-opacity-25 mt-2">
+                        <span class="text-muted small">Total Sorotan Kesalahan:</span>
+                        <span class="badge bg-white text-danger border border-danger-subtle px-2 py-1 rounded-pill fw-bold">${commentCount} Poin Catatan</span>
+                    </div>
+                </div>
+                <div class="text-muted small mb-2">
+                    Dokumen LHU beserta daftar poin sorotan kesalahan akan dikembalikan ke portal pemohon. Status permohonan akan beralih menjadi <strong>Perlu Revisi Pemohon</strong>.
+                </div>
+            </div>
+        `,
+        icon: 'warning',
+        iconColor: '#ef4444',
+        showCancelButton: true,
+        confirmButtonText: '<i class="bi bi-arrow-return-left me-1"></i> Ya, Kembalikan ke Pemohon',
+        cancelButtonText: '<i class="bi bi-x-circle me-1"></i> Batal',
+        customClass: {
+            popup: 'rounded-4 shadow-lg border-0',
+            confirmButton: 'btn btn-danger rounded-pill px-4 py-2 fw-semibold me-2 shadow-sm',
+            cancelButton: 'btn btn-outline-secondary rounded-pill px-4 py-2'
+        },
+        buttonsStyling: false,
+        reverseButtons: true
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const form = document.getElementById('formAdvanceEvaluasi' + suketId);
+            const actInput = document.getElementById('actionAdvanceEvaluasi' + suketId);
+            if (actInput) actInput.value = 'reject_evaluasi';
+            if (form) form.submit();
+        }
+    });
+}
 </script>
 @endsection

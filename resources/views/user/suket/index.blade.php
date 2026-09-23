@@ -40,6 +40,9 @@
         .modal-backdrop {
             z-index: 100040 !important;
         }
+        .swal2-container {
+            z-index: 300000 !important;
+        }
         body.modal-open #mainNavbar {
             z-index: 1000 !important;
             opacity: 0.1 !important;
@@ -1354,7 +1357,7 @@
             <div class="modal fade text-start" id="modalRevisiPemohon{{ $suket->id }}" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog modal-dialog-centered modal-lg">
                     <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden">
-                        <form action="{{ route('user.suket.submit-revision', $suket->id) }}" method="POST" enctype="multipart/form-data">
+                        <form id="formRevisiPemohon{{ $suket->id }}" action="{{ route('user.suket.submit-revision', $suket->id) }}" method="POST" enctype="multipart/form-data">
                             @csrf
                             <div class="modal-header bg-warning bg-opacity-10 border-bottom py-3 px-4">
                                 <div class="d-flex align-items-center gap-2">
@@ -1496,7 +1499,7 @@
                                 <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">
                                     Batal
                                 </button>
-                                <button type="submit" class="btn btn-sm btn-primary rounded-pill px-4 fw-bold shadow-sm" onclick="return confirm('Kirimkan tanggapan dan berkas revisi ke Tim Penguji K3?')">
+                                <button type="button" class="btn btn-sm btn-primary rounded-pill px-4 fw-bold shadow-sm" onclick="confirmSubmitRevisiPemohon('{{ $suket->id }}', '{{ $suket->nomor_order }}')">
                                     <i class="bi bi-send-check me-1"></i>Kirim Revisi ke Penguji K3
                                 </button>
                             </div>
@@ -2001,6 +2004,83 @@
                 if (form) {
                     form.submit();
                 }
+            }
+        });
+    }
+
+    /**
+     * Konfirmasi SweetAlert2 Modern: Pemohon Mengirimkan Tanggapan & Berkas Revisi LHU ke Penguji K3
+     */
+    function confirmSubmitRevisiPemohon(suketId, orderNo) {
+        const form = document.getElementById('formRevisiPemohon' + suketId);
+        if (!form) return;
+
+        const catatanInput = form.querySelector('textarea[name="catatan_revisi"]');
+        const catatan = (catatanInput ? catatanInput.value : '').trim();
+
+        if (!catatan) {
+            if (typeof Swal !== 'undefined') {
+                Swal.fire({
+                    icon: 'warning',
+                    iconColor: '#f59e0b',
+                    title: '<div class="fw-bold text-dark fs-5 mt-2">Penjelasan Tanggapan Wajib Diisi</div>',
+                    html: '<div class="text-muted small mt-2">Silakan tuliskan rangkuman penjelasan perbaikan atau klarifikasi yang Anda lakukan pada kolom catatan tanggapan sebelum mengirimkan berkas revisi.</div>',
+                    confirmButtonText: 'Tulis Penjelasan Sekarang',
+                    customClass: {
+                        popup: 'rounded-4 shadow-lg border-0',
+                        confirmButton: 'btn btn-primary rounded-pill px-4 py-2'
+                    },
+                    buttonsStyling: false
+                }).then(() => {
+                    if (catatanInput) catatanInput.focus();
+                });
+            } else {
+                alert('Penjelasan tanggapan revisi wajib diisi!');
+                if (catatanInput) catatanInput.focus();
+            }
+            return;
+        }
+
+        if (typeof Swal === 'undefined') {
+            if (confirm('Kirimkan tanggapan dan berkas revisi ke Tim Penguji K3?')) {
+                form.submit();
+            }
+            return;
+        }
+
+        Swal.fire({
+            title: '<div class="fw-bold text-dark mt-2" style="font-size: 20px;"><i class="bi bi-send-check text-primary me-2"></i>Kirim Tanggapan & Revisi?</div>',
+            html: `
+                <div class="text-start mt-3" style="font-size: 13.5px; line-height: 1.6;">
+                    <div class="p-3 rounded-4 mb-3" style="background: linear-gradient(135deg, #f0fdf4 0%, #e0f2fe 100%); border: 1px solid #bae6fd;">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="text-muted small">Nomor Order:</span>
+                            <span class="badge bg-primary px-2.5 py-1 rounded-pill fw-semibold">${orderNo}</span>
+                        </div>
+                        <div class="text-muted small mt-2 pt-2 border-top border-primary border-opacity-25">
+                            Tanggapan penjelasan dan dokumen perbaikan yang Anda lampirkan akan diteruskan secara resmi ke <strong>Tim Penguji K3 Balai K3 Surabaya</strong> untuk ditelaah ulang.
+                        </div>
+                    </div>
+                    <div class="text-muted small">
+                        Pastikan seluruh poin koreksi/sorotan penguji telah Anda perbaiki dengan benar sebelum mengirimkan berkas.
+                    </div>
+                </div>
+            `,
+            icon: 'question',
+            iconColor: '#15406A',
+            showCancelButton: true,
+            confirmButtonText: '<i class="bi bi-send-check me-1"></i> Ya, Kirimkan Revisi',
+            cancelButtonText: '<i class="bi bi-x-circle me-1"></i> Periksa Lagi',
+            customClass: {
+                popup: 'rounded-4 shadow-lg border-0',
+                confirmButton: 'btn btn-primary rounded-pill px-4 py-2 fw-semibold me-2 shadow-sm',
+                cancelButton: 'btn btn-outline-secondary rounded-pill px-4 py-2'
+            },
+            buttonsStyling: false,
+            reverseButtons: true
+        }).then((result) => {
+            if (result.isConfirmed) {
+                form.submit();
             }
         });
     }
