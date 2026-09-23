@@ -2044,5 +2044,59 @@ class SuketK3WorkflowTest extends TestCase
         $respSort->assertStatus(200);
         $respSort->assertSeeInOrder(['ORD-ST9-DELIVERED-002', 'ORD-ST9-PENDING-001']);
     }
+
+    public function test_large_lhu_file_upload_and_revision_handling()
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $user = User::create([
+            'name' => 'Pemohon Berkas Besar',
+            'email' => 'large.file@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+
+        $permohonan = Permohonan::create([
+            'user_id' => $user->id,
+            'kode' => 'ORD-LARGE-001',
+            'status' => 'selesai_pengujian',
+        ]);
+
+        // 1. Unggah LHU Manual 9.2MB (9420 KB) saat pendaftaran awal
+        $largePdf = UploadedFile::fake()->create('LHU_Banyak_Halaman_9MB.pdf', 9420, 'application/pdf');
+        $response = $this->actingAs($user)->post('/permohonan-suket/store', [
+            'nomor_order' => 'ORD-LARGE-001',
+            'faktor_k3' => ['fisika', 'kimia'],
+            'lhu_source' => 'manual',
+            'lhu_file' => $largePdf,
+            'catatan' => 'LHU manual 9MB banyak halaman',
+        ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertSessionHas('success');
+
+        $suket = SuketK3::where('nomor_order', 'ORD-LARGE-001')->first();
+        $this->assertNotNull($suket);
+        $this->assertEquals('manual', $suket->lhu_source);
+        $this->assertEquals('LHU_Banyak_Halaman_9MB.pdf', $suket->lhu_file_name);
+        $this->assertNotNull($suket->lhu_file_path);
+
+        // Ubah status ke rejected agar dapat diuji submit revisi
+        $suket->update(['evaluasi_status' => 'rejected']);
+
+        // 2. Unggah Revisi Dokumen LHU 9.5MB (9728 KB)
+        $largeRevisionPdf = UploadedFile::fake()->create('LHU_Revisi_Banyak_Halaman_9.5MB.pdf', 9728, 'application/pdf');
+        $revResponse = $this->actingAs($user)->post("/permohonan-suket/{$suket->id}/submit-revision", [
+            'catatan_revisi' => 'Perbaikan LHU lengkap dengan lampiran pengujian 9.5MB.',
+            'lhu_file' => $largeRevisionPdf,
+        ]);
+
+        $revResponse->assertSessionHasNoErrors();
+        $revResponse->assertSessionHas('success');
+
+        $suket->refresh();
+        $this->assertEquals('pending', $suket->evaluasi_status);
+        $this->assertEquals('LHU_Revisi_Banyak_Halaman_9.5MB.pdf', $suket->lhu_file_name);
+    }
 }
 

@@ -85,17 +85,23 @@ class PenerbitanSuketController extends Controller
             'faktor_k3' => ['required', 'array', 'min:1'],
             'faktor_k3.*' => ['in:fisika,kimia,biologi,ergonomi,psikologi'],
             'lhu_source' => ['required', 'in:auto,manual'],
-            'lhu_file' => ['nullable', 'file', 'extensions:pdf', 'max:20480'],
-            'foto_pengujian' => ['nullable', 'file', 'extensions:jpg,jpeg,png,pdf', 'max:20480'],
-            'denah_lokasi' => ['nullable', 'file', 'extensions:jpg,jpeg,png,pdf', 'max:20480'],
+            'lhu_file' => ['nullable', 'file', 'extensions:pdf', 'max:51200'],
+            'foto_pengujian' => ['nullable', 'file', 'extensions:jpg,jpeg,png,pdf', 'max:51200'],
+            'denah_lokasi' => ['nullable', 'file', 'extensions:jpg,jpeg,png,pdf', 'max:51200'],
             'catatan' => ['nullable', 'string', 'max:500'],
         ], [
             'nomor_order.required' => 'Nomor order / kode permohonan wajib dipilih.',
             'faktor_k3.required' => 'Pilih minimal satu faktor lingkungan kerja yang diuji.',
             'faktor_k3.min' => 'Pilih minimal satu faktor lingkungan kerja yang diuji.',
             'lhu_file.extensions' => 'Dokumen LHU harus berupa file PDF.',
+            'lhu_file.max' => 'Ukuran berkas LHU maksimal 50MB.',
+            'lhu_file.uploaded' => 'Berkas LHU gagal diunggah. Pastikan ukuran file tidak melebihi 50MB dan koneksi internet stabil.',
             'foto_pengujian.extensions' => 'Foto pengujian harus berupa file JPG, JPEG, PNG, atau PDF.',
+            'foto_pengujian.max' => 'Ukuran berkas foto pengujian maksimal 50MB.',
+            'foto_pengujian.uploaded' => 'Berkas foto pengujian gagal diunggah. Pastikan ukuran file tidak melebihi 50MB.',
             'denah_lokasi.extensions' => 'Denah lokasi harus berupa file JPG, JPEG, PNG, atau PDF.',
+            'denah_lokasi.max' => 'Ukuran berkas denah lokasi maksimal 50MB.',
+            'denah_lokasi.uploaded' => 'Berkas denah lokasi gagal diunggah. Pastikan ukuran file tidak melebihi 50MB.',
         ]);
 
         $orderCode = trim($request->input('nomor_order'));
@@ -201,15 +207,20 @@ class PenerbitanSuketController extends Controller
 
         $request->validate([
             'catatan_revisi' => ['required', 'string', 'max:2000'],
-            'lhu_file' => ['nullable', 'file', 'extensions:pdf', 'max:20480'],
-            'denah_lokasi' => ['nullable', 'file', 'extensions:pdf,jpg,jpeg,png', 'max:20480'],
-            'foto_pengujian' => ['nullable', 'file', 'extensions:pdf,jpg,jpeg,png', 'max:20480'],
+            'lhu_file' => ['nullable', 'file', 'extensions:pdf', 'max:51200'],
+            'denah_lokasi' => ['nullable', 'file', 'extensions:pdf,jpg,jpeg,png', 'max:51200'],
+            'foto_pengujian' => ['nullable', 'file', 'extensions:pdf,jpg,jpeg,png', 'max:51200'],
         ], [
             'catatan_revisi.required' => 'Penjelasan / tanggapan revisi wajib diisi.',
             'lhu_file.extensions' => 'Dokumen LHU pengganti harus berformat PDF.',
-            'lhu_file.max' => 'Ukuran berkas LHU maksimal 20MB.',
+            'lhu_file.max' => 'Ukuran berkas LHU maksimal 50MB.',
+            'lhu_file.uploaded' => 'Berkas LHU pengganti gagal diunggah. Pastikan ukuran file tidak melebihi 50MB dan koneksi internet stabil.',
             'denah_lokasi.extensions' => 'Dokumen denah lokasi harus berformat PDF, JPG, JPEG, atau PNG.',
+            'denah_lokasi.max' => 'Ukuran berkas denah lokasi maksimal 50MB.',
+            'denah_lokasi.uploaded' => 'Berkas denah lokasi pengganti gagal diunggah. Pastikan ukuran file tidak melebihi 50MB.',
             'foto_pengujian.extensions' => 'Dokumen foto pengujian harus berformat PDF, JPG, JPEG, atau PNG.',
+            'foto_pengujian.max' => 'Ukuran berkas foto pengujian maksimal 50MB.',
+            'foto_pengujian.uploaded' => 'Berkas foto pengujian pengganti gagal diunggah. Pastikan ukuran file tidak melebihi 50MB.',
         ]);
 
         $catatanRevisi = trim((string) $request->input('catatan_revisi'));
