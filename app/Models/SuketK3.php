@@ -355,6 +355,16 @@ class SuketK3 extends Model
         return $this->belongsTo(User::class, 'kuitansi_sent_by');
     }
 
+    public function sentToCustomerBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'sent_to_customer_by');
+    }
+
+    public function isDelivered(): bool
+    {
+        return !empty($this->sent_to_customer_at);
+    }
+
     public function isTagihanSent(): bool
     {
         return !empty($this->surat_tagihan_sent_at);

@@ -1974,5 +1974,75 @@ class SuketK3WorkflowTest extends TestCase
         $this->actingAs($pemohon)->get("/permohonan-suket/{$suket8->id}/preview/kuitansi")->assertStatus(403);
         $this->actingAs($pemohon)->get("/permohonan-suket/{$suket8->id}/download/kuitansi")->assertStatus(403);
     }
+
+    public function test_stage_9_delivery_filtering_and_sorting()
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $admin = User::create([
+            'name' => 'Admin Suket Stage 9',
+            'email' => 'admin.st9@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
+        ]);
+
+        $pemohon = User::create([
+            'name' => 'Pemohon PT Berjaya',
+            'email' => 'pemohon.berjaya@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+
+        // Berkas 1: Belum Diserahkan
+        $suketPending = SuketK3::create([
+            'user_id' => $pemohon->id,
+            'nomor_order' => 'ORD-ST9-PENDING-001',
+            'status_tahap' => 9,
+            'sent_to_customer_at' => null,
+            'perusahaan_nama' => 'PT Pending Suket',
+            'nomor_surat' => '566/SK-K3/IX/2026',
+        ]);
+
+        // Berkas 2: Sudah Diserahkan
+        $suketDelivered = SuketK3::create([
+            'user_id' => $pemohon->id,
+            'nomor_order' => 'ORD-ST9-DELIVERED-002',
+            'status_tahap' => 9,
+            'sent_to_customer_at' => now()->subDay(),
+            'sent_to_customer_by' => $admin->id,
+            'perusahaan_nama' => 'PT Tuntas Suket',
+            'nomor_surat' => '567/SK-K3/IX/2026',
+        ]);
+
+        // 1. Tampilkan Semua Tahap 9 (tanpa filter status penyerahan)
+        $respAll = $this->actingAs($admin)->get('/suket-k3?stage=9');
+        $respAll->assertStatus(200);
+        $respAll->assertSee('ORD-ST9-PENDING-001');
+        $respAll->assertSee('ORD-ST9-DELIVERED-002');
+        $respAll->assertSee('1 Belum');
+        $respAll->assertSee('1 Selesai');
+        $respAll->assertSee('Status Penyerahan:');
+        $respAll->assertSee('Belum Diserahkan');
+        $respAll->assertSee('Sudah Diserahkan');
+
+        // 2. Filter: Belum Diserahkan
+        $respPending = $this->actingAs($admin)->get('/suket-k3?stage=9&delivery_status=pending');
+        $respPending->assertStatus(200);
+        $respPending->assertSee('ORD-ST9-PENDING-001');
+        $respPending->assertDontSee('ORD-ST9-DELIVERED-002');
+        $respPending->assertSee('Penyerahan Suket');
+
+        // 3. Filter: Sudah Diserahkan
+        $respDelivered = $this->actingAs($admin)->get('/suket-k3?stage=9&delivery_status=delivered');
+        $respDelivered->assertStatus(200);
+        $respDelivered->assertSee('ORD-ST9-DELIVERED-002');
+        $respDelivered->assertDontSee('ORD-ST9-PENDING-001');
+        $respDelivered->assertSee('Tuntas Diserahkan');
+
+        // 4. Sort: Nomor Order A-Z
+        $respSort = $this->actingAs($admin)->get('/suket-k3?stage=9&sort=order_asc');
+        $respSort->assertStatus(200);
+        $respSort->assertSeeInOrder(['ORD-ST9-DELIVERED-002', 'ORD-ST9-PENDING-001']);
+    }
 }
 

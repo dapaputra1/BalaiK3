@@ -412,7 +412,15 @@
                         <span class="stage-badge badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill small">
                             Tahap 9
                         </span>
-                        <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[9] ?? 0 }}</span>
+                        <div class="text-end">
+                            <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[9] ?? 0 }}</span>
+                            @if(($stageCounts[9] ?? 0) > 0)
+                                <div class="small text-muted" style="font-size: 10px; line-height: 1.2;">
+                                    <span class="text-warning-emphasis fw-semibold">{{ $stage9PendingCount ?? 0 }} Belum</span> &bull; 
+                                    <span class="text-success fw-semibold">{{ $stage9DeliveredCount ?? 0 }} Selesai</span>
+                                </div>
+                            @endif
+                        </div>
                     </div>
                     <div class="d-flex align-items-center gap-2 mb-1">
                         <i class="bi bi-send-check stage-icon text-success fs-5"></i>
@@ -438,6 +446,12 @@
                     @if($activeStage)
                         <input type="hidden" name="stage" value="{{ $activeStage }}">
                     @endif
+                    @if(request('delivery_status'))
+                        <input type="hidden" name="delivery_status" value="{{ request('delivery_status') }}">
+                    @endif
+                    @if(request('sort'))
+                        <input type="hidden" name="sort" value="{{ request('sort') }}">
+                    @endif
                     <div class="row g-2 align-items-center">
                         <div class="col-12 col-md-8 col-lg-9">
                             <div class="input-group">
@@ -459,11 +473,17 @@
                 </form>
             </div>
             @if($activeStage)
-                <div class="d-flex align-items-center gap-2 mt-3 pt-2 border-top">
+                <div class="d-flex align-items-center gap-2 mt-3 pt-2 border-top flex-wrap">
                     <span class="small text-muted">Tahapan Aktif:</span>
                     <span class="badge bg-navy px-3 py-1 rounded-pill small">
                         {{ $activeStage === 'qc' ? 'Gerbang Review QC Suket' : ($stages[$activeStage]['label'] ?? "Tahap $activeStage") }}
                     </span>
+                    @if($activeStage === '9' && $deliveryStatus)
+                        <span class="badge {{ $deliveryStatus === 'pending' ? 'bg-warning text-dark' : 'bg-success' }} px-2 py-1 rounded-pill small">
+                            <i class="bi {{ $deliveryStatus === 'pending' ? 'bi-clock-history' : 'bi-check-circle' }} me-1"></i>
+                            {{ $deliveryStatus === 'pending' ? 'Belum Diserahkan' : 'Sudah Diserahkan' }}
+                        </span>
+                    @endif
                     <a href="{{ route('suket.index') }}" class="btn btn-link btn-sm text-secondary text-decoration-none p-0 ms-2 small">
                         <i class="bi bi-x-circle me-1"></i>Tampilkan Semua Permohonan
                     </a>
@@ -487,6 +507,52 @@
                 <span class="badge bg-light text-secondary border rounded-pill">Total: {{ $sukets->total() }} Berkas {{ $activeStage ? '(' . ($activeStage === 'qc' ? 'Review QC' : ($stages[$activeStage]['label'] ?? "Tahap $activeStage")) . ')' : '(Semua Tahap)' }}</span>
             </div>
         </div>
+
+        @if($activeStage === '9')
+            <div class="bg-light-subtle border-bottom px-3 py-2.5 d-flex flex-wrap align-items-center justify-content-between gap-3">
+                {{-- Filter Status Penyerahan (Pills) --}}
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="small fw-semibold text-muted me-1"><i class="bi bi-funnel me-1"></i>Status Penyerahan:</span>
+                    
+                    <a href="{{ route('suket.index', array_merge(request()->except(['delivery_status', 'page']), ['stage' => 9])) }}"
+                       class="btn btn-sm {{ empty($deliveryStatus) ? 'btn-primary shadow-sm' : 'btn-outline-secondary bg-white' }} rounded-pill px-3 py-1 fw-medium">
+                        Semua <span class="badge {{ empty($deliveryStatus) ? 'bg-white text-primary' : 'bg-secondary-subtle text-secondary' }} ms-1 rounded-pill">{{ $stageCounts[9] ?? 0 }}</span>
+                    </a>
+
+                    <a href="{{ route('suket.index', array_merge(request()->except(['delivery_status', 'page']), ['stage' => 9, 'delivery_status' => 'pending'])) }}"
+                       class="btn btn-sm {{ $deliveryStatus === 'pending' ? 'btn-warning text-dark fw-bold shadow-sm' : 'btn-outline-warning text-dark bg-white' }} rounded-pill px-3 py-1">
+                        <i class="bi bi-clock-history me-1 text-warning"></i>Belum Diserahkan 
+                        <span class="badge {{ $deliveryStatus === 'pending' ? 'bg-dark text-white' : 'bg-warning-subtle text-warning-emphasis' }} ms-1 rounded-pill">{{ $stage9PendingCount ?? 0 }}</span>
+                    </a>
+
+                    <a href="{{ route('suket.index', array_merge(request()->except(['delivery_status', 'page']), ['stage' => 9, 'delivery_status' => 'delivered'])) }}"
+                       class="btn btn-sm {{ $deliveryStatus === 'delivered' ? 'btn-success text-white fw-bold shadow-sm' : 'btn-outline-success bg-white' }} rounded-pill px-3 py-1 fw-medium">
+                        <i class="bi bi-check-circle me-1"></i>Sudah Diserahkan 
+                        <span class="badge {{ $deliveryStatus === 'delivered' ? 'bg-white text-success' : 'bg-success-subtle text-success' }} ms-1 rounded-pill">{{ $stage9DeliveredCount ?? 0 }}</span>
+                    </a>
+                </div>
+
+                {{-- Sort Dropdown --}}
+                <div class="d-flex align-items-center gap-2">
+                    <label for="sortStage9" class="small text-muted text-nowrap fw-semibold"><i class="bi bi-sort-down me-1"></i>Urutkan:</label>
+                    <form action="{{ route('suket.index') }}" method="GET" class="d-inline-block m-0">
+                        <input type="hidden" name="stage" value="9">
+                        @if(!empty($deliveryStatus))
+                            <input type="hidden" name="delivery_status" value="{{ $deliveryStatus }}">
+                        @endif
+                        @if(!empty($search))
+                            <input type="hidden" name="search" value="{{ $search }}">
+                        @endif
+                        <select name="sort" id="sortStage9" class="form-select form-select-sm rounded-pill border-secondary-subtle" style="width: auto;" onchange="this.form.submit()">
+                            <option value="latest" {{ ($sort ?? 'latest') === 'latest' ? 'selected' : '' }}>Terbaru Diperbarui</option>
+                            <option value="oldest" {{ ($sort ?? '') === 'oldest' ? 'selected' : '' }}>Terlama Diperbarui</option>
+                            <option value="delivered_desc" {{ ($sort ?? '') === 'delivered_desc' ? 'selected' : '' }}>Tgl Penyerahan (Terbaru)</option>
+                            <option value="order_asc" {{ ($sort ?? '') === 'order_asc' ? 'selected' : '' }}>Nomor Order (A-Z)</option>
+                        </select>
+                    </form>
+                </div>
+            </div>
+        @endif
 
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
@@ -573,6 +639,25 @@
                                             <span class="badge bg-info-subtle text-info border border-info-subtle px-1" style="font-size: 10px;">
                                                 <i class="bi bi-chat-left-text me-1"></i>{{ $suket->comments->count() }}
                                             </span>
+                                        @endif
+                                    @elseif($suket->status_tahap === 9)
+                                        @if($suket->sent_to_customer_at)
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill" style="font-size: 10px;">
+                                                <i class="bi bi-check-circle-fill me-1"></i>Sudah Diserahkan
+                                            </span>
+                                            <div class="text-muted small mt-1" style="font-size: 9.5px; line-height: 1.2;">
+                                                <i class="bi bi-calendar-check me-1"></i>{{ $suket->sent_to_customer_at->format('d/m/Y H:i') }}
+                                                @if($suket->sentToCustomerBy)
+                                                    <span class="d-block text-secondary mt-0.5">Oleh: {{ $suket->sentToCustomerBy->name }}</span>
+                                                @endif
+                                            </div>
+                                        @else
+                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1 rounded-pill" style="font-size: 10px;">
+                                                <i class="bi bi-hourglass-split me-1"></i>Belum Diserahkan
+                                            </span>
+                                            <div class="text-muted small mt-1" style="font-size: 9.5px; line-height: 1.2;">
+                                                Menunggu penyerahan ke pemohon
+                                            </div>
                                         @endif
                                     @else
                                         @if($suket->qc_status === 'approved')
@@ -1045,19 +1130,25 @@
                                                 <i class="bi bi-receipt me-1"></i> Kuitansi
                                             </button>
                                         @endif
-                                    @elseif($suket->status_tahap === 9)
-                                        @if(!$suket->sent_to_customer_at && in_array($currentRole, ['admin', 'superadmin']))
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm btn-success rounded-pill px-3 py-1"
-                                                style="font-size: 11px;"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#modalAdvance{{ $suket->id }}"
-                                            >
-                                                <i class="bi bi-send-check me-1"></i>Penyerahan Suket
-                                            </button>
+                                     @elseif($suket->status_tahap === 9)
+                                        @if(!$suket->sent_to_customer_at)
+                                            @if(in_array($currentRole, ['admin', 'superadmin']))
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-success rounded-pill px-3 py-1 shadow-sm"
+                                                    style="font-size: 11px;"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalAdvance{{ $suket->id }}"
+                                                >
+                                                    <i class="bi bi-send-check me-1"></i>Penyerahan Suket
+                                                </button>
+                                            @else
+                                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1 rounded-pill" style="font-size: 10px;">
+                                                    <i class="bi bi-clock me-1"></i>Menunggu Penyerahan (Admin)
+                                                </span>
+                                            @endif
                                         @else
-                                            <span class="badge bg-success-subtle text-success px-2 py-1 rounded-pill" style="font-size: 11px;">
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill" style="font-size: 11px;">
                                                 <i class="bi bi-check-all me-1"></i>Tuntas Diserahkan
                                             </span>
                                         @endif
@@ -2577,8 +2668,16 @@
                         <tr>
                             <td colspan="7" class="text-center py-5 text-muted">
                                 <i class="bi bi-inbox fs-1 d-block mb-2 text-secondary"></i>
-                                <strong>Tidak ada berkas permohonan suket pada tahap ini.</strong><br>
-                                <span class="small">Permohonan diajukan oleh pemohon/pelanggan melalui portal pemohon web Balai K3.</span>
+                                @if($activeStage === '9' && $deliveryStatus === 'pending')
+                                    <strong>Tidak ada berkas yang belum diserahkan.</strong><br>
+                                    <span class="small">Semua berkas pada Tahap 9 telah berhasil diserahkan ke pemohon.</span>
+                                @elseif($activeStage === '9' && $deliveryStatus === 'delivered')
+                                    <strong>Belum ada berkas yang sudah diserahkan.</strong><br>
+                                    <span class="small">Silakan lakukan proses penyerahan berkas suket ke pemohon.</span>
+                                @else
+                                    <strong>Tidak ada berkas permohonan suket pada tahap ini.</strong><br>
+                                    <span class="small">Permohonan diajukan oleh pemohon/pelanggan melalui portal pemohon web Balai K3.</span>
+                                @endif
                             </td>
                         </tr>
                     @endforelse

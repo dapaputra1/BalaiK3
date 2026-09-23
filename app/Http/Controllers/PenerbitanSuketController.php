@@ -406,10 +406,28 @@ class PenerbitanSuketController extends Controller
         }
 
         $search = $request->query('search');
+        $deliveryStatus = $request->query('delivery_status');
+        $sort = $request->query('sort', 'latest');
 
         // Query Suket K3 untuk Internal
-        $suketQuery = SuketK3::with(['permohonan.company', 'user', 'creator', 'signer', 'publisher', 'qcUser', 'comments.user', 'lhuComments.user', 'suketComments.user', 'evaluator', 'histories.user', 'tagihanSender', 'tagihanAccUser', 'billingSender', 'billingVerifier', 'kuitansiGenerator', 'kuitansiSender'])
-            ->latest('updated_at');
+        $suketQuery = SuketK3::with([
+            'permohonan.company', 'user', 'creator', 'signer', 'publisher', 
+            'qcUser', 'comments.user', 'lhuComments.user', 'suketComments.user', 
+            'evaluator', 'histories.user', 'tagihanSender', 'tagihanAccUser', 
+            'billingSender', 'billingVerifier', 'kuitansiGenerator', 'kuitansiSender', 
+            'sentToCustomerBy'
+        ]);
+
+        // Pengurutan (Sorting)
+        if ($sort === 'oldest') {
+            $suketQuery->oldest('updated_at');
+        } elseif ($sort === 'delivered_desc') {
+            $suketQuery->orderByDesc('sent_to_customer_at')->latest('updated_at');
+        } elseif ($sort === 'order_asc') {
+            $suketQuery->orderBy('nomor_order');
+        } else {
+            $suketQuery->latest('updated_at');
+        }
 
         // Filter berdasarkan Stage aktif
         if ($activeStage === '2') {
@@ -432,6 +450,11 @@ class PenerbitanSuketController extends Controller
             $suketQuery->where('status_tahap', 8);
         } elseif ($activeStage === '9') {
             $suketQuery->where('status_tahap', 9);
+            if ($deliveryStatus === 'pending' || $deliveryStatus === 'belum') {
+                $suketQuery->whereNull('sent_to_customer_at');
+            } elseif ($deliveryStatus === 'delivered' || $deliveryStatus === 'sudah') {
+                $suketQuery->whereNotNull('sent_to_customer_at');
+            }
         }
 
         if ($search) {
@@ -461,6 +484,9 @@ class PenerbitanSuketController extends Controller
             'all' => SuketK3::count(),
         ];
 
+        $stage9PendingCount = SuketK3::where('status_tahap', 9)->whereNull('sent_to_customer_at')->count();
+        $stage9DeliveredCount = SuketK3::where('status_tahap', 9)->whereNotNull('sent_to_customer_at')->count();
+
         $totalActive = SuketK3::where('status_tahap', '<', 9)->count();
         $totalDone = SuketK3::where('status_tahap', 9)->count();
 
@@ -468,9 +494,13 @@ class PenerbitanSuketController extends Controller
             'sukets' => $sukets,
             'stages' => SuketK3::STAGES,
             'stageCounts' => $stageCounts,
+            'stage9PendingCount' => $stage9PendingCount,
+            'stage9DeliveredCount' => $stage9DeliveredCount,
             'totalActive' => $totalActive,
             'totalDone' => $totalDone,
             'activeStage' => $activeStage,
+            'deliveryStatus' => $deliveryStatus,
+            'sort' => $sort,
             'roleAllowedStages' => array_map('strval', $roleAllowedStages),
             'search' => $search,
             'currentRole' => $currentRole,
