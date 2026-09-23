@@ -453,7 +453,7 @@
                         <input type="hidden" name="sort" value="{{ request('sort') }}">
                     @endif
                     <div class="row g-2 align-items-center">
-                        <div class="col-12 col-md-8 col-lg-9">
+                        <div class="col-12 col-md-7 col-lg-8">
                             <div class="input-group">
                                 <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
                                 <input type="text" name="search" class="form-control border-start-0" placeholder="Cari berdasarkan No. Order, Nama Perusahaan, Lokasi, atau Nomor Surat..." value="{{ $search }}">
@@ -461,7 +461,7 @@
                         </div>
                         <div class="col-6 col-md-2 col-lg-1.5 d-flex gap-1">
                             <button type="submit" class="btn btn-primary w-100 rounded-3">
-                                <i class="bi bi-filter me-1"></i>Filter
+                                <i class="bi bi-search me-1"></i>Search
                             </button>
                         </div>
                         <div class="col-6 col-md-2 col-lg-1.5">
