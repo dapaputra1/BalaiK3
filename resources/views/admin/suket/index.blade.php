@@ -912,15 +912,28 @@
                                     {{-- TOMBOL PROSES TAHAP (Advance Stage) --}}
                                     @if($canProcess && $suket->status_tahap < 9)
                                         @if($suket->status_tahap === 2)
-                                            <button
-                                                type="button"
-                                                class="btn btn-sm btn-primary rounded-pill px-3 py-1"
-                                                style="background-color: #15406A; border-color: #15406A; font-size: 11px;"
-                                                data-bs-toggle="modal"
-                                                data-bs-target="#modalEvaluasiSideBySide{{ $suket->id }}"
-                                            >
-                                                <i class="bi bi-layout-split me-1"></i> Evaluasi Dokumen
-                                            </button>
+                                            @if($suket->evaluasi_status === 'rejected')
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-outline-warning text-dark rounded-pill px-3 py-1 fw-semibold"
+                                                    style="font-size: 11px;"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalEvaluasiSideBySide{{ $suket->id }}"
+                                                    title="Dokumen dikembalikan ke pemohon untuk revisi. Menunggu tanggapan atau berkas perbaikan dari pemohon."
+                                                >
+                                                    <i class="bi bi-clock-history me-1 text-warning"></i> Menunggu Respon Pemohon
+                                                </button>
+                                            @else
+                                                <button
+                                                    type="button"
+                                                    class="btn btn-sm btn-primary rounded-pill px-3 py-1"
+                                                    style="background-color: #15406A; border-color: #15406A; font-size: 11px;"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#modalEvaluasiSideBySide{{ $suket->id }}"
+                                                >
+                                                    <i class="bi bi-layout-split me-1"></i> Evaluasi Dokumen
+                                                </button>
+                                            @endif
                                         @elseif($suket->status_tahap === 3)
                                             {{-- Tombol Kirim ke QC hanya muncul saat belum diajukan ke QC (Penyusunan Suket) --}}
                                             @if($suket->qc_status !== 'pending')
@@ -1302,6 +1315,16 @@
 
                             {{-- 3. Form Keputusan Evaluasi (Setujui / Tolak) --}}
                             <div class="card border rounded-3 p-3 bg-light shadow-xs border-secondary-subtle">
+                                @if($suket->evaluasi_status === 'rejected')
+                                    <div class="alert alert-warning py-2 px-3 small rounded-3 mb-3 border border-warning-subtle">
+                                        <div class="fw-bold text-dark mb-1">
+                                            <i class="bi bi-clock-history text-warning me-1"></i> Status: Menunggu Tanggapan / Berkas Revisi Pemohon
+                                        </div>
+                                        <div class="text-muted" style="font-size: 11px;">
+                                            Dokumen LHU / lampiran telah dikembalikan ke pemohon. Harap menunggu pemohon mengunggah berkas revisi dan memberikan tanggapan sebelum permohonan dapat disetujui kembali.
+                                        </div>
+                                    </div>
+                                @endif
                                 <form action="{{ route('suket.advance', $suket->id) }}" method="POST">
                                     @csrf
                                     <label class="form-label small fw-bold text-dark mb-1">
@@ -1310,11 +1333,17 @@
                                     <textarea name="catatan" rows="2" class="form-control form-control-sm mb-2" placeholder="Tuliskan kesimpulan evaluasi hasil uji berdasarkan Permenaker No. 5/2018 (atau alasan umum jika ditolak)..." required>{{ $suket->catatan_evaluasi }}</textarea>
                                     <div class="d-flex justify-content-between align-items-center gap-2">
                                         <button type="submit" name="action" value="reject_evaluasi" class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-semibold" style="font-size: 11px;" onclick="return confirm('Apakah Anda yakin ingin meminta revisi dokumen/LHU ke pemohon beserta daftar poin sorotan kesalahan di atas?')">
-                                            <i class="bi bi-arrow-return-left me-1"></i>Minta Revisi ke Pemohon
+                                            <i class="bi bi-arrow-return-left me-1"></i>{{ $suket->evaluasi_status === 'rejected' ? 'Perbarui Catatan Revisi' : 'Minta Revisi ke Pemohon' }}
                                         </button>
-                                        <button type="submit" name="action" value="next" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold" style="font-size: 11px;">
-                                            <i class="bi bi-check-circle me-1"></i>Setujui & Lanjut Tahap 3
-                                        </button>
+                                        @if($suket->evaluasi_status === 'rejected')
+                                            <button type="button" class="btn btn-sm btn-secondary rounded-pill px-3 py-1 fw-semibold disabled" disabled style="font-size: 11px;" title="Tunggu pemohon mengirimkan tanggapan dan berkas revisi">
+                                                <i class="bi bi-hourglass-split me-1"></i>Menunggu Respon Pemohon
+                                            </button>
+                                        @else
+                                            <button type="submit" name="action" value="next" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-semibold" style="font-size: 11px;">
+                                                <i class="bi bi-check-circle me-1"></i>Setujui & Lanjut Tahap 3
+                                            </button>
+                                        @endif
                                     </div>
                                 </form>
                             </div>

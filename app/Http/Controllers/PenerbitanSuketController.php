@@ -281,6 +281,10 @@ class PenerbitanSuketController extends Controller
             return redirect()->back()->with('error', 'Status berkas suket saat ini bukan pada tahap Surat Tagihan.');
         }
 
+        if (!$suket->isTagihanSent()) {
+            return redirect()->back()->with('error', 'Surat Tagihan belum diterbitkan atau dikirimkan oleh Petugas Keuangan/Bendahara Balai K3.');
+        }
+
         DB::transaction(function () use ($suket, $user, $request) {
             $suket->surat_tagihan_acc_at = now();
             $suket->surat_tagihan_acc_by = $user->id;
@@ -317,6 +321,10 @@ class PenerbitanSuketController extends Controller
 
         if ((int) $suket->status_tahap !== 7) {
             return redirect()->back()->with('error', 'Status berkas suket saat ini bukan pada tahap Kode Billing.');
+        }
+
+        if (!$suket->isBillingSent()) {
+            return redirect()->back()->with('error', 'Kode Billing belum diterbitkan atau dikirimkan oleh Bendahara Balai K3.');
         }
 
         $request->validate([
@@ -585,6 +593,15 @@ class PenerbitanSuketController extends Controller
             }
             if (in_array($type, ['signed', 'final', 'draft', 'draft_pdf'], true) && empty($suket->sent_to_customer_at)) {
                 abort(403, 'Dokumen Surat Keterangan K3 belum resmi diserahkan ke akun Anda. Mohon menunggu proses verifikasi dan penyerahan oleh Balai K3.');
+            }
+            if ($type === 'tagihan' && !$suket->isTagihanSent()) {
+                abort(403, 'Surat Tagihan belum resmi diterbitkan atau dikirimkan oleh Petugas Keuangan/Bendahara Balai K3.');
+            }
+            if (in_array($type, ['billing', 'guide', 'panduan', 'billing_guide'], true) && !$suket->isBillingSent()) {
+                abort(403, 'Kode Billing dan Panduan Pembayaran belum resmi diterbitkan oleh Bendahara Balai K3.');
+            }
+            if ($type === 'kuitansi' && !$suket->isKuitansiSent()) {
+                abort(403, 'Kuitansi lunas resmi belum diterbitkan atau dikirimkan oleh Bendahara Balai K3.');
             }
         }
 
@@ -951,6 +968,13 @@ class PenerbitanSuketController extends Controller
 
             return redirect()->route('suket.index', ['stage' => 3])
                 ->with('success', "Draf Suket {$suket->nomor_order} berhasil diajukan ke Tim QC untuk review kelayakan.");
+        }
+
+        // Validasi khusus saat mau lanjut dari Tahap 2 ke Tahap 3
+        if ($request->action === 'next' && $currentStage === 2) {
+            if ($suket->evaluasi_status === 'rejected') {
+                return redirect()->back()->with('error', 'Dokumen masih dalam status menunggu tanggapan atau berkas perbaikan dari pemohon.');
+            }
         }
 
         // Validasi khusus saat mau lanjut dari Tahap 4 ke Tahap 5
@@ -1652,6 +1676,15 @@ class PenerbitanSuketController extends Controller
             }
             if (in_array($type, ['signed', 'final', 'draft'], true) && empty($suket->sent_to_customer_at)) {
                 abort(403, 'Dokumen Surat Keterangan K3 belum resmi diserahkan ke akun Anda. Mohon menunggu proses verifikasi dan penyerahan oleh Balai K3.');
+            }
+            if ($type === 'tagihan' && !$suket->isTagihanSent()) {
+                abort(403, 'Surat Tagihan belum resmi diterbitkan atau dikirimkan oleh Petugas Keuangan/Bendahara Balai K3.');
+            }
+            if (in_array($type, ['billing', 'guide', 'panduan', 'billing_guide'], true) && !$suket->isBillingSent()) {
+                abort(403, 'Kode Billing dan Panduan Pembayaran belum resmi diterbitkan oleh Bendahara Balai K3.');
+            }
+            if ($type === 'kuitansi' && !$suket->isKuitansiSent()) {
+                abort(403, 'Kuitansi lunas resmi belum diterbitkan atau dikirimkan oleh Bendahara Balai K3.');
             }
         }
 

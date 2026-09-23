@@ -465,7 +465,23 @@ class SuketK3WorkflowTest extends TestCase
         $adminView->assertSee('lhu-annotator.js');
         $adminView->assertSee('Pengajuan suket didaftarkan melalui Nomor Order ' . $suket->nomor_order);
 
-        // 4. Setelah diperbaiki, Penguji K3 menyetujui Evaluasi Dokumen
+        // 4. Verifikasi bahwa Penguji K3 TIDAK bisa menyetujui jika pemohon belum mengirimkan revisi
+        $blockedRes = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
+            'action' => 'next',
+            'catatan' => 'Mencoba approve sebelum ada revisi pemohon',
+        ]);
+        $blockedRes->assertSessionHas('error');
+        $this->assertEquals(2, $suket->fresh()->status_tahap);
+
+        // Pemohon mengirimkan tanggapan / revisi berkas evaluasi
+        $this->actingAs($pemohon)->post("/permohonan-suket/{$suket->id}/submit-revision", [
+            'catatan_revisi' => 'Data LHU titik kebisingan telah diperbaiki menjadi 85 dBA sesuai lampiran.',
+        ])->assertSessionHas('success');
+
+        $suket->refresh();
+        $this->assertEquals('pending', $suket->evaluasi_status);
+
+        // Setelah ada respon/revisi dari pemohon, Penguji K3 menyetujui Evaluasi Dokumen
         $approveRes = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
             'action' => 'next',
             'catatan' => 'LHU dan data pendukung telah diverifikasi dan memenuhi Permenaker No. 5/2018',
@@ -1622,9 +1638,14 @@ class SuketK3WorkflowTest extends TestCase
         ]);
 
         // 1. Uji Preview Tagihan on-the-fly ketika berkas belum pernah diunggah/digenerate
-        $previewBeforeSend = $this->actingAs($pemohon)->get("/permohonan-suket/{$suket->id}/preview/tagihan");
-        $previewBeforeSend->assertStatus(200);
-        $previewBeforeSend->assertHeader('Content-Type', 'application/pdf');
+        // Admin / bendahara bisa preview on-the-fly sebelum kirim
+        $previewBeforeSendAdmin = $this->actingAs($admin)->get("/suket-k3/{$suket->id}/preview/tagihan");
+        $previewBeforeSendAdmin->assertStatus(200);
+        $previewBeforeSendAdmin->assertHeader('Content-Type', 'application/pdf');
+
+        // Pemohon TIDAK BOLEH melihat tagihan sebelum surat_tagihan_sent_at (403 Forbidden)
+        $previewBeforeSendUser = $this->actingAs($pemohon)->get("/permohonan-suket/{$suket->id}/preview/tagihan");
+        $previewBeforeSendUser->assertStatus(403);
 
         // 2. Admin kirim surat tagihan TANPA upload file manual (Auto-Generate aktif)
         $postTagihan = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
@@ -1663,10 +1684,15 @@ class SuketK3WorkflowTest extends TestCase
         $suket->refresh();
         $this->assertEquals(8, $suket->status_tahap);
 
-        // 6. Uji Preview Kuitansi on-the-fly di Tahap 8 sebelum admin upload berkas fisik
-        $previewKuitansiBeforeSend = $this->actingAs($pemohon)->get("/permohonan-suket/{$suket->id}/preview/kuitansi");
-        $previewKuitansiBeforeSend->assertStatus(200);
-        $previewKuitansiBeforeSend->assertHeader('Content-Type', 'application/pdf');
+        // 6. Uji Preview Kuitansi on-the-fly di Tahap 8 sebelum admin kirim berkas fisik
+        // Admin bisa preview on the fly
+        $previewKuitansiBeforeSendAdmin = $this->actingAs($admin)->get("/suket-k3/{$suket->id}/preview/kuitansi");
+        $previewKuitansiBeforeSendAdmin->assertStatus(200);
+        $previewKuitansiBeforeSendAdmin->assertHeader('Content-Type', 'application/pdf');
+
+        // Pemohon TIDAK BOLEH melihat kuitansi sebelum kuitansi_sent_at (403 Forbidden)
+        $previewKuitansiBeforeSendUser = $this->actingAs($pemohon)->get("/permohonan-suket/{$suket->id}/preview/kuitansi");
+        $previewKuitansiBeforeSendUser->assertStatus(403);
 
         // 7. Admin kirim kuitansi TANPA upload file manual (Auto-Generate aktif)
         $postKuitansi = $this->actingAs($admin)->post("/suket-k3/{$suket->id}/advance", [
@@ -1829,6 +1855,124 @@ class SuketK3WorkflowTest extends TestCase
         $pagedResponse->assertSee('page-link');
         $pagedResponse->assertSee('Menampilkan');
         $pagedResponse->assertDontSee('w-5 h-5');
+    }
+
+    public function test_user_and_admin_gate_revisions_for_stages_2_6_7_8(): void
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $admin = User::create([
+            'name' => 'Admin Gate Test',
+            'email' => 'admin.gate.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'admin',
+        ]);
+
+        $pemohon = User::create([
+            'name' => 'Pemohon Gate Test',
+            'email' => 'pemohon.gate.' . uniqid() . '@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+
+        // ==========================================
+        // 1. REVISI 1: TAHAP 2 - Evaluasi Dokumen Dikembalikan ke Pemohon
+        // ==========================================
+        $suket2 = SuketK3::create([
+            'user_id' => $pemohon->id,
+            'nomor_order' => 'ORD-GATE-ST2',
+            'status_tahap' => 2,
+            'evaluasi_status' => 'rejected',
+            'catatan_evaluasi' => 'Mohon perbaiki lembar LHU',
+            'perusahaan_nama' => 'PT Revisi Evaluasi',
+        ]);
+
+        // Di admin, button menunjukkan "Menunggu Respon Pemohon"
+        $adminView2 = $this->actingAs($admin)->get('/suket-k3?stage=2');
+        $adminView2->assertStatus(200);
+        $adminView2->assertSee('Menunggu Respon Pemohon');
+
+        // Admin mencoba advance saat status masih rejected -> diblokir
+        $blockedAdv2 = $this->actingAs($admin)->post("/suket-k3/{$suket2->id}/advance", [
+            'action' => 'next',
+        ]);
+        $blockedAdv2->assertSessionHas('error');
+        $this->assertEquals(2, $suket2->fresh()->status_tahap);
+
+        // ==========================================
+        // 2. REVISI 2: TAHAP 6 - Surat Tagihan Belum Dikirim
+        // ==========================================
+        $suket6 = SuketK3::create([
+            'user_id' => $pemohon->id,
+            'nomor_order' => 'ORD-GATE-ST6',
+            'status_tahap' => 6,
+            'surat_tagihan_sent_at' => null,
+            'surat_tagihan_nominal' => 3500000,
+            'perusahaan_nama' => 'PT Menunggu Tagihan',
+        ]);
+
+        $userView6 = $this->actingAs($pemohon)->get('/permohonan-suket');
+        $userView6->assertStatus(200);
+        // Pemohon TIDAK melihat button ACC Tagihan
+        $userView6->assertDontSee("formQuickAccTagihan{$suket6->id}");
+        $userView6->assertDontSee("formAccTagihan{$suket6->id}");
+        $userView6->assertSee('Menunggu Tagihan');
+        $userView6->assertSee('Surat Tagihan Sedang Disiapkan oleh Petugas Keuangan');
+
+        // Pemohon mencoba POST ACC tagihan secara langsung -> diblokir
+        $accRes = $this->actingAs($pemohon)->post("/permohonan-suket/{$suket6->id}/acc-tagihan");
+        $accRes->assertSessionHas('error');
+        $this->assertFalse($suket6->fresh()->isTagihanAcc());
+
+        // Pemohon mencoba preview/download tagihan sebelum dikirim -> 403 Forbidden
+        $this->actingAs($pemohon)->get("/permohonan-suket/{$suket6->id}/preview/tagihan")->assertStatus(403);
+        $this->actingAs($pemohon)->get("/permohonan-suket/{$suket6->id}/download/tagihan")->assertStatus(403);
+
+        // ==========================================
+        // 3. REVISI 3: TAHAP 7 - Kode Billing Belum Dikirim
+        // ==========================================
+        $suket7 = SuketK3::create([
+            'user_id' => $pemohon->id,
+            'nomor_order' => 'ORD-GATE-ST7',
+            'status_tahap' => 7,
+            'billing_sent_at' => null,
+            'perusahaan_nama' => 'PT Menunggu Billing',
+        ]);
+
+        $userView7 = $this->actingAs($pemohon)->get('/permohonan-suket');
+        $userView7->assertStatus(200);
+        // Pemohon TIDAK melihat button Upload Bukti Bayar
+        $userView7->assertSee('Menunggu Billing');
+        $userView7->assertSee('Kode Billing SIMPONI Sedang Disiapkan');
+
+        // Pemohon mencoba upload bukti bayar sebelum billing dikirim -> diblokir
+        $fakeProof = UploadedFile::fake()->create('bukti_transfer.jpg', 100, 'image/jpeg');
+        $uploadRes = $this->actingAs($pemohon)->post("/permohonan-suket/{$suket7->id}/upload-payment-proof", [
+            'payment_proof' => $fakeProof,
+        ]);
+        $uploadRes->assertSessionHas('error');
+        $this->assertNull($suket7->fresh()->billing_proof_path);
+
+        // ==========================================
+        // 4. REVISI 4: TAHAP 8 - Kuitansi Belum Dikirim
+        // ==========================================
+        $suket8 = SuketK3::create([
+            'user_id' => $pemohon->id,
+            'nomor_order' => 'ORD-GATE-ST8',
+            'status_tahap' => 8,
+            'kuitansi_sent_at' => null,
+            'perusahaan_nama' => 'PT Menunggu Kuitansi',
+        ]);
+
+        $userView8 = $this->actingAs($pemohon)->get('/permohonan-suket');
+        $userView8->assertStatus(200);
+        // Pemohon TIDAK melihat button Lihat Kuitansi / Unduh
+        $userView8->assertSee('Menunggu Kuitansi');
+        $userView8->assertSee('Kuitansi Resmi Sedang Diproses');
+
+        // Pemohon mencoba preview/download kuitansi sebelum dikirim -> 403 Forbidden
+        $this->actingAs($pemohon)->get("/permohonan-suket/{$suket8->id}/preview/kuitansi")->assertStatus(403);
+        $this->actingAs($pemohon)->get("/permohonan-suket/{$suket8->id}/download/kuitansi")->assertStatus(403);
     }
 }
 
