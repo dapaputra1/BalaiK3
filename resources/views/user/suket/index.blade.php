@@ -346,27 +346,26 @@
     </style>
 
     {{-- Breadcrumb & Header --}}
-    <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3 mb-4">
-        <div>
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb mb-1 small text-muted">
-                    <li class="breadcrumb-item"><a href="{{ route('home') }}" class="text-decoration-none text-muted">Beranda</a></li>
-                    <li class="breadcrumb-item"><a href="/riwayat_pelayanan" class="text-decoration-none text-muted">Pelayanan</a></li>
-                    <li class="breadcrumb-item active text-navy fw-semibold" aria-current="page">Permohonan Suket K3</li>
-                </ol>
-            </nav>
-            <h4 class="fw-bold text-dark mb-1 fs-5 fs-md-4">
-                <i class="bi bi-file-earmark-medical text-navy me-2"></i>Permohonan Surat Keterangan (Suket) K3 Lingkungan Kerja
-            </h4>
-            <p class="text-muted small mb-0">
-                Layanan pengajuan dan monitoring penerbitan Surat Keterangan K3 Lingkungan Kerja resmi berstandar <strong>Permenaker No. 5 Tahun 2018</strong>.
-            </p>
-        </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap w-100 w-md-auto">
-            <button type="button" class="btn btn-primary rounded-pill px-3 py-2 btn-sm fw-semibold shadow-sm d-flex align-items-center justify-content-center gap-2 flex-fill flex-md-grow-0" data-bs-toggle="modal" data-bs-target="#modalAjukanSuket">
+    {{-- Breadcrumb & Header --}}
+    <div class="mb-4">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-1 small text-muted">
+                <li class="breadcrumb-item"><a href="{{ route('home') }}" class="text-decoration-none text-muted">Beranda</a></li>
+                <li class="breadcrumb-item"><a href="/riwayat_pelayanan" class="text-decoration-none text-muted">Pelayanan</a></li>
+                <li class="breadcrumb-item active text-navy fw-semibold" aria-current="page">Permohonan Suket K3</li>
+            </ol>
+        </nav>
+        <h4 class="fw-bold text-dark mb-1 fs-5 fs-md-4">
+            <i class="bi bi-file-earmark-medical text-navy me-2"></i>Permohonan Surat Keterangan (Suket) K3 Lingkungan Kerja
+        </h4>
+        <p class="text-muted small mb-3">
+            Layanan pengajuan dan monitoring penerbitan Surat Keterangan K3 Lingkungan Kerja resmi berstandar <strong>Permenaker No. 5 Tahun 2018</strong>.
+        </p>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <button type="button" class="btn btn-primary rounded-pill px-3 py-2 btn-sm fw-semibold shadow-sm d-flex align-items-center justify-content-center gap-2" data-bs-toggle="modal" data-bs-target="#modalAjukanSuket">
                 <i class="bi bi-plus-circle-fill"></i> Ajukan Suket Baru
             </button>
-            <a href="/riwayat_pelayanan" class="btn btn-outline-secondary rounded-pill px-3 py-2 btn-sm d-flex align-items-center justify-content-center gap-2 flex-fill flex-md-grow-0">
+            <a href="/riwayat_pelayanan" class="btn btn-outline-secondary rounded-pill px-3 py-2 btn-sm d-flex align-items-center justify-content-center gap-2">
                 <i class="bi bi-arrow-left"></i> Riwayat Pelayanan
             </a>
         </div>
