@@ -682,14 +682,16 @@
         font-weight:500;
         margin-bottom:6px;
         position: relative;
-    }
-    .menu a:hover {
-        background:#fff;
-        color:#0f3b63;
+        transition: background .2s ease, color .2s ease;
     }
     .menu a.active {
         background: transparent;
         color:#fff;
+    }
+    .menu a:hover,
+    .menu a.active:hover {
+        background:#fff !important;
+        color:#0f3b63 !important;
     }
     .menu-text {
         display:inline-block;
@@ -706,9 +708,15 @@
         text-decoration-thickness: 2px;
         text-underline-offset: 4px;
     }
+    .menu a:hover .menu-text,
+    .menu a.active:hover .menu-text {
+        color: #0f3b63 !important;
+        text-decoration-color: #0f3b63 !important;
+    }
     .menu a:hover i,
     .menu a.active i {
         transform: scale(1.08);
+        color: #0f3b63 !important;
     }
     .menu i { font-size:16px; }
     .menu-icon {
@@ -893,22 +901,26 @@
                                         }
                                     }
                                 } else {
-                                    $isActive = empty($reqQuery);
+                                    // Target URL tanpa query string (seperti Semua Permohonan -> /suket-k3)
+                                    // Hanya aktif jika request TIDAK memiliki parameter 'stage'
+                                    $isActive = empty($reqQuery['stage']);
                                 }
                             }
 
-                            if (!$isActive) {
+                            if (!$isActive && empty($targetQuery) && empty($reqQuery['stage'])) {
                                 $isActive = request()->url() === $absolute || request()->fullUrlIs($absolute);
                             }
 
-                            if (!$isActive) {
-                                if ($targetPath !== '') {
+                            if (!$isActive && empty($targetQuery) && empty($reqQuery['stage'])) {
+                                if ($targetPath !== '' && $targetPath !== 'suket-k3') {
                                     $isActive = request()->is($targetPath) || request()->is($targetPath . '/*');
                                 }
                             }
 
                             if (
                                 !$isActive &&
+                                empty($targetQuery) &&
+                                empty($reqQuery['stage']) &&
                                 is_string($hrefValue) &&
                                 !str_contains($hrefValue, '/') &&
                                 !str_starts_with($hrefValue, 'http')
