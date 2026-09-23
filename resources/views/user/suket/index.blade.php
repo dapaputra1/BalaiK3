@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-<div class="container py-4 mt-5 history-shell" style="font-family: 'Poppins', sans-serif;">
+<div class="container py-3 py-md-4 mt-3 mt-md-5 history-shell" style="font-family: 'Poppins', sans-serif;">
     <style>
         .history-shell {
             font-family: 'Poppins', sans-serif;
@@ -203,19 +203,150 @@
             border-radius: 18px !important;
         }
 
+        /* ========================================================================= */
+        /* RESPONSIVE DESIGN UNTUK MOBILE & TABLET                                 */
+        /* ========================================================================= */
         @media (max-width: 767.98px) {
+            .history-shell {
+                padding-left: 10px !important;
+                padding-right: 10px !important;
+            }
+            .history-card {
+                padding: 16px !important;
+                border-radius: 16px !important;
+            }
+            .track-wrap {
+                padding-top: 4px;
+                padding-bottom: 4px;
+            }
             .track-steps {
                 overflow-x: auto;
                 padding-bottom: 8px;
+                -webkit-overflow-scrolling: touch;
+                scroll-snap-type: x proximity;
+                scrollbar-width: thin;
+            }
+            .track-steps::-webkit-scrollbar {
+                height: 4px;
+            }
+            .track-steps::-webkit-scrollbar-track {
+                background: #f1f5f9;
+                border-radius: 4px;
+            }
+            .track-steps::-webkit-scrollbar-thumb {
+                background: #cbd5e1;
+                border-radius: 4px;
             }
             .track-step {
-                min-width: 100px;
+                min-width: 78px;
+                scroll-snap-align: start;
+            }
+            .track-step .circle {
+                width: 22px;
+                height: 22px;
+                font-size: 9.5px;
+            }
+            .track-step .step-label {
+                font-size: 10px;
+            }
+            .filter-card {
+                border-radius: 14px !important;
+            }
+            .filter-card .card-body {
+                padding: 12px !important;
+            }
+            .filter-toolbar {
+                flex-direction: column;
+                align-items: stretch !important;
+            }
+            .filter-btn-group {
+                width: 100%;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+            }
+            .filter-btn-group::-webkit-scrollbar {
+                display: none;
+            }
+            .filter-search {
+                width: 100% !important;
+                min-width: 100% !important;
+                margin-top: 8px;
+            }
+            #modalAjukanSuket .modal-dialog {
+                margin: 8px auto !important;
+                max-width: 96% !important;
+                max-height: calc(100vh - 16px) !important;
+            }
+            #modalAjukanSuket .modal-body {
+                padding: 16px !important;
+                max-height: calc(100vh - 140px) !important;
+            }
+            #modalAjukanSuket .modal-header,
+            #modalAjukanSuket .modal-footer {
+                padding: 12px 16px !important;
+            }
+            #previewDocModal .modal-dialog {
+                margin: 8px auto !important;
+                max-width: 98% !important;
+            }
+            .modal-evaluasi-lhu-user .modal-dialog {
+                margin: 0 !important;
+                max-width: 100% !important;
+                height: 100vh !important;
+            }
+            .modal-evaluasi-lhu-user .modal-content {
+                height: 100vh !important;
+                border-radius: 0 !important;
+            }
+            .eval-mobile-tab-wrap {
+                display: block !important;
+            }
+            .action-btn-group {
+                width: 100%;
+            }
+            .action-btn-group > * {
+                flex: 1 1 auto;
+                text-align: center;
+            }
+            .eval-reject-btn-group {
+                width: 100%;
+            }
+            .eval-reject-btn-group > * {
+                flex: 1 1 auto;
+                text-align: center;
+            }
+            .user-eval-reject-alert {
+                overflow-x: hidden;
+            }
+        }
+
+        /* Mode Side-by-side vs Tab di Modal Evaluasi LHU */
+        @media (min-width: 992px) {
+            .eval-side-col {
+                display: flex !important;
+                opacity: 1 !important;
+                visibility: visible !important;
+            }
+            .eval-mobile-tab-bar {
+                display: none !important;
+            }
+        }
+        @media (max-width: 991.98px) {
+            .eval-side-col {
+                display: none;
+            }
+            .eval-side-col.active {
+                display: flex !important;
+            }
+            .eval-mobile-tab-bar {
+                display: block !important;
             }
         }
     </style>
 
     {{-- Breadcrumb & Header --}}
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3 mb-4">
         <div>
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb mb-1 small text-muted">
@@ -224,18 +355,18 @@
                     <li class="breadcrumb-item active text-navy fw-semibold" aria-current="page">Permohonan Suket K3</li>
                 </ol>
             </nav>
-            <h4 class="fw-bold text-dark mb-1">
+            <h4 class="fw-bold text-dark mb-1 fs-5 fs-md-4">
                 <i class="bi bi-file-earmark-medical text-navy me-2"></i>Permohonan Surat Keterangan (Suket) K3 Lingkungan Kerja
             </h4>
             <p class="text-muted small mb-0">
                 Layanan pengajuan dan monitoring penerbitan Surat Keterangan K3 Lingkungan Kerja resmi berstandar <strong>Permenaker No. 5 Tahun 2018</strong>.
             </p>
         </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <button type="button" class="btn btn-primary rounded-pill px-3 py-2 btn-sm fw-semibold shadow-sm d-flex align-items-center gap-2" data-bs-toggle="modal" data-bs-target="#modalAjukanSuket">
+        <div class="d-flex align-items-center gap-2 flex-wrap w-100 w-md-auto">
+            <button type="button" class="btn btn-primary rounded-pill px-3 py-2 btn-sm fw-semibold shadow-sm d-flex align-items-center justify-content-center gap-2 flex-fill flex-md-grow-0" data-bs-toggle="modal" data-bs-target="#modalAjukanSuket">
                 <i class="bi bi-plus-circle-fill"></i> Ajukan Suket Baru
             </button>
-            <a href="/riwayat_pelayanan" class="btn btn-outline-secondary rounded-pill px-3 py-2 btn-sm d-flex align-items-center gap-2">
+            <a href="/riwayat_pelayanan" class="btn btn-outline-secondary rounded-pill px-3 py-2 btn-sm d-flex align-items-center justify-content-center gap-2 flex-fill flex-md-grow-0">
                 <i class="bi bi-arrow-left"></i> Riwayat Pelayanan
             </a>
         </div>
@@ -279,19 +410,21 @@
 
     {{-- Filter Toolbar (Seperti riwayat_pelayanan.blade.php) --}}
     <div class="card border-0 shadow-sm rounded-4 mb-4 filter-card bg-white">
-        <div class="card-body p-3">
+        <div class="card-body p-2 p-sm-3">
             <div class="d-flex flex-wrap gap-2 align-items-center filter-toolbar">
-                <button type="button" class="btn btn-outline-primary btn-sm active px-3 rounded-pill" data-user-filter="all">
-                    Semua Permohonan
-                    <span class="badge bg-secondary-subtle text-secondary ms-1">{{ $sukets->total() }}</span>
-                </button>
-                <button type="button" class="btn btn-outline-primary btn-sm px-3 rounded-pill" data-user-filter="process">
-                    Sedang Diproses
-                </button>
-                <button type="button" class="btn btn-outline-primary btn-sm px-3 rounded-pill" data-user-filter="done">
-                    Tuntas Diserahkan
-                </button>
-                <div class="ms-auto filter-search" style="min-width: 250px;">
+                <div class="filter-btn-group d-flex gap-1 flex-nowrap">
+                    <button type="button" class="btn btn-outline-primary btn-sm active px-3 rounded-pill text-nowrap" data-user-filter="all">
+                        Semua Permohonan
+                        <span class="badge bg-secondary-subtle text-secondary ms-1">{{ $sukets->total() }}</span>
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm px-3 rounded-pill text-nowrap" data-user-filter="process">
+                        Sedang Diproses
+                    </button>
+                    <button type="button" class="btn btn-outline-primary btn-sm px-3 rounded-pill text-nowrap" data-user-filter="done">
+                        Tuntas Diserahkan
+                    </button>
+                </div>
+                <div class="ms-md-auto filter-search">
                     <div class="input-group input-group-sm">
                         <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-search"></i></span>
                         <input type="text" class="form-control border-start-0 bg-light" placeholder="Cari nomor order / surat..." id="userSearchInput">
@@ -330,10 +463,10 @@
                  data-surat="{{ strtolower($suket->nomor_surat ?? '') }}"
                  data-company="{{ strtolower($suket->perusahaan_nama ?? '') }}">
                 
-                <div class="history-card p-4 shadow-sm">
+                <div class="history-card p-3 p-sm-4 shadow-sm">
                     {{-- Head Row: Info Utama & Status Badge --}}
                     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3 pb-3 border-bottom">
-                        <div>
+                        <div class="flex-grow-1">
                             <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
                                 <h5 class="fw-bold text-dark mb-0 fs-6">{{ $suket->nomor_order }}</h5>
                                 <span class="badge bg-light text-secondary border px-2 py-1 rounded-pill small">
@@ -345,7 +478,7 @@
                                 <i class="bi bi-geo-alt me-1"></i>{{ $suket->lokasi ?: 'Lokasi Pengujian' }}
                             </div>
                         </div>
-                        <div class="text-end">
+                        <div class="text-start text-sm-end w-100 w-sm-auto mt-1 mt-sm-0">
                             @if($isDelivered)
                                 <span class="badge bg-success text-white px-3 py-2 rounded-pill fw-semibold shadow-sm mb-1 d-inline-block">
                                     <i class="bi bi-patch-check-fill me-1"></i>Tuntas Diserahkan
@@ -389,7 +522,7 @@
                         </div>
                     </div>
 
-                    {{-- Horizontal Stepper Tracking (6 Tahap) --}}
+                    {{-- Horizontal Stepper Tracking (9 Tahap) --}}
                     <div class="mb-4">
                         <div class="d-flex justify-content-between align-items-center mb-2">
                             <div class="small fw-bold text-dark">
@@ -451,6 +584,10 @@
                                 @endforeach
                             </div>
                         </div>
+                        <div class="d-md-none text-muted small mt-1 d-flex align-items-center justify-content-between" style="font-size: 10.5px;">
+                            <span><i class="bi bi-arrow-left-right me-1 text-primary"></i>Geser timeline</span>
+                            <span class="badge bg-light text-secondary border">Tahap Aktif: {{ $stageNumber }}</span>
+                        </div>
                     </div>
 
                     {{-- Ruang Lingkup & Dokumen Terlampir --}}
@@ -470,11 +607,11 @@
 
                         {{-- Action Buttons & Document Gate --}}
                         <div class="col-md-5">
-                            <div class="d-flex justify-content-md-end align-items-center gap-2 flex-wrap">
+                            <div class="d-flex justify-content-md-end align-items-center gap-2 flex-wrap action-btn-group w-100">
                                 {{-- Tombol Buka Evaluasi LHU --}}
                                 <button 
                                     type="button" 
-                                    class="btn btn-sm rounded-pill px-3 {{ $suket->isEvaluasiRejected() ? 'btn-danger shadow-sm' : 'btn-outline-primary' }}"
+                                    class="btn btn-sm rounded-pill px-3 {{ $suket->isEvaluasiRejected() ? 'btn-danger shadow-sm' : 'btn-outline-primary' }} flex-fill flex-md-grow-0"
                                     data-bs-toggle="modal" 
                                     data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}"
                                     title="Buka Dokumen LHU & Hasil Evaluasi"
@@ -490,7 +627,7 @@
                                 @if($suket->isEvaluasiRejected())
                                     <button 
                                         type="button" 
-                                        class="btn btn-warning btn-sm rounded-pill px-3 fw-bold text-dark shadow-sm"
+                                        class="btn btn-warning btn-sm rounded-pill px-3 fw-bold text-dark shadow-sm flex-fill flex-md-grow-0"
                                         data-bs-toggle="modal" 
                                         data-bs-target="#modalRevisiPemohon{{ $suket->id }}"
                                         title="Kirim Catatan Tanggapan / Berkas Revisi"
@@ -503,14 +640,14 @@
                                 @if($isDelivered && ($suket->signed_file_path || $suket->draft_file_path))
                                     <button 
                                         type="button" 
-                                        class="btn btn-success btn-sm rounded-pill px-3 fw-semibold shadow-sm"
+                                        class="btn btn-success btn-sm rounded-pill px-3 fw-semibold shadow-sm flex-fill flex-md-grow-0"
                                         onclick="openUserPreview('{{ route('user.suket.preview-doc', [$suket->id, 'signed']) }}', 'Surat Keterangan K3 Resmi - {{ $suket->nomor_order }}')"
                                     >
                                         <i class="bi bi-eye-fill me-1"></i>Lihat Suket Resmi
                                     </button>
                                     <a 
                                         href="{{ route('user.suket.download-doc', [$suket->id, 'signed']) }}" 
-                                        class="btn btn-outline-success btn-sm rounded-pill px-3 fw-semibold"
+                                        class="btn btn-outline-success btn-sm rounded-pill px-3 fw-semibold flex-fill flex-md-grow-0"
                                         title="Unduh Berkas Suket Resmi"
                                         download
                                     >
@@ -518,18 +655,18 @@
                                     </a>
                                 @elseif($stageNumber === 6)
                                     @if($suket->isTagihanSent() && !$suket->isTagihanAcc())
-                                        <form id="formQuickAccTagihan{{ $suket->id }}" action="{{ route('user.suket.acc-tagihan', $suket->id) }}" method="POST" class="d-inline">
+                                        <form id="formQuickAccTagihan{{ $suket->id }}" action="{{ route('user.suket.acc-tagihan', $suket->id) }}" method="POST" class="d-inline flex-fill flex-md-grow-0">
                                             @csrf
-                                            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm" onclick="confirmAccTagihan('{{ $suket->id }}', '{{ $suket->nomor_order }}', '{{ $suket->surat_tagihan_nominal ? number_format($suket->surat_tagihan_nominal, 0, ',', '.') : '-' }}', '{{ addslashes($suket->perusahaan_nama) }}')">
+                                            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 fw-semibold shadow-sm w-100" onclick="confirmAccTagihan('{{ $suket->id }}', '{{ $suket->nomor_order }}', '{{ $suket->surat_tagihan_nominal ? number_format($suket->surat_tagihan_nominal, 0, ',', '.') : '-' }}', '{{ addslashes($suket->perusahaan_nama) }}')">
                                                 <i class="bi bi-check-circle-fill me-1"></i>ACC Tagihan
                                             </button>
                                         </form>
                                     @elseif($suket->isTagihanAcc())
-                                        <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-3" disabled>
+                                        <button type="button" class="btn btn-outline-success btn-sm rounded-pill px-3 flex-fill flex-md-grow-0" disabled>
                                             <i class="bi bi-check-circle me-1"></i>Tagihan Di-ACC
                                         </button>
                                     @else
-                                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" disabled title="Surat Tagihan sedang diproses oleh petugas keuangan">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 flex-fill flex-md-grow-0" disabled title="Surat Tagihan sedang diproses oleh petugas keuangan">
                                             <i class="bi bi-hourglass-split me-1 text-primary"></i>Menunggu Tagihan
                                         </button>
                                     @endif
@@ -538,55 +675,57 @@
                                         @if(!$suket->isBillingPaid() || $suket->isBillingProofRejected())
                                             <button 
                                                 type="button" 
-                                                class="btn btn-sm btn-warning rounded-pill px-3 fw-semibold shadow-sm text-dark"
+                                                class="btn btn-sm btn-warning rounded-pill px-3 fw-semibold shadow-sm text-dark flex-fill flex-md-grow-0"
                                                 data-bs-toggle="modal"
                                                 data-bs-target="#modalUploadBukti{{ $suket->id }}"
                                             >
                                                 <i class="bi bi-upload me-1"></i>Upload Bukti Bayar
                                             </button>
                                         @else
-                                            <button type="button" class="btn btn-outline-info btn-sm rounded-pill px-3" disabled>
+                                            <button type="button" class="btn btn-outline-info btn-sm rounded-pill px-3 flex-fill flex-md-grow-0" disabled>
                                                 <i class="bi bi-clock-history me-1"></i>Menunggu Verifikasi
                                             </button>
                                         @endif
                                     @else
-                                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" disabled title="Kode Billing sedang disiapkan oleh bendahara">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 flex-fill flex-md-grow-0" disabled title="Kode Billing sedang disiapkan oleh bendahara">
                                             <i class="bi bi-hourglass-split me-1 text-primary"></i>Menunggu Billing
                                         </button>
                                     @endif
                                 @elseif($stageNumber === 8)
                                     @if($suket->isKuitansiSent())
-                                        <div class="d-flex align-items-center gap-1">
+                                        <div class="d-flex align-items-center gap-1 flex-fill flex-md-grow-0">
                                             <a 
                                                 href="{{ route('user.suket.preview-doc', [$suket->id, 'kuitansi']) }}" 
                                                 target="_blank" 
-                                                class="btn btn-sm btn-outline-info rounded-pill px-3 fw-semibold shadow-sm"
+                                                class="btn btn-sm btn-outline-info rounded-pill px-3 fw-semibold shadow-sm flex-fill text-center"
                                             >
                                                 <i class="bi bi-eye me-1"></i>Lihat Kuitansi
                                             </a>
                                             <a 
                                                 href="{{ route('user.suket.download-doc', [$suket->id, 'kuitansi']) }}" 
-                                                class="btn btn-sm btn-info rounded-pill px-3 text-white fw-semibold shadow-sm"
+                                                class="btn btn-sm btn-info rounded-pill px-3 text-white fw-semibold shadow-sm flex-fill text-center"
                                                 download
                                             >
                                                 <i class="bi bi-download me-1"></i>Unduh
                                             </a>
                                         </div>
                                     @else
-                                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" disabled title="Kuitansi resmi sedang disiapkan oleh bendahara">
+                                        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 flex-fill flex-md-grow-0" disabled title="Kuitansi resmi sedang disiapkan oleh bendahara">
                                             <i class="bi bi-hourglass-split me-1 text-primary"></i>Menunggu Kuitansi
                                         </button>
                                     @endif
                                 @else
-                                    {{-- JIKA BELUM DISERAHKAN: INDIKATOR DALAM PROSES --}}
-                                    <button 
-                                        type="button" 
-                                        class="btn btn-outline-secondary btn-sm rounded-pill px-3" 
-                                        disabled
-                                        title="Dokumen Suket resmi hanya dapat dibuka setelah proses penyerahan tuntas."
-                                    >
-                                        <i class="bi bi-hourglass-split me-1 text-primary"></i>Sedang Diproses
-                                    </button>
+                                    {{-- JIKA BELUM DISERAHKAN: INDIKATOR DALAM PROSES (Hanya jika tidak sedang perlu revisi pemohon) --}}
+                                    @if(!$suket->isEvaluasiRejected())
+                                        <button 
+                                            type="button" 
+                                            class="btn btn-outline-secondary btn-sm rounded-pill px-3 flex-fill flex-md-grow-0" 
+                                            disabled
+                                            title="Dokumen Suket resmi hanya dapat dibuka setelah proses penyerahan tuntas."
+                                        >
+                                            <i class="bi bi-hourglass-split me-1 text-primary"></i>Sedang Diproses
+                                        </button>
+                                    @endif
                                 @endif
                             </div>
                         </div>
@@ -594,73 +733,80 @@
 
                     {{-- Alert Box Informasi Status Alur & Catatan Evaluator --}}
                     @if($suket->isEvaluasiRejected())
-                        <div class="alert alert-danger border-0 rounded-3 p-3 mt-3 mb-0">
-                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2 pb-2 border-bottom border-danger-subtle">
+                        <div class="alert alert-danger border-0 rounded-4 p-3 p-sm-4 mt-3 mb-0 shadow-sm user-eval-reject-alert">
+                            {{-- Header Alert: Judul & Badge Sorotan --}}
+                            <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2 mb-2 pb-2 border-bottom border-danger-subtle">
                                 <div class="fw-bold d-flex align-items-center gap-2 text-danger fs-6 mb-0">
-                                    <i class="bi bi-exclamation-triangle-fill"></i> Hasil Evaluasi LHU Memerlukan Perbaikan / Revisi
+                                    <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0"></i>
+                                    <span>Hasil Evaluasi LHU Memerlukan Perbaikan / Revisi</span>
                                 </div>
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="badge bg-danger text-white rounded-pill px-2 py-1 small">
-                                        {{ $suket->pemohonComments ? $suket->pemohonComments->count() : 0 }} Poin Sorotan Kesalahan
+                                <div>
+                                    <span class="badge bg-danger text-white rounded-pill px-2.5 py-1.5 small shadow-xs">
+                                        <i class="bi bi-highlighter me-1"></i>{{ $suket->pemohonComments ? $suket->pemohonComments->count() : 0 }} Poin Sorotan
                                     </span>
-                                    <button type="button" class="btn btn-sm btn-outline-danger bg-white rounded-pill px-3 shadow-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}">
-                                        <i class="bi bi-eye-fill me-1"></i>Lihat Sorotan Dokumen
-                                    </button>
-                                    <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#modalRevisiPemohon{{ $suket->id }}">
-                                        <i class="bi bi-pencil-square me-1"></i>Kirim Tanggapan / Revisi
-                                    </button>
                                 </div>
                             </div>
 
+                            {{-- Tombol Aksi Cepat Responsif --}}
+                            <div class="d-flex flex-wrap gap-2 mb-3 eval-reject-btn-group">
+                                <button type="button" class="btn btn-sm btn-outline-danger bg-white rounded-pill px-3 py-1.5 shadow-sm fw-semibold flex-fill flex-sm-grow-0 text-center" data-bs-toggle="modal" data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}">
+                                    <i class="bi bi-eye-fill me-1"></i>Lihat Sorotan Dokumen
+                                </button>
+                                <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 py-1.5 shadow-sm fw-bold flex-fill flex-sm-grow-0 text-center" data-bs-toggle="modal" data-bs-target="#modalRevisiPemohon{{ $suket->id }}">
+                                    <i class="bi bi-pencil-square me-1"></i>Kirim Tanggapan / Revisi
+                                </button>
+                            </div>
+
                             @if($suket->catatan_evaluasi)
-                                <div class="p-2 bg-white bg-opacity-75 rounded border border-danger-subtle mb-3 text-dark small">
-                                    <strong>Kesimpulan Penguji K3:</strong> {{ $suket->catatan_evaluasi }}
+                                <div class="p-2.5 bg-white bg-opacity-80 rounded-3 border border-danger-subtle mb-3 text-dark small">
+                                    <strong class="text-danger"><i class="bi bi-chat-quote-fill me-1"></i>Kesimpulan Penguji K3:</strong>
+                                    <div class="mt-1 text-break">{{ $suket->catatan_evaluasi }}</div>
                                 </div>
                             @endif
 
                             @if($suket->catatan_revisi_pemohon)
-                                <div class="p-2 bg-warning bg-opacity-15 rounded border border-warning-subtle mb-3 text-dark small">
+                                <div class="p-2.5 bg-warning bg-opacity-15 rounded-3 border border-warning-subtle mb-3 text-dark small">
                                     <strong class="text-warning-emphasis"><i class="bi bi-chat-left-quote-fill me-1"></i>Penjelasan / Tanggapan Terakhir yang Anda Kirim:</strong>
-                                    <div class="mt-1" style="white-space: pre-wrap;">{{ $suket->catatan_revisi_pemohon }}</div>
+                                    <div class="mt-1 text-break" style="white-space: pre-wrap;">{{ $suket->catatan_revisi_pemohon }}</div>
                                 </div>
                             @endif
 
                             {{-- DAFTAR HIGHLIGHT / SOROTAN KESALAHAN LHU DARI PENGUJI --}}
                             @if($suket->pemohonComments && $suket->pemohonComments->count() > 0)
-                                <div class="mb-1">
+                                <div class="mb-2">
                                     <div class="small fw-bold text-dark mb-2">
                                         <i class="bi bi-highlighter text-danger me-1"></i>Daftar Bagian LHU yang Disorot Salah oleh Penguji K3:
                                     </div>
                                     <div class="d-flex flex-column gap-2">
                                         @foreach($suket->pemohonComments as $cm)
-                                            <div class="card border rounded-3 p-3 bg-white shadow-xs border-danger-subtle" id="user-comment-card-{{ $suket->id }}-{{ $cm->id }}">
-                                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                                    <div class="d-flex align-items-center gap-2 flex-wrap">
-                                                        <span class="badge bg-danger text-white" style="font-size: 10px;">
+                                            <div class="card border rounded-3 p-2.5 p-sm-3 bg-white shadow-xs border-danger-subtle user-eval-reject-card" id="user-comment-card-{{ $suket->id }}-{{ $cm->id }}">
+                                                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2 pb-1 border-bottom border-light">
+                                                    <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                                        <span class="badge bg-danger text-white rounded-pill px-2 py-1" style="font-size: 10px;">
                                                             Sorotan #{{ $loop->iteration }}
                                                         </span>
                                                         @if($cm->bagian)
-                                                            <span class="badge bg-light text-dark border" style="font-size: 11px;">
+                                                            <span class="badge bg-light text-dark border rounded-pill px-2 py-1" style="font-size: 11px;">
                                                                 <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ $cm->bagian }}
                                                             </span>
                                                         @endif
+                                                        <span class="text-muted ms-1" style="font-size: 10.5px;">
+                                                            <i class="bi bi-clock me-0.5"></i>{{ $cm->created_at ? $cm->created_at->diffForHumans() : '' }}
+                                                        </span>
                                                     </div>
-                                                    <div class="d-flex align-items-center gap-2">
-                                                        <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-0" style="font-size: 10.5px;" data-bs-toggle="modal" data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}" onclick="setTimeout(() => window.LhuAnnotator.scrollToHighlight({{ $suket->id }}, {{ $cm->id }}, '{{ addslashes($cm->bagian ?? '') }}'), 400)">
+                                                    <div>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-2.5 py-1 fw-semibold" style="font-size: 11px;" data-bs-toggle="modal" data-bs-target="#modalUserEvaluasiLhu{{ $suket->id }}" onclick="showDocHighlightMobile({{ $suket->id }}, {{ $cm->id }}, '{{ addslashes($cm->bagian ?? '') }}')">
                                                             <i class="bi bi-geo-alt-fill me-1"></i>Tunjukkan di Dokumen
                                                         </button>
-                                                        <span class="text-muted" style="font-size: 10px;">
-                                                            {{ $cm->created_at ? $cm->created_at->diffForHumans() : '' }}
-                                                        </span>
                                                     </div>
                                                 </div>
 
                                                 @if($cm->highlight_text)
-                                                    <div class="p-2 rounded bg-warning bg-opacity-25 border border-warning my-2">
+                                                    <div class="p-2 rounded-3 bg-warning bg-opacity-25 border border-warning my-2">
                                                         <div class="text-muted small fw-bold" style="font-size: 10px; text-transform: uppercase;">
                                                             <i class="bi bi-highlighter text-warning-emphasis me-1"></i>Bagian / Data yang Salah:
                                                         </div>
-                                                        <div class="font-monospace small text-dark fw-bold mt-1">
+                                                        <div class="font-monospace small text-dark fw-bold mt-1 text-break">
                                                             <mark class="bg-warning text-dark px-1 rounded">{{ $cm->highlight_text }}</mark>
                                                         </div>
                                                     </div>
@@ -668,7 +814,7 @@
 
                                                 <div class="small text-dark mt-1">
                                                     <strong class="text-danger"><i class="bi bi-arrow-right-circle-fill me-1"></i>Instruksi Perbaikan:</strong>
-                                                    <div class="mt-1 text-muted" style="white-space: pre-wrap;">{{ $cm->comment }}</div>
+                                                    <div class="mt-1 text-muted text-break" style="white-space: pre-wrap;">{{ $cm->comment }}</div>
                                                 </div>
                                             </div>
                                         @endforeach
@@ -676,9 +822,10 @@
                                 </div>
                             @endif
 
-                            <div class="mt-3 pt-2 border-top border-danger-subtle d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            {{-- Footer CTA Revisi --}}
+                            <div class="mt-3 pt-2 border-top border-danger-subtle d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center gap-2">
                                 <span class="small text-muted"><i class="bi bi-info-circle me-1"></i>Silakan telaah poin catatan di atas atau buka dokumen LHU, lalu kirimkan jawaban atau berkas perbaikan.</span>
-                                <button type="button" class="btn btn-sm btn-danger rounded-pill px-4 py-1 fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#modalRevisiPemohon{{ $suket->id }}">
+                                <button type="button" class="btn btn-sm btn-danger rounded-pill px-4 py-2 fw-bold shadow-sm w-100 w-sm-auto text-nowrap" data-bs-toggle="modal" data-bs-target="#modalRevisiPemohon{{ $suket->id }}">
                                     <i class="bi bi-send-check me-1"></i>Kirim Revisi / Tanggapan Sekarang
                                 </button>
                             </div>
@@ -797,27 +944,27 @@
                                         </span>
                                     </div>
                                     <div class="row g-2 p-2 rounded-3 bg-white bg-opacity-75 border border-primary border-opacity-20 small text-dark mb-2">
-                                        <div class="col-sm-6">
+                                        <div class="col-12 col-sm-6">
                                             <span class="text-muted"><i class="bi bi-cash-stack text-primary me-1"></i> Total Tagihan Resmi PNBP:</span><br>
                                             <strong class="fs-5 text-primary">{{ $suket->surat_tagihan_nominal ? ('Rp ' . number_format($suket->surat_tagihan_nominal, 0, ',', '.')) : 'Sesuai penetapan resmi' }}</strong>
                                         </div>
-                                        <div class="col-sm-6">
+                                        <div class="col-12 col-sm-6">
                                             <span class="text-muted"><i class="bi bi-clock-history text-primary me-1"></i> Tanggal Diterbitkan Petugas:</span><br>
                                             <strong>{{ $suket->surat_tagihan_sent_at ? \Carbon\Carbon::parse($suket->surat_tagihan_sent_at)->format('d F Y, H:i') . ' WIB' : 'Hari ini' }}</strong>
                                         </div>
                                     </div>
-                                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 pt-1">
-                                        <div class="d-flex align-items-center gap-2 flex-wrap">
-                                            <a href="{{ route('user.suket.preview-doc', [$suket->id, 'tagihan']) }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold">
+                                    <div class="d-flex align-items-stretch align-items-sm-center justify-content-between flex-column flex-sm-row gap-2 pt-1">
+                                        <div class="d-flex align-items-center gap-2 flex-wrap flex-fill">
+                                            <a href="{{ route('user.suket.preview-doc', [$suket->id, 'tagihan']) }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-semibold flex-fill flex-sm-grow-0 text-center">
                                                 <i class="bi bi-eye me-1"></i> Lihat Rincian PDF
                                             </a>
-                                            <a href="{{ route('user.suket.download-doc', [$suket->id, 'tagihan']) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-semibold" download>
+                                            <a href="{{ route('user.suket.download-doc', [$suket->id, 'tagihan']) }}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 fw-semibold flex-fill flex-sm-grow-0 text-center" download>
                                                 <i class="bi bi-file-earmark-pdf me-1"></i> Unduh (.pdf)
                                             </a>
                                         </div>
-                                        <form id="formAccTagihan{{ $suket->id }}" action="{{ route('user.suket.acc-tagihan', $suket->id) }}" method="POST" class="d-inline ms-auto">
+                                        <form id="formAccTagihan{{ $suket->id }}" action="{{ route('user.suket.acc-tagihan', $suket->id) }}" method="POST" class="d-inline ms-sm-auto w-100 w-sm-auto">
                                             @csrf
-                                            <button type="button" class="btn btn-sm btn-success rounded-pill px-4 shadow-sm fw-semibold" onclick="confirmAccTagihan('{{ $suket->id }}', '{{ $suket->nomor_order }}', '{{ $suket->surat_tagihan_nominal ? number_format($suket->surat_tagihan_nominal, 0, ',', '.') : '-' }}', '{{ addslashes($suket->perusahaan_nama) }}')">
+                                            <button type="button" class="btn btn-sm btn-success rounded-pill px-4 shadow-sm fw-semibold w-100" onclick="confirmAccTagihan('{{ $suket->id }}', '{{ $suket->nomor_order }}', '{{ $suket->surat_tagihan_nominal ? number_format($suket->surat_tagihan_nominal, 0, ',', '.') : '-' }}', '{{ addslashes($suket->perusahaan_nama) }}')">
                                                 <i class="bi bi-check-circle-fill me-1"></i> ACC Surat Tagihan
                                             </button>
                                         </form>
@@ -907,11 +1054,18 @@
                                     @endif
 
                                     <div class="row g-2 mb-2 small">
-                                        <div class="col-sm-6">
+                                        <div class="col-12 col-sm-6">
                                             <span class="text-muted">Kode Billing:</span><br>
-                                            <strong class="fs-5 text-dark font-monospace">{{ $suket->billing_kode ?: 'Sedang Diproses Bendahara' }}</strong>
+                                            <div class="d-flex align-items-center gap-2 mt-1 flex-wrap">
+                                                <strong class="fs-5 text-dark font-monospace text-break">{{ $suket->billing_kode ?: 'Sedang Diproses Bendahara' }}</strong>
+                                                @if($suket->billing_kode)
+                                                    <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-0" style="font-size: 11px;" onclick="copyBillingCode('{{ $suket->billing_kode }}', this)" title="Salin Kode Billing">
+                                                        <i class="bi bi-clipboard me-1"></i>Salin
+                                                    </button>
+                                                @endif
+                                            </div>
                                         </div>
-                                        <div class="col-sm-6">
+                                        <div class="col-12 col-sm-6">
                                             <span class="text-muted">Batas Waktu Pembayaran:</span><br>
                                             <strong class="text-danger">{{ $suket->billing_expires_at ? \Carbon\Carbon::parse($suket->billing_expires_at)->format('d M Y, H:i') : 'Sesuai masa aktif billing' }}</strong>
                                         </div>
@@ -919,27 +1073,27 @@
 
                                     <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
                                         @if($suket->billing_file_path)
-                                            <a href="{{ route('user.suket.download-doc', [$suket->id, 'billing']) }}" class="btn btn-sm btn-outline-dark rounded-pill px-3" download>
+                                            <a href="{{ route('user.suket.download-doc', [$suket->id, 'billing']) }}" class="btn btn-sm btn-outline-dark rounded-pill px-3 flex-fill flex-sm-grow-0 text-center" download>
                                                 <i class="bi bi-file-earmark-pdf me-1"></i> Unduh Salinan Billing
                                             </a>
                                         @endif
 
                                         @if($suket->hasBillingGuide())
-                                            <a href="{{ route('user.suket.download-doc', [$suket->id, 'guide']) }}" class="btn btn-sm btn-outline-info rounded-pill px-3" target="_blank" download>
+                                            <a href="{{ route('user.suket.download-doc', [$suket->id, 'guide']) }}" class="btn btn-sm btn-outline-info rounded-pill px-3 flex-fill flex-sm-grow-0 text-center" target="_blank" download>
                                                 <i class="bi bi-book me-1"></i> Unduh Panduan Pembayaran
                                             </a>
                                         @endif
 
                                         @if($suket->isBillingProofRejected())
-                                            <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm fw-semibold" data-bs-toggle="modal" data-bs-target="#modalUploadBukti{{ $suket->id }}">
+                                            <button type="button" class="btn btn-sm btn-danger rounded-pill px-3 shadow-sm fw-semibold flex-fill flex-sm-grow-0" data-bs-toggle="modal" data-bs-target="#modalUploadBukti{{ $suket->id }}">
                                                 <i class="bi bi-cloud-arrow-up-fill me-1"></i> Upload Ulang Bukti Pembayaran
                                             </button>
                                         @elseif(!$suket->isBillingPaid())
-                                            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#modalUploadBukti{{ $suket->id }}">
+                                            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm flex-fill flex-sm-grow-0" data-bs-toggle="modal" data-bs-target="#modalUploadBukti{{ $suket->id }}">
                                                 <i class="bi bi-upload me-1"></i> Upload Bukti Pembayaran
                                             </button>
                                         @elseif($suket->isBillingProofPending())
-                                            <span class="badge bg-warning-subtle text-dark border border-warning-subtle px-3 py-2 rounded-pill small">
+                                            <span class="badge bg-warning-subtle text-dark border border-warning-subtle px-3 py-2 rounded-pill small flex-fill text-center">
                                                 <i class="bi bi-clock-history me-1"></i> Bukti terunggah ({{ $suket->billing_proof_name ?? 'Bukti_Bayar' }}) &bull; Menunggu verifikasi bendahara
                                             </span>
                                             <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-1" data-bs-toggle="modal" data-bs-target="#modalUploadBukti{{ $suket->id }}" title="Upload Ulang Bukti Bayar">
@@ -972,10 +1126,10 @@
                                         Tanggal: {{ $suket->kuitansi_sent_at ? \Carbon\Carbon::parse($suket->kuitansi_sent_at)->format('d M Y') : ($suket->billing_verified_at ? \Carbon\Carbon::parse($suket->billing_verified_at)->format('d M Y') : 'Hari ini') }}
                                     </div>
                                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                                        <a href="{{ route('user.suket.preview-doc', [$suket->id, 'kuitansi']) }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-xs">
+                                        <a href="{{ route('user.suket.preview-doc', [$suket->id, 'kuitansi']) }}" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-xs flex-fill flex-sm-grow-0 text-center">
                                             <i class="bi bi-eye me-1"></i> Lihat Kuitansi PDF
                                         </a>
-                                        <a href="{{ route('user.suket.download-doc', [$suket->id, 'kuitansi']) }}" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm" download>
+                                        <a href="{{ route('user.suket.download-doc', [$suket->id, 'kuitansi']) }}" class="btn btn-sm btn-primary rounded-pill px-3 shadow-sm flex-fill flex-sm-grow-0 text-center" download>
                                             <i class="bi bi-download me-1"></i> Unduh Berkas Kuitansi Resmi
                                         </a>
                                     </div>
@@ -1049,16 +1203,15 @@
             </div>
 
             {{-- MODAL EVALUASI DOKUMEN SIDE-BY-SIDE (SISI USER / PEMOHON) --}}
-            {{-- MODAL EVALUASI DOKUMEN SIDE-BY-SIDE (SISI USER / PEMOHON) --}}
             <div class="modal fade text-start modal-evaluasi-lhu-user" id="modalUserEvaluasiLhu{{ $suket->id }}" tabindex="-1" aria-hidden="true">
-                <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 95vw;">
+                <div class="modal-dialog modal-dialog-centered modal-xl modal-fullscreen-lg-down" style="max-width: 95vw;">
                     <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="height: 90vh;">
-                        <div class="modal-header py-2 px-3 bg-light border-bottom">
+                        <div class="modal-header py-2 px-3 bg-light border-bottom flex-shrink-0">
                             <div class="d-flex align-items-center gap-2 flex-wrap">
                                 <span class="badge bg-primary px-2 py-1 rounded-pill">
                                     <i class="bi bi-file-earmark-check me-1"></i>Hasil Evaluasi Dokumen LHU (Tahap 2)
                                 </span>
-                                <h6 class="modal-title fw-bold text-dark mb-0">
+                                <h6 class="modal-title fw-bold text-dark mb-0 text-truncate" style="max-width: 240px;">
                                     {{ $suket->nomor_order }} - {{ $suket->perusahaan_nama }}
                                 </h6>
                                 @if($suket->isEvaluasiRejected())
@@ -1069,34 +1222,47 @@
                                     <span class="badge bg-warning text-dark rounded-pill"><i class="bi bi-clock me-1"></i>Dalam Proses Telaah</span>
                                 @endif
                             </div>
-                            <div class="d-flex align-items-center gap-2">
+                            <div class="d-flex align-items-center gap-2 ms-auto">
                                 @if($suket->hasLhuDocument())
-                                    <a href="{{ route('user.suket.download-doc', [$suket->id, 'lhu']) }}" class="btn btn-xs btn-outline-secondary rounded px-2 py-1" download>
-                                        <i class="bi bi-download me-1"></i>Unduh Berkas LHU
+                                    <a href="{{ route('user.suket.download-doc', [$suket->id, 'lhu']) }}" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-1" download title="Unduh Berkas LHU">
+                                        <i class="bi bi-download me-1"></i><span class="d-none d-sm-inline">Unduh Berkas LHU</span>
                                     </a>
                                 @endif
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                <button type="button" class="btn-close ms-1" data-bs-dismiss="modal" aria-label="Close"></button>
                             </div>
                         </div>
-                        <div class="modal-body p-0" style="height: calc(90vh - 56px);">
+
+                        {{-- MOBILE TAB SWITCH (Khusus Layar HP / Tablet < 992px) --}}
+                        <div class="eval-mobile-tab-bar bg-light border-bottom p-2 px-3 flex-shrink-0">
+                            <div class="nav nav-pills nav-fill bg-white p-1 rounded-pill border shadow-xs" role="tablist">
+                                <button class="nav-link active py-1 px-3 rounded-pill small fw-semibold eval-nav-tab-btn" id="btn-tab-pdf-{{ $suket->id }}" onclick="switchUserEvalTab({{ $suket->id }}, 'pdf')">
+                                    <i class="bi bi-file-earmark-pdf text-danger me-1"></i>Dokumen LHU
+                                </button>
+                                <button class="nav-link py-1 px-3 rounded-pill small fw-semibold eval-nav-tab-btn" id="btn-tab-notes-{{ $suket->id }}" onclick="switchUserEvalTab({{ $suket->id }}, 'notes')">
+                                    <i class="bi bi-chat-dots-fill text-warning me-1"></i>Catatan Penguji ({{ $suket->pemohonComments ? $suket->pemohonComments->count() : 0 }})
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="modal-body p-0 position-relative" style="height: calc(90vh - 56px);">
                             <div class="row g-0 h-100">
                                 {{-- SISI KIRI: DOKUMEN LHU DENGAN HIGHLIGHT KUNING & MARKER NOMOR --}}
-                                <div class="col-lg-7 d-flex flex-column h-100 border-end bg-dark bg-opacity-10">
+                                <div class="col-lg-7 d-flex flex-column h-100 border-end bg-dark bg-opacity-10 eval-side-col eval-col-pdf-{{ $suket->id }} active" id="evalUserPdfSide{{ $suket->id }}">
                                     <div class="d-flex justify-content-between align-items-center p-2 bg-white border-bottom flex-shrink-0">
-                                        <span class="small fw-semibold text-muted">
+                                        <span class="small fw-semibold text-muted text-truncate me-2">
                                             <i class="bi bi-file-earmark-pdf text-danger me-1"></i>Dokumen LHU (Disorot Bagian yang Memerlukan Revisi)
                                         </span>
-                                        <span class="badge bg-warning text-dark" style="font-size: 10px;">
+                                        <span class="badge bg-warning text-dark flex-shrink-0" style="font-size: 10px;">
                                             <i class="bi bi-highlighter me-1"></i>{{ $suket->pemohonComments ? $suket->pemohonComments->count() : 0 }} Titik Sorotan
                                         </span>
                                     </div>
 
-                                    <div class="flex-grow-1 position-relative overflow-y-auto p-3 d-flex flex-column align-items-center" id="evalUserPdfWrap{{ $suket->id }}" style="background-color: #525659; min-height: 0;">
+                                    <div class="flex-grow-1 position-relative overflow-y-auto p-2 p-sm-3 d-flex flex-column align-items-center" id="evalUserPdfWrap{{ $suket->id }}" style="background-color: #525659; min-height: 0;">
                                         @if($suket->hasLhuDocument())
                                             <div id="evalUserPdfContainer{{ $suket->id }}" class="w-100 d-flex flex-column align-items-center"></div>
                                         @else
-                                            <div class="text-center p-5 text-white my-auto">
-                                                <i class="bi bi-file-earmark-pdf fs-1 text-warning mb-3 d-block"></i>
+                                            <div class="text-center p-4 text-white my-auto">
+                                                <i class="bi bi-file-earmark-pdf fs-1 text-warning mb-2 d-block"></i>
                                                 <h6 class="fw-bold">Dokumen LHU Sedang Dipersiapkan</h6>
                                                 <p class="small text-white-50 mb-0">Berkas LHU belum diunggah atau masih dalam proses oleh tim Balai K3.</p>
                                             </div>
@@ -1105,7 +1271,7 @@
                                 </div>
 
                                 {{-- SISI KANAN: PANEL CATATAN EVALUASI & INSTRUKSI REVISI --}}
-                                <div class="col-lg-5 d-flex flex-column h-100 bg-white">
+                                <div class="col-lg-5 d-flex flex-column h-100 bg-white eval-side-col eval-col-notes-{{ $suket->id }}" id="evalUserNotesSide{{ $suket->id }}">
                                     <div class="p-3 border-bottom bg-light flex-shrink-0">
                                         <h6 class="fw-bold text-dark mb-1">
                                             <i class="bi bi-clipboard2-check text-primary me-2"></i>Catatan & Sorotan Evaluator K3
@@ -1139,7 +1305,7 @@
                                                                     </span>
                                                                 @endif
                                                             </div>
-                                                            <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-0" style="font-size: 10px;" onclick="window.LhuAnnotator.scrollToHighlight({{ $suket->id }}, {{ $cm->id }}, '{{ addslashes($cm->bagian ?? '') }}')">
+                                                            <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-0" style="font-size: 10px;" onclick="showDocHighlightMobile({{ $suket->id }}, {{ $cm->id }}, '{{ addslashes($cm->bagian ?? '') }}')">
                                                                 <i class="bi bi-geo-alt-fill me-1"></i>Tunjukkan di Dokumen
                                                             </button>
                                                         </div>
@@ -1542,19 +1708,19 @@
 <div class="modal fade" id="previewDocModal" tabindex="-1" aria-labelledby="previewDocModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-xl" style="max-width: 94vw; margin: 24px auto;">
         <div class="modal-content border-0 shadow-lg rounded-4 overflow-hidden" style="height: 86vh; max-height: calc(100vh - 48px);">
-            <div class="modal-header bg-navy text-white p-3 px-4 d-flex justify-content-between align-items-center flex-shrink-0">
-                <div class="d-flex align-items-center gap-2 overflow-hidden me-3">
-                    <i class="bi bi-file-earmark-text-fill fs-4 text-warning flex-shrink-0"></i>
-                    <h6 class="modal-title fw-bold mb-0 text-white text-truncate" id="previewDocModalLabel">Pratinjau Dokumen</h6>
+            <div class="modal-header bg-navy text-white p-2 p-sm-3 px-3 px-sm-4 d-flex justify-content-between align-items-center flex-shrink-0">
+                <div class="d-flex align-items-center gap-2 overflow-hidden me-2">
+                    <i class="bi bi-file-earmark-text-fill fs-5 fs-sm-4 text-warning flex-shrink-0"></i>
+                    <h6 class="modal-title fw-bold mb-0 text-white text-truncate fs-6" id="previewDocModalLabel">Pratinjau Dokumen</h6>
                 </div>
-                <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                    <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-3 fw-semibold" onclick="printUserPreview()" title="Cetak Dokumen">
-                        <i class="bi bi-printer me-1"></i>Cetak
+                <div class="d-flex align-items-center gap-1 gap-sm-2 flex-shrink-0">
+                    <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-2 px-sm-3 fw-semibold" onclick="printUserPreview()" title="Cetak Dokumen">
+                        <i class="bi bi-printer"></i><span class="d-none d-sm-inline ms-1">Cetak</span>
                     </button>
-                    <a href="#" id="previewUserDirectLink" target="_blank" class="btn btn-sm btn-outline-light rounded-pill px-3 fw-semibold" title="Buka di Tab Baru">
-                        <i class="bi bi-box-arrow-up-right me-1"></i>Tab Baru
+                    <a href="#" id="previewUserDirectLink" target="_blank" class="btn btn-sm btn-outline-light rounded-pill px-2 px-sm-3 fw-semibold" title="Buka di Tab Baru">
+                        <i class="bi bi-box-arrow-up-right"></i><span class="d-none d-sm-inline ms-1">Tab Baru</span>
                     </a>
-                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close btn-close-white ms-1" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
             </div>
             <div class="modal-body p-0 position-relative d-flex align-items-center justify-content-center" style="flex: 1 1 auto; background: #525659; overflow: hidden;">
@@ -1575,6 +1741,65 @@
 </div>
 
 <script>
+    function copyBillingCode(code, btn) {
+        if (!code) return;
+        const successFeedback = () => {
+            const orig = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check2 text-success me-1"></i>Tersalin!';
+            setTimeout(() => {
+                btn.innerHTML = orig;
+            }, 2000);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(code).then(successFeedback).catch(() => {
+                fallbackCopy(code, btn);
+            });
+        } else {
+            fallbackCopy(code, btn);
+        }
+    }
+
+    function fallbackCopy(code, btn) {
+        const temp = document.createElement('input');
+        temp.value = code;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand('copy');
+        document.body.removeChild(temp);
+        const orig = btn.innerHTML;
+        btn.innerHTML = '<i class="bi bi-check2 text-success me-1"></i>Tersalin!';
+        setTimeout(() => {
+            btn.innerHTML = orig;
+        }, 2000);
+    }
+
+    function switchUserEvalTab(suketId, tab) {
+        const pdfSide = document.getElementById('evalUserPdfSide' + suketId);
+        const notesSide = document.getElementById('evalUserNotesSide' + suketId);
+        const btnPdf = document.getElementById('btn-tab-pdf-' + suketId);
+        const btnNotes = document.getElementById('btn-tab-notes-' + suketId);
+
+        if (tab === 'pdf') {
+            if (pdfSide) pdfSide.classList.add('active');
+            if (notesSide) notesSide.classList.remove('active');
+            if (btnPdf) btnPdf.classList.add('active');
+            if (btnNotes) btnNotes.classList.remove('active');
+        } else {
+            if (pdfSide) pdfSide.classList.remove('active');
+            if (notesSide) notesSide.classList.add('active');
+            if (btnPdf) btnPdf.classList.remove('active');
+            if (btnNotes) btnNotes.classList.add('active');
+        }
+    }
+
+    function showDocHighlightMobile(suketId, cmId, bagian) {
+        switchUserEvalTab(suketId, 'pdf');
+        setTimeout(() => {
+            if (window.LhuAnnotator && typeof window.LhuAnnotator.scrollToHighlight === 'function') {
+                window.LhuAnnotator.scrollToHighlight(suketId, cmId, bagian);
+            }
+        }, 300);
+    }
     function toggleModalLhu(val) {
         const box = document.getElementById('modal_manual_lhu_box');
         if (!box) return;
