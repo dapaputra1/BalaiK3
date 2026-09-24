@@ -455,6 +455,8 @@
                 'children' => [
                     ['label' => 'Semua Permohonan', 'icon' => 'bi bi-grid-fill', 'href' => route('suket.index'), 'badge' => $badgeCounts['suket_k3'] ?? 0],
                     ['label' => 'Evaluasi Dokumen', 'icon' => 'bi bi-file-earmark-check', 'href' => route('suket.index', ['stage' => 2]), 'badge' => $badgeCounts['suket_t2'] ?? 0],
+                    ['label' => 'Penyusunan Suket', 'icon' => 'bi bi-file-earmark-word', 'href' => route('suket.index', ['stage' => 3]), 'badge' => $badgeCounts['suket_t3'] ?? 0],
+                    ['label' => 'Review QC Suket', 'icon' => 'bi bi-shield-check', 'href' => route('suket.index', ['stage' => 'qc']), 'badge' => $badgeCounts['suket_qc'] ?? 0],
                     ['label' => 'Penandatanganan Suket', 'icon' => 'bi bi-pen', 'href' => route('suket.index', ['stage' => 4]), 'badge' => $badgeCounts['suket_t4'] ?? 0],
                     ['label' => 'Penerbitan Suket', 'icon' => 'bi bi-award', 'href' => route('suket.index', ['stage' => 5]), 'badge' => $badgeCounts['suket_t5'] ?? 0],
                     ['label' => 'Surat Tagihan Suket', 'icon' => 'bi bi-envelope-paper', 'href' => route('suket.index', ['stage' => 6]), 'badge' => $badgeCounts['suket_t6'] ?? 0],
@@ -574,6 +576,45 @@
                 'collapsible' => true,
                 'children' => [
                     ['label' => 'Review QC Suket', 'icon' => 'bi bi-shield-check', 'href' => route('suket.index', ['stage' => 'qc']), 'badge' => $badgeCounts['suket_qc'] ?? 0],
+                ],
+            ],
+        ],
+        'bendahara' => [
+            ['type' => 'link', 'label' => 'Dashboard', 'icon' => 'bi bi-grid', 'route' => 'superadmin.dashboard'],
+            [
+                'type' => 'section',
+                'label' => 'Penerbitan Suket',
+                'id' => 'suketBendahara',
+                'collapsible' => true,
+                'children' => [
+                    ['label' => 'Surat Tagihan Suket', 'icon' => 'bi bi-envelope-paper', 'href' => route('suket.index', ['stage' => 6]), 'badge' => $badgeCounts['suket_t6'] ?? 0],
+                    ['label' => 'Kode Billing Suket', 'icon' => 'bi bi-upc', 'href' => route('suket.index', ['stage' => 7]), 'badge' => $badgeCounts['suket_t7'] ?? 0],
+                    ['label' => 'Kuitansi Suket', 'icon' => 'bi bi-receipt', 'href' => route('suket.index', ['stage' => 8]), 'badge' => $badgeCounts['suket_t8'] ?? 0],
+                ],
+            ],
+        ],
+        'penguji_k3' => [
+            ['type' => 'link', 'label' => 'Dashboard', 'icon' => 'bi bi-grid', 'route' => 'pcu.dashboard'],
+            [
+                'type' => 'section',
+                'label' => 'Penerbitan Suket',
+                'id' => 'suketPenguji',
+                'collapsible' => true,
+                'children' => [
+                    ['label' => 'Evaluasi Dokumen', 'icon' => 'bi bi-file-earmark-check', 'href' => route('suket.index', ['stage' => 2]), 'badge' => $badgeCounts['suket_t2'] ?? 0],
+                    ['label' => 'Penyusunan Suket', 'icon' => 'bi bi-file-earmark-word', 'href' => route('suket.index', ['stage' => 3]), 'badge' => $badgeCounts['suket_t3'] ?? 0],
+                ],
+            ],
+        ],
+        'kepala_balai' => [
+            ['type' => 'link', 'label' => 'Dashboard', 'icon' => 'bi bi-grid', 'route' => 'superadmin.dashboard'],
+            [
+                'type' => 'section',
+                'label' => 'Penerbitan Suket',
+                'id' => 'suketKepalaBalai',
+                'collapsible' => true,
+                'children' => [
+                    ['label' => 'Penandatanganan Suket', 'icon' => 'bi bi-pen', 'href' => route('suket.index', ['stage' => 4]), 'badge' => $badgeCounts['suket_t4'] ?? 0],
                 ],
             ],
         ],

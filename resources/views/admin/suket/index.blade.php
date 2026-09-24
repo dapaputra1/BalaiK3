@@ -116,6 +116,34 @@
     .stage-card.is-active .stage-sub {
         color: rgba(255, 255, 255, 0.8) !important;
     }
+    .stage-card.is-disabled {
+        opacity: 0.55 !important;
+        cursor: not-allowed !important;
+        pointer-events: none !important;
+        background: #f8fafc !important;
+        border-color: #e2e8f0 !important;
+        box-shadow: none !important;
+        user-select: none;
+    }
+    .stage-card.is-disabled:hover {
+        transform: none !important;
+        box-shadow: none !important;
+        border-color: #e2e8f0 !important;
+    }
+    .stage-card.is-disabled .stage-title {
+        color: #64748b !important;
+    }
+    .stage-card.is-disabled .stage-icon {
+        color: #94a3b8 !important;
+    }
+    .stage-card.is-disabled .stage-badge {
+        background: #e2e8f0 !important;
+        color: #64748b !important;
+        border-color: #cbd5e1 !important;
+    }
+    .stage-card.is-disabled .stage-count {
+        color: #64748b !important;
+    }
     .workflow-search-wrap .form-control:focus {
         border-color: #a7bed9;
         box-shadow: 0 0 0 0.2rem rgba(21, 64, 106, 0.15);
@@ -165,23 +193,46 @@
 
         <div class="row g-2">
             {{-- Tab "Semua Permohonan" --}}
-            @php $isAll = empty($activeStage); @endphp
+            @php
+                $isAll = empty($activeStage);
+                $canAll = in_array($currentRole, ['admin', 'superadmin'], true);
+            @endphp
             <div class="col-6 col-md-4 col-xl">
-                <a href="{{ route('suket.index') }}" class="stage-card p-3 h-100 shadow-sm {{ $isAll ? 'is-active' : '' }}">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="stage-badge badge bg-light text-secondary border px-2 py-1 rounded-pill small">
-                            Semua
-                        </span>
-                        <span class="stage-count fw-bold fs-5 text-dark">{{ $totalActive + $totalDone }}</span>
+                @if($canAll)
+                    <a href="{{ route('suket.index') }}" class="stage-card p-3 h-100 shadow-sm {{ $isAll ? 'is-active' : '' }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-light text-secondary border px-2 py-1 rounded-pill small">
+                                Semua
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-dark">{{ $totalActive + $totalDone }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-grid-fill stage-icon text-primary fs-5"></i>
+                            <div class="stage-title fw-bold text-dark small lh-sm">Semua Permohonan</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success-subtle px-1 rounded">Kewenangan Anda</span>
+                        </div>
+                    </a>
+                @else
+                    <div class="stage-card is-disabled p-3 h-100 shadow-sm" title="Hanya Administrator yang dapat melihat rekap keseluruhan alur">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-light text-muted border px-2 py-1 rounded-pill small">
+                                Semua
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-muted">{{ $totalActive + $totalDone }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-grid-fill stage-icon text-muted fs-5"></i>
+                            <div class="stage-title fw-bold text-muted small lh-sm">Semua Permohonan</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
+                            <span class="badge bg-secondary-subtle text-muted border border-secondary-subtle px-1.5 py-0.5 rounded-pill" style="font-size: 10px;">
+                                <i class="bi bi-lock-fill me-1 text-secondary"></i>Hanya Administrator
+                            </span>
+                        </div>
                     </div>
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <i class="bi bi-grid-fill stage-icon text-primary fs-5"></i>
-                        <div class="stage-title fw-bold text-dark small lh-sm">Semua Permohonan</div>
-                    </div>
-                    <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
-                        Daftar Keseluruhan
-                    </div>
-                </a>
+                @endif
             </div>
 
             {{-- Tahap 2: Evaluasi Dokumen --}}
@@ -190,25 +241,41 @@
                 $canT2 = in_array($currentRole, ['pcu', 'penguji_k3', 'admin', 'superadmin'], true);
             @endphp
             <div class="col-6 col-md-4 col-xl">
-                <a href="{{ route('suket.index', ['stage' => $isT2 ? null : 2]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT2 ? 'is-active' : '' }}">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="stage-badge badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 rounded-pill small">
-                            Tahap 2
-                        </span>
-                        <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[2] ?? 0 }}</span>
-                    </div>
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <i class="bi bi-file-earmark-check stage-icon text-primary fs-5"></i>
-                        <div class="stage-title fw-bold text-dark small lh-sm">Evaluasi Dokumen</div>
-                    </div>
-                    <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
-                        @if($canT2)
+                @if($canT2)
+                    <a href="{{ route('suket.index', ['stage' => $isT2 ? null : 2]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT2 ? 'is-active' : '' }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 rounded-pill small">
+                                Tahap 2
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[2] ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-file-earmark-check stage-icon text-primary fs-5"></i>
+                            <div class="stage-title fw-bold text-dark small lh-sm">Evaluasi Dokumen</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
                             <span class="badge bg-success bg-opacity-25 text-success border border-success-subtle px-1 rounded">Kewenangan Anda</span>
-                        @else
-                            <span>PENGUJI / ADMIN</span>
-                        @endif
+                        </div>
+                    </a>
+                @else
+                    <div class="stage-card is-disabled p-3 h-100 shadow-sm" title="Bukan kewenangan role Anda">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-light text-muted border px-2 py-1 rounded-pill small">
+                                Tahap 2
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-muted">{{ $stageCounts[2] ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-file-earmark-check stage-icon text-muted fs-5"></i>
+                            <div class="stage-title fw-bold text-muted small lh-sm">Evaluasi Dokumen</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
+                            <span class="badge bg-secondary-subtle text-muted border border-secondary-subtle px-1.5 py-0.5 rounded-pill" style="font-size: 10px;">
+                                <i class="bi bi-lock-fill me-1 text-secondary"></i>Hanya Penguji / PCU
+                            </span>
+                        </div>
                     </div>
-                </a>
+                @endif
             </div>
 
             {{-- Tahap 3: Penyusunan Suket --}}
@@ -217,25 +284,41 @@
                 $canT3 = in_array($currentRole, ['pcu', 'penguji_k3', 'admin', 'superadmin'], true);
             @endphp
             <div class="col-6 col-md-4 col-xl">
-                <a href="{{ route('suket.index', ['stage' => $isT3 ? null : 3]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT3 ? 'is-active' : '' }}">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="stage-badge badge bg-info-subtle text-info border border-info-subtle px-2 py-1 rounded-pill small">
-                            Tahap 3
-                        </span>
-                        <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[3] ?? 0 }}</span>
-                    </div>
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <i class="bi bi-file-earmark-word stage-icon text-info fs-5"></i>
-                        <div class="stage-title fw-bold text-dark small lh-sm">Penyusunan Suket</div>
-                    </div>
-                    <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
-                        @if($canT3)
+                @if($canT3)
+                    <a href="{{ route('suket.index', ['stage' => $isT3 ? null : 3]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT3 ? 'is-active' : '' }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-info-subtle text-info border border-info-subtle px-2 py-1 rounded-pill small">
+                                Tahap 3
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[3] ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-file-earmark-word stage-icon text-info fs-5"></i>
+                            <div class="stage-title fw-bold text-dark small lh-sm">Penyusunan Suket</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
                             <span class="badge bg-success bg-opacity-25 text-success border border-success-subtle px-1 rounded">Kewenangan Anda</span>
-                        @else
-                            <span>PENGUJI / ADMIN</span>
-                        @endif
+                        </div>
+                    </a>
+                @else
+                    <div class="stage-card is-disabled p-3 h-100 shadow-sm" title="Bukan kewenangan role Anda">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-light text-muted border px-2 py-1 rounded-pill small">
+                                Tahap 3
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-muted">{{ $stageCounts[3] ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-file-earmark-word stage-icon text-muted fs-5"></i>
+                            <div class="stage-title fw-bold text-muted small lh-sm">Penyusunan Suket</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
+                            <span class="badge bg-secondary-subtle text-muted border border-secondary-subtle px-1.5 py-0.5 rounded-pill" style="font-size: 10px;">
+                                <i class="bi bi-lock-fill me-1 text-secondary"></i>Hanya Penguji / PCU
+                            </span>
+                        </div>
                     </div>
-                </a>
+                @endif
             </div>
 
             {{-- Review QC Suket --}}
@@ -245,25 +328,41 @@
                 $qcPendingCount = $stageCounts['qc'] ?? \App\Models\SuketK3::where('status_tahap', 3)->where('qc_status', 'pending')->count();
             @endphp
             <div class="col-6 col-md-4 col-xl">
-                <a href="{{ route('suket.index', ['stage' => $isQc ? null : 'qc']) }}" class="stage-card p-3 h-100 shadow-sm {{ $isQc ? 'is-active' : '' }}">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="stage-badge badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1 rounded-pill small">
-                            Gerbang QC
-                        </span>
-                        <span class="stage-count fw-bold fs-5 text-dark">{{ $qcPendingCount }}</span>
-                    </div>
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <i class="bi bi-shield-check stage-icon text-warning fs-5"></i>
-                        <div class="stage-title fw-bold text-dark small lh-sm">Review QC Suket</div>
-                    </div>
-                    <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
-                        @if($canQcRole)
+                @if($canQcRole)
+                    <a href="{{ route('suket.index', ['stage' => $isQc ? null : 'qc']) }}" class="stage-card p-3 h-100 shadow-sm {{ $isQc ? 'is-active' : '' }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1 rounded-pill small">
+                                Gerbang QC
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-dark">{{ $qcPendingCount }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-shield-check stage-icon text-warning fs-5"></i>
+                            <div class="stage-title fw-bold text-dark small lh-sm">Review QC Suket</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
                             <span class="badge bg-success bg-opacity-25 text-success border border-success-subtle px-1 rounded">Kewenangan Anda</span>
-                        @else
-                            <span>TIM QC</span>
-                        @endif
+                        </div>
+                    </a>
+                @else
+                    <div class="stage-card is-disabled p-3 h-100 shadow-sm" title="Bukan kewenangan role Anda">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-light text-muted border px-2 py-1 rounded-pill small">
+                                Gerbang QC
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-muted">{{ $qcPendingCount }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-shield-check stage-icon text-muted fs-5"></i>
+                            <div class="stage-title fw-bold text-muted small lh-sm">Review QC Suket</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
+                            <span class="badge bg-secondary-subtle text-muted border border-secondary-subtle px-1.5 py-0.5 rounded-pill" style="font-size: 10px;">
+                                <i class="bi bi-lock-fill me-1 text-secondary"></i>Hanya Tim QC
+                            </span>
+                        </div>
                     </div>
-                </a>
+                @endif
             </div>
 
             {{-- Tahap 4: Penandatanganan Suket --}}
@@ -272,25 +371,41 @@
                 $canT4 = in_array($currentRole, ['mp', 'kepala_balai', 'admin', 'superadmin'], true);
             @endphp
             <div class="col-6 col-md-4 col-xl">
-                <a href="{{ route('suket.index', ['stage' => $isT4 ? null : 4]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT4 ? 'is-active' : '' }}">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="stage-badge badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 rounded-pill small">
-                            Tahap 4
-                        </span>
-                        <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[4] ?? 0 }}</span>
-                    </div>
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <i class="bi bi-pen stage-icon text-danger fs-5"></i>
-                        <div class="stage-title fw-bold text-dark small lh-sm">Penandatanganan Suket</div>
-                    </div>
-                    <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
-                        @if($canT4)
+                @if($canT4)
+                    <a href="{{ route('suket.index', ['stage' => $isT4 ? null : 4]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT4 ? 'is-active' : '' }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 rounded-pill small">
+                                Tahap 4
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[4] ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-pen stage-icon text-danger fs-5"></i>
+                            <div class="stage-title fw-bold text-dark small lh-sm">Penandatanganan Suket</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
                             <span class="badge bg-success bg-opacity-25 text-success border border-success-subtle px-1 rounded">Kewenangan Anda</span>
-                        @else
-                            <span>KEPALA BALAI / ADMIN</span>
-                        @endif
+                        </div>
+                    </a>
+                @else
+                    <div class="stage-card is-disabled p-3 h-100 shadow-sm" title="Bukan kewenangan role Anda">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-light text-muted border px-2 py-1 rounded-pill small">
+                                Tahap 4
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-muted">{{ $stageCounts[4] ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-pen stage-icon text-muted fs-5"></i>
+                            <div class="stage-title fw-bold text-muted small lh-sm">Penandatanganan Suket</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
+                            <span class="badge bg-secondary-subtle text-muted border border-secondary-subtle px-1.5 py-0.5 rounded-pill" style="font-size: 10px;">
+                                <i class="bi bi-lock-fill me-1 text-secondary"></i>Hanya Kepala Balai
+                            </span>
+                        </div>
                     </div>
-                </a>
+                @endif
             </div>
 
             {{-- Tahap 5: Penerbitan Suket --}}
@@ -299,25 +414,41 @@
                 $canT5 = in_array($currentRole, ['admin', 'superadmin'], true);
             @endphp
             <div class="col-6 col-md-4 col-xl">
-                <a href="{{ route('suket.index', ['stage' => $isT5 ? null : 5]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT5 ? 'is-active' : '' }}">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="stage-badge badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1 rounded-pill small">
-                            Tahap 5
-                        </span>
-                        <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[5] ?? 0 }}</span>
-                    </div>
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <i class="bi bi-award stage-icon text-secondary fs-5"></i>
-                        <div class="stage-title fw-bold text-dark small lh-sm">Penerbitan Suket</div>
-                    </div>
-                    <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
-                        @if($canT5)
+                @if($canT5)
+                    <a href="{{ route('suket.index', ['stage' => $isT5 ? null : 5]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT5 ? 'is-active' : '' }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1 rounded-pill small">
+                                Tahap 5
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[5] ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-award stage-icon text-secondary fs-5"></i>
+                            <div class="stage-title fw-bold text-dark small lh-sm">Penerbitan Suket</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
                             <span class="badge bg-success bg-opacity-25 text-success border border-success-subtle px-1 rounded">Kewenangan Anda</span>
-                        @else
-                            <span>ADMINISTRATOR</span>
-                        @endif
+                        </div>
+                    </a>
+                @else
+                    <div class="stage-card is-disabled p-3 h-100 shadow-sm" title="Bukan kewenangan role Anda">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-light text-muted border px-2 py-1 rounded-pill small">
+                                Tahap 5
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-muted">{{ $stageCounts[5] ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-award stage-icon text-muted fs-5"></i>
+                            <div class="stage-title fw-bold text-muted small lh-sm">Penerbitan Suket</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
+                            <span class="badge bg-secondary-subtle text-muted border border-secondary-subtle px-1.5 py-0.5 rounded-pill" style="font-size: 10px;">
+                                <i class="bi bi-lock-fill me-1 text-secondary"></i>Hanya Administrator
+                            </span>
+                        </div>
                     </div>
-                </a>
+                @endif
             </div>
 
             {{-- Tahap 6: Surat Tagihan --}}
@@ -326,25 +457,41 @@
                 $canT6 = in_array($currentRole, ['bendahara', 'admin', 'superadmin'], true);
             @endphp
             <div class="col-6 col-md-4 col-xl">
-                <a href="{{ route('suket.index', ['stage' => $isT6 ? null : 6]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT6 ? 'is-active' : '' }}">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="stage-badge badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 rounded-pill small">
-                            Tahap 6
-                        </span>
-                        <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[6] ?? 0 }}</span>
-                    </div>
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <i class="bi bi-envelope-paper stage-icon text-primary fs-5"></i>
-                        <div class="stage-title fw-bold text-dark small lh-sm">Surat Tagihan</div>
-                    </div>
-                    <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
-                        @if($canT6)
+                @if($canT6)
+                    <a href="{{ route('suket.index', ['stage' => $isT6 ? null : 6]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT6 ? 'is-active' : '' }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 rounded-pill small">
+                                Tahap 6
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[6] ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-envelope-paper stage-icon text-primary fs-5"></i>
+                            <div class="stage-title fw-bold text-dark small lh-sm">Surat Tagihan</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
                             <span class="badge bg-success bg-opacity-25 text-success border border-success-subtle px-1 rounded">Kewenangan Anda</span>
-                        @else
-                            <span>BENDAHARA / ADMIN</span>
-                        @endif
+                        </div>
+                    </a>
+                @else
+                    <div class="stage-card is-disabled p-3 h-100 shadow-sm" title="Bukan kewenangan role Anda">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-light text-muted border px-2 py-1 rounded-pill small">
+                                Tahap 6
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-muted">{{ $stageCounts[6] ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-envelope-paper stage-icon text-muted fs-5"></i>
+                            <div class="stage-title fw-bold text-muted small lh-sm">Surat Tagihan</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
+                            <span class="badge bg-secondary-subtle text-muted border border-secondary-subtle px-1.5 py-0.5 rounded-pill" style="font-size: 10px;">
+                                <i class="bi bi-lock-fill me-1 text-secondary"></i>Hanya Bendahara / Admin
+                            </span>
+                        </div>
                     </div>
-                </a>
+                @endif
             </div>
 
             {{-- Tahap 7: Kode Billing --}}
@@ -353,25 +500,41 @@
                 $canT7 = in_array($currentRole, ['bendahara', 'admin', 'superadmin'], true);
             @endphp
             <div class="col-6 col-md-4 col-xl">
-                <a href="{{ route('suket.index', ['stage' => $isT7 ? null : 7]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT7 ? 'is-active' : '' }}">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="stage-badge badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1 rounded-pill small">
-                            Tahap 7
-                        </span>
-                        <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[7] ?? 0 }}</span>
-                    </div>
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <i class="bi bi-upc stage-icon text-warning fs-5"></i>
-                        <div class="stage-title fw-bold text-dark small lh-sm">Kode Billing</div>
-                    </div>
-                    <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
-                        @if($canT7)
+                @if($canT7)
+                    <a href="{{ route('suket.index', ['stage' => $isT7 ? null : 7]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT7 ? 'is-active' : '' }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1 rounded-pill small">
+                                Tahap 7
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[7] ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-upc stage-icon text-warning fs-5"></i>
+                            <div class="stage-title fw-bold text-dark small lh-sm">Kode Billing</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
                             <span class="badge bg-success bg-opacity-25 text-success border border-success-subtle px-1 rounded">Kewenangan Anda</span>
-                        @else
-                            <span>BENDAHARA / ADMIN</span>
-                        @endif
+                        </div>
+                    </a>
+                @else
+                    <div class="stage-card is-disabled p-3 h-100 shadow-sm" title="Bukan kewenangan role Anda">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-light text-muted border px-2 py-1 rounded-pill small">
+                                Tahap 7
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-muted">{{ $stageCounts[7] ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-upc stage-icon text-muted fs-5"></i>
+                            <div class="stage-title fw-bold text-muted small lh-sm">Kode Billing</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
+                            <span class="badge bg-secondary-subtle text-muted border border-secondary-subtle px-1.5 py-0.5 rounded-pill" style="font-size: 10px;">
+                                <i class="bi bi-lock-fill me-1 text-secondary"></i>Hanya Bendahara / Admin
+                            </span>
+                        </div>
                     </div>
-                </a>
+                @endif
             </div>
 
             {{-- Tahap 8: Kuitansi --}}
@@ -380,25 +543,41 @@
                 $canT8 = in_array($currentRole, ['bendahara', 'admin', 'superadmin'], true);
             @endphp
             <div class="col-6 col-md-4 col-xl">
-                <a href="{{ route('suket.index', ['stage' => $isT8 ? null : 8]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT8 ? 'is-active' : '' }}">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="stage-badge badge bg-info-subtle text-info border border-info-subtle px-2 py-1 rounded-pill small">
-                            Tahap 8
-                        </span>
-                        <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[8] ?? 0 }}</span>
-                    </div>
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <i class="bi bi-receipt stage-icon text-info fs-5"></i>
-                        <div class="stage-title fw-bold text-dark small lh-sm">Kuitansi</div>
-                    </div>
-                    <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
-                        @if($canT8)
+                @if($canT8)
+                    <a href="{{ route('suket.index', ['stage' => $isT8 ? null : 8]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT8 ? 'is-active' : '' }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-info-subtle text-info border border-info-subtle px-2 py-1 rounded-pill small">
+                                Tahap 8
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[8] ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-receipt stage-icon text-info fs-5"></i>
+                            <div class="stage-title fw-bold text-dark small lh-sm">Kuitansi</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
                             <span class="badge bg-success bg-opacity-25 text-success border border-success-subtle px-1 rounded">Kewenangan Anda</span>
-                        @else
-                            <span>BENDAHARA / ADMIN</span>
-                        @endif
+                        </div>
+                    </a>
+                @else
+                    <div class="stage-card is-disabled p-3 h-100 shadow-sm" title="Bukan kewenangan role Anda">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-light text-muted border px-2 py-1 rounded-pill small">
+                                Tahap 8
+                            </span>
+                            <span class="stage-count fw-bold fs-5 text-muted">{{ $stageCounts[8] ?? 0 }}</span>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-receipt stage-icon text-muted fs-5"></i>
+                            <div class="stage-title fw-bold text-muted small lh-sm">Kuitansi</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
+                            <span class="badge bg-secondary-subtle text-muted border border-secondary-subtle px-1.5 py-0.5 rounded-pill" style="font-size: 10px;">
+                                <i class="bi bi-lock-fill me-1 text-secondary"></i>Hanya Bendahara / Admin
+                            </span>
+                        </div>
                     </div>
-                </a>
+                @endif
             </div>
 
             {{-- Tahap 9: Penyerahan Suket --}}
@@ -407,33 +586,57 @@
                 $canT9 = in_array($currentRole, ['admin', 'superadmin'], true);
             @endphp
             <div class="col-6 col-md-4 col-xl">
-                <a href="{{ route('suket.index', ['stage' => $isT9 ? null : 9]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT9 ? 'is-active' : '' }}">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <span class="stage-badge badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill small">
-                            Tahap 9
-                        </span>
-                        <div class="text-end">
-                            <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[9] ?? 0 }}</span>
-                            @if(($stageCounts[9] ?? 0) > 0)
-                                <div class="small text-muted" style="font-size: 10px; line-height: 1.2;">
-                                    <span class="text-warning-emphasis fw-semibold">{{ $stage9PendingCount ?? 0 }} Belum</span> &bull; 
-                                    <span class="text-success fw-semibold">{{ $stage9DeliveredCount ?? 0 }} Selesai</span>
-                                </div>
-                            @endif
+                @if($canT9)
+                    <a href="{{ route('suket.index', ['stage' => $isT9 ? null : 9]) }}" class="stage-card p-3 h-100 shadow-sm {{ $isT9 ? 'is-active' : '' }}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded-pill small">
+                                Tahap 9
+                            </span>
+                            <div class="text-end">
+                                <span class="stage-count fw-bold fs-5 text-dark">{{ $stageCounts[9] ?? 0 }}</span>
+                                @if(($stageCounts[9] ?? 0) > 0)
+                                    <div class="small text-muted" style="font-size: 10px; line-height: 1.2;">
+                                        <span class="text-warning-emphasis fw-semibold">{{ $stage9PendingCount ?? 0 }} Belum</span> &bull; 
+                                        <span class="text-success fw-semibold">{{ $stage9DeliveredCount ?? 0 }} Selesai</span>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-send-check stage-icon text-success fs-5"></i>
+                            <div class="stage-title fw-bold text-dark small lh-sm">Penyerahan Suket</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success-subtle px-1 rounded">Kewenangan Anda</span>
+                        </div>
+                    </a>
+                @else
+                    <div class="stage-card is-disabled p-3 h-100 shadow-sm" title="Bukan kewenangan role Anda">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stage-badge badge bg-light text-muted border px-2 py-1 rounded-pill small">
+                                Tahap 9
+                            </span>
+                            <div class="text-end">
+                                <span class="stage-count fw-bold fs-5 text-muted">{{ $stageCounts[9] ?? 0 }}</span>
+                                @if(($stageCounts[9] ?? 0) > 0)
+                                    <div class="small text-muted" style="font-size: 10px; line-height: 1.2;">
+                                        <span class="text-muted fw-semibold">{{ $stage9PendingCount ?? 0 }} Belum</span> &bull; 
+                                        <span class="text-muted fw-semibold">{{ $stage9DeliveredCount ?? 0 }} Selesai</span>
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <i class="bi bi-send-check stage-icon text-muted fs-5"></i>
+                            <div class="stage-title fw-bold text-muted small lh-sm">Penyerahan Suket</div>
+                        </div>
+                        <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
+                            <span class="badge bg-secondary-subtle text-muted border border-secondary-subtle px-1.5 py-0.5 rounded-pill" style="font-size: 10px;">
+                                <i class="bi bi-lock-fill me-1 text-secondary"></i>Hanya Administrator
+                            </span>
                         </div>
                     </div>
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <i class="bi bi-send-check stage-icon text-success fs-5"></i>
-                        <div class="stage-title fw-bold text-dark small lh-sm">Penyerahan Suket</div>
-                    </div>
-                    <div class="stage-sub small mt-auto pt-2 text-muted" style="font-size: 11px;">
-                        @if($canT9)
-                            <span class="badge bg-success bg-opacity-25 text-success border border-success-subtle px-1 rounded">Kewenangan Anda</span>
-                        @else
-                            <span>ADMINISTRATOR</span>
-                        @endif
-                    </div>
-                </a>
+                @endif
             </div>
         </div>
     </div>
