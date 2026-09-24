@@ -891,8 +891,8 @@
                                             'title' => 'Dokumen LHU: ' . $suket->nomor_order,
                                             'icon' => 'bi bi-file-earmark-pdf text-danger',
                                             'btn_class' => 'btn-outline-danger',
-                                            'preview_url' => route('suket.preview-doc', [$suket->id, 'lhu']),
-                                            'download_url' => route('suket.download-doc', [$suket->id, 'lhu']),
+                                            'preview_url' => route('suket.preview-doc', [$suket->id, 'lhu', 'v' => $suket->updated_at?->timestamp ?? time()]),
+                                            'download_url' => route('suket.download-doc', [$suket->id, 'lhu', 'v' => $suket->updated_at?->timestamp ?? time()]),
                                             'type' => 'pdf',
                                         ];
                                     }
@@ -1407,17 +1407,17 @@
                                                             <div class="d-flex align-items-center gap-1">
                                                                 <span class="small fw-semibold text-muted me-2"><i class="bi bi-file-earmark-text text-danger me-1"></i>Dokumen Uji:</span>
                                                                 @if($suket->hasLhuDocument())
-                                                                    <button type="button" class="btn btn-xs btn-outline-danger active rounded px-2 py-1" onclick="switchEvalDoc('{{ route('suket.preview-doc', [$suket->id, 'lhu']) }}', 'evalIframe{{ $suket->id }}', 'evalImg{{ $suket->id }}', 'pdf')">
+                                                                    <button type="button" class="btn btn-xs btn-outline-danger active rounded px-2 py-1" onclick="switchEvalDoc('{{ route('suket.preview-doc', [$suket->id, 'lhu', 'v' => $suket->updated_at?->timestamp ?? time()]) }}', {{ $suket->id }}, 'pdf', this)">
                                                                         <i class="bi bi-file-earmark-pdf me-1"></i>LHU
                                                                     </button>
                                                                 @endif
                                                                 @if($suket->foto_pengujian_path)
-                                                                    <button type="button" class="btn btn-xs btn-outline-info rounded px-2 py-1" onclick="switchEvalDoc('{{ route('suket.preview-doc', [$suket->id, 'foto']) }}', 'evalIframe{{ $suket->id }}', 'evalImg{{ $suket->id }}', 'image')">
+                                                                    <button type="button" class="btn btn-xs btn-outline-info rounded px-2 py-1" onclick="switchEvalDoc('{{ route('suket.preview-doc', [$suket->id, 'foto', 'v' => $suket->updated_at?->timestamp ?? time()]) }}', {{ $suket->id }}, 'image', this)">
                                                                         <i class="bi bi-image me-1"></i>Foto
                                                                     </button>
                                                                 @endif
                                                                 @if($suket->denah_lokasi_path)
-                                                                    <button type="button" class="btn btn-xs btn-outline-warning rounded px-2 py-1" onclick="switchEvalDoc('{{ route('suket.preview-doc', [$suket->id, 'denah']) }}', 'evalIframe{{ $suket->id }}', 'evalImg{{ $suket->id }}', 'image')">
+                                                                    <button type="button" class="btn btn-xs btn-outline-warning rounded px-2 py-1" onclick="switchEvalDoc('{{ route('suket.preview-doc', [$suket->id, 'denah', 'v' => $suket->updated_at?->timestamp ?? time()]) }}', {{ $suket->id }}, 'image', this)">
                                                                         <i class="bi bi-map me-1"></i>Denah
                                                                     </button>
                                                                 @endif
@@ -1434,7 +1434,7 @@
                                                             </div>
                                                             <div>
                                                                 @if($suket->hasLhuDocument())
-                                                                    <a href="{{ route('suket.preview-doc', [$suket->id, 'lhu']) }}" target="_blank" class="btn btn-xs btn-light border rounded px-2 py-1 text-muted" title="Buka di Tab Baru">
+                                                                    <a href="{{ route('suket.preview-doc', [$suket->id, 'lhu', 'v' => $suket->updated_at?->timestamp ?? time()]) }}" target="_blank" class="btn btn-xs btn-light border rounded px-2 py-1 text-muted" title="Buka di Tab Baru">
                                                                         <i class="bi bi-box-arrow-up-right me-1"></i>Tab Baru
                                                                     </a>
                                                                     <a href="{{ route('suket.download-doc', [$suket->id, 'lhu']) }}" class="btn btn-xs btn-outline-secondary rounded px-2 py-1" title="Unduh File LHU" download>
@@ -1987,6 +1987,17 @@
                                                                 <div class="col-sm-6">
                                                                     <label class="form-label small fw-semibold text-dark">Nominal Tagihan (Rp)</label>
                                                                     <input type="text" name="surat_tagihan_nominal" class="form-control form-control-sm" placeholder="Contoh: 1.500.000" value="{{ $suket->surat_tagihan_nominal ? number_format($suket->surat_tagihan_nominal, 0, ',', '.') : '' }}">
+                                                                    @php
+                                                                        $bItems = $suket->getFaktorBreakdownItems();
+                                                                    @endphp
+                                                                    @if(!empty($bItems))
+                                                                        <div class="mt-1 d-flex flex-wrap gap-1 align-items-center">
+                                                                            <span class="text-muted" style="font-size: 11px;"><i class="bi bi-tag-fill text-primary"></i> Terhitung dari faktor:</span>
+                                                                            @foreach($bItems as $bItem)
+                                                                                <span class="badge bg-light text-secondary border px-1.5 py-0.5 rounded" style="font-size: 10.5px;">{{ $bItem['short_label'] }}: Rp {{ number_format($bItem['price'], 0, ',', '.') }}</span>
+                                                                            @endforeach
+                                                                        </div>
+                                                                    @endif
                                                                 </div>
                                                                 <div class="col-sm-6">
                                                                     <label class="form-label small fw-semibold text-dark">Upload Berkas Surat Tagihan <span class="text-muted fw-normal">(PDF, Opsional)</span></label>
@@ -2377,7 +2388,7 @@
                                                                     <i class="bi bi-file-earmark-check me-1"></i>Draf Suket
                                                                 </button>
                                                                 @if($suket->hasLhuDocument())
-                                                                    <button type="button" id="btnSwitchQcLhu{{ $suket->id }}" class="btn btn-xs btn-outline-secondary rounded px-2 py-1" onclick="switchQcDoc('{{ route('suket.preview-doc', [$suket->id, 'lhu']) }}', 'qcPdfContainer{{ $suket->id }}', 'qcIframe{{ $suket->id }}', 'pdf', 'qc_{{ $suket->id }}', this)">
+                                                                    <button type="button" id="btnSwitchQcLhu{{ $suket->id }}" class="btn btn-xs btn-outline-secondary rounded px-2 py-1" onclick="switchQcDoc('{{ route('suket.preview-doc', [$suket->id, 'lhu', 'v' => $suket->updated_at?->timestamp ?? time()]) }}', 'qcPdfContainer{{ $suket->id }}', 'qcIframe{{ $suket->id }}', 'pdf', 'qc_{{ $suket->id }}', this)">
                                                                         <i class="bi bi-file-earmark-pdf me-1"></i>LHU (Ref)
                                                                     </button>
                                                                 @endif
@@ -2975,19 +2986,49 @@ function docPreviewLoaded() {
     }
 }
 
-function switchEvalDoc(url, iframeId, imgId, type) {
-    const iframe = document.getElementById(iframeId);
-    const img = document.getElementById(imgId);
-    if (!iframe || !img) return;
+function switchEvalDoc(url, suketId, type, btnEl) {
+    if (btnEl) {
+        btnEl.parentElement.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        btnEl.classList.add('active');
+    }
+    const pdfContainer = document.getElementById('evalPdfContainer' + suketId);
+    const iframe = document.getElementById('evalIframe' + suketId);
+    const img = document.getElementById('evalImg' + suketId);
+    const toolbar = document.querySelector('.lhu-annotator-toolbar[data-suket="' + suketId + '"]');
 
     if (type === 'image') {
-        iframe.style.display = 'none';
-        img.src = url;
-        img.style.display = 'block';
+        if (pdfContainer) pdfContainer.style.display = 'none';
+        if (iframe) {
+            iframe.style.display = 'none';
+            iframe.src = '';
+        }
+        if (toolbar) toolbar.style.display = 'none';
+        if (img) {
+            img.src = url;
+            img.style.display = 'block';
+        }
     } else {
-        img.style.display = 'none';
-        iframe.src = url;
-        iframe.style.display = 'block';
+        if (img) {
+            img.style.display = 'none';
+            img.src = '';
+        }
+        if (iframe) {
+            iframe.style.display = 'none';
+            iframe.src = '';
+        }
+        if (toolbar) toolbar.style.display = '';
+        if (pdfContainer) {
+            pdfContainer.style.display = 'flex';
+            if (window.LhuAnnotator && window.LhuAnnotator.instances[suketId]) {
+                const inst = window.LhuAnnotator.instances[suketId];
+                inst.loadedUrl = null;
+                inst.pdf = null;
+                window.LhuAnnotator.init({
+                    ...inst.config,
+                    pdfUrl: url
+                });
+            }
+        }
     }
 }
 
@@ -3058,10 +3099,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const modalEl{{ $suketItem->id }} = document.getElementById('modalEvaluasiSideBySide{{ $suketItem->id }}');
             if (modalEl{{ $suketItem->id }}) {
                 modalEl{{ $suketItem->id }}.addEventListener('shown.bs.modal', function () {
+                    if (window.LhuAnnotator && window.LhuAnnotator.instances[{{ $suketItem->id }}]) {
+                        window.LhuAnnotator.instances[{{ $suketItem->id }}].loadedUrl = null;
+                        window.LhuAnnotator.instances[{{ $suketItem->id }}].pdf = null;
+                    }
                     window.LhuAnnotator.init({
                         suketId: {{ $suketItem->id }},
                         containerId: 'evalPdfContainer{{ $suketItem->id }}',
-                        pdfUrl: '{{ route('suket.preview-doc', [$suketItem->id, 'lhu']) }}',
+                        pdfUrl: '{{ route('suket.preview-doc', [$suketItem->id, 'lhu']) }}?v={{ $suketItem->updated_at?->timestamp ?? time() }}',
                         comments: @json($suketItem->lhuComments ?? []),
                         readOnly: false,
                         floatingBtnId: 'gdocsFloatingBtn{{ $suketItem->id }}',

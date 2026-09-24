@@ -1587,22 +1587,36 @@
 
                 {{-- 2. RUANG LINGKUP FAKTOR K3 --}}
                 <div class="mb-3">
-                    <label class="form-label small fw-bold text-dark mb-1">
-                        2. Ruang Lingkup Faktor K3 yang Diuji <span class="text-danger">*</span>
-                    </label>
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label small fw-bold text-dark mb-0">
+                            2. Ruang Lingkup Faktor K3 yang Diuji <span class="text-danger">*</span>
+                        </label>
+                        <span class="text-muted small" style="font-size: 11px;">Pilih satu atau lebih faktor uji</span>
+                    </div>
                     <div class="row g-2">
                         @foreach($faktorOptions as $fKey => $fDesc)
+                            @php
+                                $fPrice = \App\Models\SuketK3::FAKTOR_PRICES[$fKey] ?? 0;
+                            @endphp
                             <div class="col-md-6">
-                                <label class="d-flex align-items-center gap-2 p-2 px-3 border rounded-3 bg-light w-100 mb-0" style="cursor: pointer;">
-                                    <input 
-                                        class="form-check-input mt-0 flex-shrink-0" 
-                                        type="checkbox" 
-                                        name="faktor_k3[]" 
-                                        value="{{ $fKey }}" 
-                                        id="modal_f_{{ $fKey }}"
-                                        @checked(is_array(old('faktor_k3')) && in_array($fKey, old('faktor_k3')))
-                                    >
-                                    <span class="small fw-semibold text-dark" style="font-size: 12px;">{{ $fDesc }}</span>
+                                <label class="d-flex align-items-center justify-content-between p-2 px-3 border rounded-3 bg-light w-100 mb-0 faktor-k3-card" id="card_f_{{ $fKey }}" style="cursor: pointer; transition: all .2s ease;">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <input 
+                                            class="form-check-input mt-0 flex-shrink-0 faktor-k3-check" 
+                                            type="checkbox" 
+                                            name="faktor_k3[]" 
+                                            value="{{ $fKey }}" 
+                                            id="modal_f_{{ $fKey }}"
+                                            data-price="{{ $fPrice }}"
+                                            data-name="{{ ucfirst($fKey) }}"
+                                            @checked(is_array(old('faktor_k3')) && in_array($fKey, old('faktor_k3')))
+                                            onchange="calculateSuketTotal()"
+                                        >
+                                        <span class="small fw-semibold text-dark" style="font-size: 12px;">{{ $fDesc }}</span>
+                                    </div>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2 py-1 ms-2 flex-shrink-0" style="font-size: 11px;">
+                                        Rp {{ number_format($fPrice, 0, ',', '.') }}
+                                    </span>
                                 </label>
                             </div>
                         @endforeach
@@ -1610,6 +1624,27 @@
                     @error('faktor_k3')
                         <div class="text-danger small mt-1" style="font-size: 11px;">{{ $message }}</div>
                     @enderror
+
+                    {{-- LIVE ESTIMASI BIAYA & AUTO GENERATE TAGIHAN INFO --}}
+                    <div class="mt-2 p-3 rounded-3 border bg-white shadow-sm" id="boxKalkulasiBiaya" style="border-left: 4px solid #0d6efd !important;">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <span class="small fw-bold text-dark d-flex align-items-center gap-1">
+                                    <i class="bi bi-calculator-fill text-primary"></i> Estimasi Total Biaya Tagihan (PNBP):
+                                </span>
+                                <small class="text-muted d-block mt-0.5" id="labelRincianTerpilih" style="font-size: 11.5px;">
+                                    Belum ada faktor yang dipilih
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <span class="fs-5 fw-bold text-primary" id="textTotalTagihan">Rp 0</span>
+                            </div>
+                        </div>
+                        <div class="mt-2 pt-2 border-top border-light-subtle d-flex align-items-center gap-1.5 text-secondary" style="font-size: 11px;">
+                            <i class="bi bi-info-circle-fill text-primary flex-shrink-0"></i>
+                            <span>Biaya di atas akan otomatis digenerate menjadi nilai pada <strong>Surat Tagihan Resmi</strong> dan <strong>Kode Billing SIMPONI</strong>.</span>
+                        </div>
+                    </div>
                 </div>
 
                 {{-- 3. SUMBER DOKUMEN LHU --}}
@@ -1806,6 +1841,44 @@
         const box = document.getElementById('modal_manual_lhu_box');
         if (!box) return;
         box.style.display = (val === 'manual') ? 'block' : 'none';
+    }
+
+    function calculateSuketTotal() {
+        const checks = document.querySelectorAll('.faktor-k3-check');
+        let total = 0;
+        let selectedItems = [];
+
+        checks.forEach(chk => {
+            const card = document.getElementById('card_f_' + chk.value);
+            const price = parseFloat(chk.getAttribute('data-price')) || 0;
+            const name = chk.getAttribute('data-name') || chk.value;
+            if (chk.checked) {
+                total += price;
+                selectedItems.push(`${name} (Rp ${price.toLocaleString('id-ID')})`);
+                if (card) {
+                    card.classList.add('border-primary', 'bg-primary-subtle', 'bg-opacity-25');
+                    card.classList.remove('bg-light');
+                }
+            } else {
+                if (card) {
+                    card.classList.remove('border-primary', 'bg-primary-subtle', 'bg-opacity-25');
+                    card.classList.add('bg-light');
+                }
+            }
+        });
+
+        const totalEl = document.getElementById('textTotalTagihan');
+        const labelEl = document.getElementById('labelRincianTerpilih');
+        if (totalEl) {
+            totalEl.textContent = 'Rp ' + total.toLocaleString('id-ID');
+        }
+        if (labelEl) {
+            if (selectedItems.length > 0) {
+                labelEl.innerHTML = '<span class="text-dark fw-medium">Rincian:</span> ' + selectedItems.join(' + ');
+            } else {
+                labelEl.textContent = 'Pilih minimal satu faktor lingkungan kerja di atas';
+            }
+        }
     }
 
     function openUserPreview(url, title) {
@@ -2098,10 +2171,14 @@ document.addEventListener('DOMContentLoaded', function() {
             const userModalEl{{ $suketItem->id }} = document.getElementById('modalUserEvaluasiLhu{{ $suketItem->id }}');
             if (userModalEl{{ $suketItem->id }}) {
                 userModalEl{{ $suketItem->id }}.addEventListener('shown.bs.modal', function () {
+                    if (window.LhuAnnotator && window.LhuAnnotator.instances[{{ $suketItem->id }}]) {
+                        window.LhuAnnotator.instances[{{ $suketItem->id }}].loadedUrl = null;
+                        window.LhuAnnotator.instances[{{ $suketItem->id }}].pdf = null;
+                    }
                     window.LhuAnnotator.init({
                         suketId: {{ $suketItem->id }},
                         containerId: 'evalUserPdfContainer{{ $suketItem->id }}',
-                        pdfUrl: '{{ route('user.suket.preview-doc', [$suketItem->id, 'lhu']) }}',
+                        pdfUrl: '{{ route('user.suket.preview-doc', [$suketItem->id, 'lhu']) }}?v={{ $suketItem->updated_at?->timestamp ?? time() }}',
                         comments: @json($suketItem->pemohonComments ?? []),
                         readOnly: true,
                     });
@@ -2109,6 +2186,14 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         @endif
     @endforeach
+
+    calculateSuketTotal();
+    const modalAjukanSuketEl = document.getElementById('modalAjukanSuket');
+    if (modalAjukanSuketEl) {
+        modalAjukanSuketEl.addEventListener('shown.bs.modal', function () {
+            calculateSuketTotal();
+        });
+    }
 });
 </script>
 @endsection

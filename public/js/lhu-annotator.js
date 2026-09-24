@@ -117,9 +117,20 @@ window.LhuAnnotator = {
 
         } catch (err) {
             instance.isRendering = false;
-            console.warn("Gagal merender PDF via PDF.js, beralih ke iframe fallback:", err);
+            console.warn("Gagal merender PDF via PDF.js:", err);
             container.innerHTML = `
-                <iframe src="${config.pdfUrl}" class="w-100 h-100 border-0 rounded shadow-sm" style="min-height: 80vh;"></iframe>
+                <div class="card border-0 shadow-sm rounded-4 p-4 text-center mx-auto my-5" style="max-width: 500px; background: rgba(255,255,255,0.95);">
+                    <i class="bi bi-file-earmark-exclamation fs-1 text-warning mb-2"></i>
+                    <h6 class="fw-bold text-dark">Pratinjau Dokumen Memerlukan Pembaca Eksternal</h6>
+                    <p class="small text-muted mb-3">
+                        Format berkas ini tidak dapat dipratinjau langsung di dalam browser atau sedang diproses. Anda dapat mengunduh berkas untuk ditinjau.
+                    </p>
+                    <div>
+                        <a href="${config.pdfUrl}" class="btn btn-sm btn-primary rounded-pill px-4 fw-semibold shadow-xs" download>
+                            <i class="bi bi-download me-1"></i> Unduh Berkas Dokumen
+                        </a>
+                    </div>
+                </div>
             `;
         }
     },

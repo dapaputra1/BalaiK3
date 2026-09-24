@@ -610,6 +610,61 @@ class SuketDocxService
     }
 
     /**
+     * Convert any Word document (.docx or .doc) to PDF binary stream for in-browser preview / PDF.js
+     */
+    public function renderAnyWordToPdf(string $fullPath): ?string
+    {
+        if (!file_exists($fullPath) || !is_readable($fullPath)) {
+            return null;
+        }
+
+        $errorLevel = error_reporting(E_ALL & ~E_DEPRECATED);
+        $prevXmlErrors = libxml_use_internal_errors(true);
+
+        try {
+            $phpWord = null;
+            try {
+                $phpWord = IOFactory::load($fullPath, 'Word2007');
+            } catch (\Throwable $e1) {
+                try {
+                    $phpWord = IOFactory::load($fullPath);
+                } catch (\Throwable $e2) {
+                    Log::warning('SuketDocxService: failed to load word document: ' . $e2->getMessage());
+                    return null;
+                }
+            }
+
+            if (!$phpWord) {
+                return null;
+            }
+
+            $htmlWriter = IOFactory::createWriter($phpWord, 'HTML');
+
+            ob_start();
+            $htmlWriter->save('php://output');
+            $rawHtml = ob_get_clean();
+
+            $styledHtml = '<!DOCTYPE html><html><head><meta charset="utf-8"><style>'
+                . '@page { size: a4 portrait; margin: 1.5cm; }'
+                . 'body { font-family: Arial, "Helvetica Neue", sans-serif; font-size: 10pt; line-height: 1.4; color: #111; margin: 0; padding: 0; }'
+                . 'table { border-collapse: collapse; width: 100%; margin-bottom: 12pt; }'
+                . 'td, th { border: 1px solid #333; padding: 4pt 6pt; font-size: 9.5pt; }'
+                . 'img { max-width: 100%; height: auto; }'
+                . 'p { margin: 0 0 6pt 0; }'
+                . '</style></head><body>' . $rawHtml . '</body></html>';
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML($styledHtml)->setPaper('a4', 'portrait');
+            return $pdf->output();
+        } catch (\Throwable $e) {
+            Log::warning('SuketDocxService: renderAnyWordToPdf failed: ' . $e->getMessage());
+            return null;
+        } finally {
+            libxml_use_internal_errors($prevXmlErrors);
+            error_reporting($errorLevel);
+        }
+    }
+
+    /**
      * Normalisasi dan styling cerdas HTML hasil konversi DOCX agar layout (termasuk posisi tanda tangan kanan,
      * tabel faktor K3, kop surat, dan metadata) presisi dan tidak berantakan / acak-acakan di preview browser maupun PDF.
      */

@@ -240,14 +240,27 @@
       <tr>
         <th style="width: 25px;">No</th>
         <th>Uraian / Deskripsi Layanan K3</th>
-        <th style="width: 140px;">Faktor K3 Diuji</th>
+        <th style="width: 140px;">Ruang Lingkup Uji</th>
         <th style="width: 130px;">Jumlah (Rp)</th>
       </tr>
     </thead>
     <tbody>
       @php
-        $faktorList = is_array($suket->faktor_k3) ? array_map('ucfirst', $suket->faktor_k3) : ['Lingkungan Kerja'];
+        $rincianItems = !empty($items) ? $items : ($suket ? $suket->getFaktorBreakdownItems() : []);
       @endphp
+      @forelse($rincianItems as $idx => $item)
+      <tr>
+        <td class="num">{{ $idx + 1 }}</td>
+        <td>
+          <strong>Uji {{ $item['label'] }}</strong><br>
+          <span style="font-size: 8pt; color: #4b5563;">
+            Evaluasi berkas hasil pengujian teknis, verifikasi kesesuaian baku mutu / Nilai Ambang Batas (NAB), dan penerbitan Surat Keterangan K3.
+          </span>
+        </td>
+        <td style="text-align: center;">{{ $item['short_label'] ?? ucfirst($item['key']) }}</td>
+        <td class="price">Rp {{ number_format($item['price'], 0, ',', '.') }}</td>
+      </tr>
+      @empty
       <tr>
         <td class="num">1</td>
         <td>
@@ -256,9 +269,10 @@
             Evaluasi berkas LHU, penyusunan naskah dinas, review tata naskah QC, dan pengesahan sah Kepala Balai K3 Surabaya.
           </span>
         </td>
-        <td>{{ implode(', ', $faktorList) }}</td>
+        <td style="text-align: center;">Lingkungan Kerja</td>
         <td class="price">Rp {{ number_format($nominalTagihan, 0, ',', '.') }}</td>
       </tr>
+      @endforelse
     </tbody>
     <tfoot>
       <tr>

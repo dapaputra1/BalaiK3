@@ -2098,5 +2098,79 @@ class SuketK3WorkflowTest extends TestCase
         $this->assertEquals('pending', $suket->evaluasi_status);
         $this->assertEquals('LHU_Revisi_Banyak_Halaman_9.5MB.pdf', $suket->lhu_file_name);
     }
+
+    public function test_permohonan_faktor_prices_auto_generate_surat_tagihan_nominal_and_breakdown()
+    {
+        $this->withoutMiddleware(ValidateCsrfToken::class);
+
+        $user = User::create([
+            'name' => 'Pemohon Uji Harga',
+            'email' => 'harga.faktor@example.com',
+            'password' => bcrypt('password'),
+            'role' => 'user',
+        ]);
+
+        $permohonan1 = Permohonan::create([
+            'user_id' => $user->id,
+            'kode' => 'ORD-PRICE-001',
+            'status' => 'selesai_pengujian',
+        ]);
+
+        // 1. Pilih 2 faktor: Fisika (2.500.000) dan Kimia (3.000.000) -> total 5.500.000
+        $res1 = $this->actingAs($user)->post('/permohonan-suket/store', [
+            'nomor_order' => 'ORD-PRICE-001',
+            'faktor_k3' => ['fisika', 'kimia'],
+            'lhu_source' => 'manual',
+            'lhu_file' => UploadedFile::fake()->create('LHU_Test.pdf', 200, 'application/pdf'),
+        ]);
+        $res1->assertSessionHasNoErrors();
+        $res1->assertSessionHas('success');
+
+        $suket1 = SuketK3::where('nomor_order', 'ORD-PRICE-001')->first();
+        $this->assertNotNull($suket1);
+        $this->assertEquals(5500000, (float) $suket1->surat_tagihan_nominal);
+        $this->assertEquals([
+            'fisika' => 2500000,
+            'kimia' => 3000000,
+        ], $suket1->biaya_rincian);
+
+        // Check breakdown items helper
+        $items = $suket1->getFaktorBreakdownItems();
+        $this->assertCount(2, $items);
+        $this->assertEquals('fisika', $items[0]['key']);
+        $this->assertEquals(2500000, $items[0]['price']);
+        $this->assertEquals('kimia', $items[1]['key']);
+        $this->assertEquals(3000000, $items[1]['price']);
+
+        // Check PDF generation for Surat Tagihan
+        $controller = app(\App\Http\Controllers\PenerbitanSuketController::class);
+        $pdf = $controller->generateSuratTagihanPdf($suket1);
+        $pdfOutput = $pdf->output();
+        $this->assertNotEmpty($pdfOutput);
+
+        // 2. Permohonan lain: Biologi (2.000.000) + Ergonomi (1.500.000) + Psikologi (1.000.000) -> 4.500.000
+        $permohonan2 = Permohonan::create([
+            'user_id' => $user->id,
+            'kode' => 'ORD-PRICE-002',
+            'status' => 'selesai_pengujian',
+        ]);
+
+        $res2 = $this->actingAs($user)->post('/permohonan-suket/store', [
+            'nomor_order' => 'ORD-PRICE-002',
+            'faktor_k3' => ['biologi', 'ergonomi', 'psikologi'],
+            'lhu_source' => 'manual',
+            'lhu_file' => UploadedFile::fake()->create('LHU_Test2.pdf', 200, 'application/pdf'),
+        ]);
+        $res2->assertSessionHasNoErrors();
+
+        $suket2 = SuketK3::where('nomor_order', 'ORD-PRICE-002')->first();
+        $this->assertNotNull($suket2);
+        $this->assertEquals(4500000, (float) $suket2->surat_tagihan_nominal);
+        $this->assertEquals([
+            'biologi' => 2000000,
+            'ergonomi' => 1500000,
+            'psikologi' => 1000000,
+        ], $suket2->biaya_rincian);
+    }
 }
 

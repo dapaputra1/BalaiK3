@@ -157,12 +157,23 @@ class PenerbitanSuketController extends Controller
             $denahPath = $file->storeAs('suket_docs/denah', 'denah_' . time() . '_' . uniqid() . '.' . $ext, self::PRIVATE_DISK);
         }
 
+        $selectedFaktors = (array) $request->input('faktor_k3', []);
+        $breakdown = [];
+        $totalNominal = 0;
+        foreach ($selectedFaktors as $fKey) {
+            $fPrice = (float) (SuketK3::FAKTOR_PRICES[$fKey] ?? 0);
+            $breakdown[$fKey] = $fPrice;
+            $totalNominal += $fPrice;
+        }
+
         $suket = SuketK3::create([
             'user_id' => $user->id,
             'permohonan_id' => $permohonan->id,
             'nomor_order' => $permohonan->kode,
             'status_tahap' => 2,
-            'faktor_k3' => $request->input('faktor_k3'),
+            'faktor_k3' => $selectedFaktors,
+            'biaya_rincian' => $breakdown,
+            'surat_tagihan_nominal' => $totalNominal,
             'lhu_source' => $lhuSource,
             'lhu_file_path' => $lhuPath,
             'lhu_file_name' => $lhuName,
@@ -585,12 +596,23 @@ class PenerbitanSuketController extends Controller
             $denahPath = $file->storeAs('suket_docs/denah', 'denah_' . time() . '_' . uniqid() . '.' . $ext, self::PRIVATE_DISK);
         }
 
+        $selectedFaktors = (array) $request->input('faktor_k3', []);
+        $breakdown = [];
+        $totalNominal = 0;
+        foreach ($selectedFaktors as $fKey) {
+            $fPrice = (float) (SuketK3::FAKTOR_PRICES[$fKey] ?? 0);
+            $breakdown[$fKey] = $fPrice;
+            $totalNominal += $fPrice;
+        }
+
         $suket = SuketK3::create([
             'user_id' => $permohonan?->user_id ?? auth()->id(),
             'permohonan_id' => $permohonan?->id,
             'nomor_order' => $permohonan?->kode ?? $orderCode,
             'status_tahap' => 1,
-            'faktor_k3' => $request->input('faktor_k3'),
+            'faktor_k3' => $selectedFaktors,
+            'biaya_rincian' => $breakdown,
+            'surat_tagihan_nominal' => $totalNominal,
             'lhu_source' => $lhuSource,
             'lhu_file_path' => $lhuPath,
             'lhu_file_name' => $lhuName,
@@ -796,12 +818,33 @@ class PenerbitanSuketController extends Controller
         }
 
         $fullPath = Storage::disk($disk)->path($path);
+
+        // Jika dokumen LHU berformat Word (.docx atau .doc), konversi ke PDF on-the-fly agar PDF.js annotator dapat menampilkan dokumen tanpa auto-download
+        if ($type === 'lhu') {
+            $isWord = str_ends_with(strtolower($path), '.docx') || str_ends_with(strtolower($path), '.doc');
+            if ($isWord) {
+                $pdfBinary = app(\App\Services\SuketDocxService::class)->renderAnyWordToPdf($fullPath);
+                if ($pdfBinary) {
+                    return response($pdfBinary, 200, [
+                        'Content-Type' => 'application/pdf',
+                        'Content-Disposition' => 'inline; filename="LHU_' . $suket->nomor_order . '.pdf"',
+                        'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
+                        'Pragma' => 'no-cache',
+                        'Expires' => '0',
+                    ]);
+                }
+            }
+        }
+
         $mime = Storage::disk($disk)->mimeType($path) ?: 'application/octet-stream';
         $filename = basename($path);
 
         return response()->file($fullPath, [
             'Content-Type' => $mime,
             'Content-Disposition' => 'inline; filename="' . $filename . '"',
+            'Cache-Control' => 'no-cache, no-store, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
         ]);
     }
 
@@ -1810,7 +1853,7 @@ class PenerbitanSuketController extends Controller
      */
     public function generateSuratTagihanPdf(SuketK3 $suket)
     {
-        $nominalTagihan = (float) ($suket->surat_tagihan_nominal ?: ($suket->permohonan?->total_biaya ?: 2500000));
+        $nominalTagihan = (float) ($suket->surat_tagihan_nominal ?: SuketK3::calculateFaktorTotal((array) $suket->faktor_k3));
         $terbilang = TerbilangHelper::make($nominalTagihan);
         $nomorTagihan = 'TAG/BK3-SBY/' . ($suket->surat_tagihan_sent_at ? \Carbon\Carbon::parse($suket->surat_tagihan_sent_at)->format('Ymd') : now()->format('Ymd')) . '/' . $suket->id;
         $tanggalTagihan = \Carbon\Carbon::parse($suket->surat_tagihan_sent_at ?? now())->translatedFormat('d F Y');
@@ -1821,6 +1864,7 @@ class PenerbitanSuketController extends Controller
 
         $logoAsset = $this->resolveWordHeaderLogoAsset();
         $logoBase64 = $logoAsset ? base64_encode($logoAsset['binary']) : null;
+        $items = $suket->getFaktorBreakdownItems();
 
         return Pdf::loadView('admin.pdf.surat_tagihan_suket', [
             'suket' => $suket,
@@ -1831,6 +1875,7 @@ class PenerbitanSuketController extends Controller
             'bendaharaNama' => $bendaharaNama,
             'bendaharaNip' => $bendaharaNip,
             'logoBase64' => $logoBase64,
+            'items' => $items,
         ])->setPaper('a4', 'portrait');
     }
 

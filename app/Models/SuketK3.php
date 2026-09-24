@@ -51,6 +51,7 @@ class SuketK3 extends Model
         'surat_tagihan_file_path',
         'surat_tagihan_file_name',
         'surat_tagihan_nominal',
+        'biaya_rincian',
         'surat_tagihan_sent_at',
         'surat_tagihan_sent_by',
         'surat_tagihan_acc_at',
@@ -97,6 +98,7 @@ class SuketK3 extends Model
         'signed_at' => 'datetime',
         'published_at' => 'datetime',
         'surat_tagihan_nominal' => 'decimal:2',
+        'biaya_rincian' => 'array',
         'surat_tagihan_sent_at' => 'datetime',
         'surat_tagihan_acc_at' => 'datetime',
         'billing_sent_at' => 'datetime',
@@ -115,6 +117,14 @@ class SuketK3 extends Model
         'biologi' => 'Faktor Biologi (Jamur, Bakteri, Angka Kuman)',
         'ergonomi' => 'Faktor Ergonomi (Postur Kerja, Manual Handling)',
         'psikologi' => 'Faktor Psikologi (Beban Kerja, Stres Kerja)',
+    ];
+
+    public const FAKTOR_PRICES = [
+        'fisika' => 2500000,
+        'kimia' => 3000000,
+        'biologi' => 2000000,
+        'ergonomi' => 1500000,
+        'psikologi' => 1000000,
     ];
 
     public const STAGES = [
@@ -453,5 +463,45 @@ class SuketK3 extends Model
             'catatan' => $catatan,
             'metadata' => $metadata,
         ]);
+    }
+
+    public function getFaktorBreakdownItems(): array
+    {
+        $faktorOptions = self::FAKTOR_OPTIONS;
+        $faktorPrices = self::FAKTOR_PRICES;
+        $selected = is_array($this->faktor_k3) ? $this->faktor_k3 : [];
+        $savedRincian = is_array($this->biaya_rincian) ? $this->biaya_rincian : [];
+
+        $items = [];
+        foreach ($selected as $key) {
+            $price = isset($savedRincian[$key]) ? (float) $savedRincian[$key] : (float) ($faktorPrices[$key] ?? 0);
+            $items[] = [
+                'key' => $key,
+                'label' => $faktorOptions[$key] ?? ('Faktor ' . ucfirst($key)),
+                'short_label' => ucfirst($key),
+                'price' => $price,
+            ];
+        }
+
+        if (empty($items)) {
+            $nominal = (float) ($this->surat_tagihan_nominal ?: ($this->permohonan?->total_biaya ?: 2500000));
+            $items[] = [
+                'key' => 'general',
+                'label' => 'Penerbitan Surat Keterangan K3 Lingkungan Kerja',
+                'short_label' => 'Lingkungan Kerja',
+                'price' => $nominal,
+            ];
+        }
+
+        return $items;
+    }
+
+    public static function calculateFaktorTotal(array $factors): float
+    {
+        $total = 0;
+        foreach ($factors as $f) {
+            $total += self::FAKTOR_PRICES[$f] ?? 0;
+        }
+        return (float) $total;
     }
 }
