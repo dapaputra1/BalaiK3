@@ -975,8 +975,8 @@
                                         ];
                                     }
 
-                                    // 8. Panduan Pembayaran
-                                    if ($suket->hasBillingGuide()) {
+                                    // 8. Panduan Pembayaran (Hanya tampil jika sudah tahap 7 ke atas atau billing sudah dikirim/ada)
+                                    if ($suket->hasBillingGuide() && ($stg >= 7 || $suket->isBillingSent() || $suket->billing_file_path || $suket->billing_kode)) {
                                         $allDocs['guide'] = [
                                             'label' => 'Panduan',
                                             'title' => 'Panduan Pembayaran: ' . $suket->nomor_order,
