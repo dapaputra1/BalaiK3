@@ -151,9 +151,9 @@
                                             <i class="bi bi-pencil fs-6"></i>
                                         </a>
 
-                                        <!-- Tombol Cetak PDF Langsung -->
-                                        <a href="{{ route('ergo.pdf', $item->id) }}" target="_blank" class="btn btn-sm btn-outline-danger p-1.5 rounded-3" title="Unduh PDF">
-                                            <i class="bi bi-file-earmark-pdf fs-6"></i>
+                                        <!-- Tombol Unduh LHU Word (DOCX) -->
+                                        <a href="{{ route('ergo.docx', $item->id) }}" class="btn btn-sm btn-outline-primary p-1.5 rounded-3" title="Unduh Dokumen LHU (Word / DOCX)">
+                                            <i class="bi bi-file-earmark-word fs-6 text-primary"></i>
                                         </a>
 
                                         <!-- Tombol Hapus -->

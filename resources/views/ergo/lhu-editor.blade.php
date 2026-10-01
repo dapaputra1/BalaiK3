@@ -45,9 +45,9 @@
                 <i class="bi bi-floppy"></i>
                 <span>Simpan Perubahan</span>
             </button>
-            <a href="{{ route('ergo.pdf', $assessment->id) }}" target="_blank" class="btn btn-danger btn-sm rounded-3 d-flex align-items-center gap-1.5 shadow-sm">
-                <i class="bi bi-file-earmark-pdf"></i>
-                <span>Cetak / Unduh PDF</span>
+            <a href="{{ route('ergo.docx', $assessment->id) }}" class="btn btn-outline-primary btn-sm rounded-3 d-flex align-items-center gap-1.5 shadow-sm">
+                <i class="bi bi-file-earmark-word"></i>
+                <span>Unduh LHU (Word / DOCX)</span>
             </a>
         </div>
     </div>
@@ -159,6 +159,11 @@
             <div class="fw-bold text-dark text-uppercase small mb-1">5. Narasi Analisis Potensi Bahaya (Butir 5)</div>
             <div class="text-muted small mb-2">Uraikan secara spesifik sikap janggal leher, bahu, pergelangan tangan, dan keluhan Nordic Body Map:</div>
             <textarea name="lhu_analysis" rows="4" class="form-control small">{{ old('lhu_analysis', $assessment->lhu_analysis) }}</textarea>
+            <div class="text-muted small mb-2">Uraikan secara spesifik sikap janggal leher, bahu, pergelangan tangan, dan keluhan Nordic Body Map / GOTRAK:</div>
+            @php
+                $defaultAnalysis = "a. Hasil penilaian potensi bahaya ergonomi {$assessment->worker_name} ({$assessment->position}) tubuh bagian atas yang berpotensi bahaya adalah :\n- Leher menekuk ke depan > 20° atau ke belakang < 5°\n- Bahu : Lengan atau siku yang tidak ditopang, dengan posisi di atas tinggi perut\n- Pergelangan tangan : Menekuk ke depan atau kesamping\n" . (!empty($assessment->gotrak_summary_narrative) ? $assessment->gotrak_summary_narrative : "Dari hasil wawancara menggunakan formulir keluhan Gangguan Otot Rangka Akibat Kerja didapatkan keluhan tidak nyaman pada leher dan punggung bawah dengan frekuensi terkadang.") . "\nb. Hasil penilaian potensi bahaya ergonomi bagian bawah yang berpotensi bahaya adalah :\n- Duduk dalam waktu yang lama tanpa sandaran atau penopang punggung yang memadai\n- Tubuh membungkuk ke depan dengan sudut antara 20 hingga 45 derajat";
+            @endphp
+            <textarea name="lhu_analysis" rows="5" class="form-control small">{{ old('lhu_analysis', $assessment->lhu_analysis ?? $defaultAnalysis) }}</textarea>
         </div>
 
         {{-- 6. Kesimpulan --}}

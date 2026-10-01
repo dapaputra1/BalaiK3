@@ -500,7 +500,11 @@
             &nbsp;&nbsp;&nbsp;&nbsp;- Leher menekuk ke depan &gt; 20&deg; atau ke belakang &lt; 5&deg;<br>
             &nbsp;&nbsp;&nbsp;&nbsp;- Bahu : Lengan atau siku yang tidak ditopang, dengan posisi di atas tinggi perut<br>
             &nbsp;&nbsp;&nbsp;&nbsp;- Pergelangan tangan : Menekuk ke depan atau kesamping<br>
+            @if(!empty($assessment->gotrak_summary_narrative))
+            {{ $assessment->gotrak_summary_narrative }}<br>
+            @else
             Dari hasil wawancara menggunakan formulir keluhan Gangguan Otot Rangka Akibat Kerja didapatkan keluhan tidak nyaman pada leher dan punggung bawah dengan frekuensi terkadang.<br>
+            @endif
             b. Hasil penilaian potensi bahaya ergonomi bagian bawah yang berpotensi bahaya adalah :<br>
             &nbsp;&nbsp;&nbsp;&nbsp;- Duduk dalam waktu yang lama tanpa sandaran atau penopang punggung yang memadai<br>
             &nbsp;&nbsp;&nbsp;&nbsp;- Tubuh membungkuk ke depan dengan sudut antara 20 hingga 45 derajat
@@ -643,6 +647,64 @@
         </div>
     </div>
 
+    <!-- Ringkasan Survei Keluhan GOTRAK (SNI 9011:2021 Tabel 1) -->
+    @if(isset($gotrakAssessments) && count($gotrakAssessments) > 0)
+        @php
+            $freqLabels = [1 => 'Tidak pernah', 2 => 'Terkadang (1-3x/th)', 3 => 'Sering (1-3x/bln)', 4 => 'Selalu (tiap hari)'];
+            $sevLabels = [1 => 'Tidak ada masalah', 2 => 'Tidak nyaman', 3 => 'Sakit', 4 => 'Sakit parah'];
+            $activeGotrak = $gotrakAssessments->filter(function($item) {
+                return $item->score > 1;
+            });
+        @endphp
+        <div style="font-size: 8.5pt; font-weight: bold; text-align: center; margin-top: 4px; margin-bottom: 3px;">
+            Hasil Evaluasi Keluhan Otot Rangka (GOTRAK / SNI 9011:2021)
+        </div>
+        <table class="table-checklist" style="margin-bottom: 8px;">
+            <thead>
+                <tr>
+                    <th width="24px">No.</th>
+                    <th width="120px">Bagian Tubuh</th>
+                    <th width="50px">Sisi</th>
+                    <th width="105px">Frekuensi</th>
+                    <th width="95px">Keparahan</th>
+                    <th width="45px">Skor</th>
+                    <th width="85px">Kategori Risiko</th>
+                    <th>Pekerjaan Penyebab</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if($activeGotrak->count() > 0)
+                    @foreach($activeGotrak as $idx => $g)
+                        <tr>
+                            <td class="center">{{ $loop->iteration }}.</td>
+                            <td><strong>{{ $g->body_part_name }}</strong></td>
+                            <td class="center">{{ $g->side ?? '-' }}</td>
+                            <td>{{ $freqLabels[$g->frequency] ?? $g->frequency }}</td>
+                            <td>{{ $sevLabels[$g->severity] ?? $g->severity }}</td>
+                            <td class="center bold">{{ $g->score }}</td>
+                            <td class="center">
+                                @if($g->risk_category === 'Risiko Rendah')
+                                    <span style="color: #065f46; font-weight: bold;">Rendah</span>
+                                @elseif($g->risk_category === 'Risiko Sedang')
+                                    <span style="color: #92400e; font-weight: bold;">Sedang</span>
+                                @else
+                                    <span style="color: #991b1b; font-weight: bold;">Tinggi</span>
+                                @endif
+                            </td>
+                            <td>{{ $g->cause_description ?? '-' }}</td>
+                        </tr>
+                    @endforeach
+                @else
+                    <tr>
+                        <td colspan="8" class="center" style="font-style: italic; color: #555; padding: 5px;">
+                            Tidak terdapat keluhan gangguan otot rangka kerja yang dilaporkan (Semua skor keluhan = 1, Risiko Rendah).
+                        </td>
+                    </tr>
+                @endif
+            </tbody>
+        </table>
+    @endif
+
     <!-- Rekaman Foto/Video Teranotasi Sudut -->
     <div style="font-size: 8.5pt; font-weight: bold; text-align: center; margin-bottom: 3px;">
         Hasil Rekaman Foto/Video
@@ -725,16 +787,54 @@
             </tr>
 
             <tr class="group-header">
-                <td colspan="3">Hasil Periksa Pengangkatan Beban Secara Manual</td>
+                <td colspan="3">Hasil Periksa Pengangkatan Beban Secara Manual (MMH - SNI 9011:2021)</td>
             </tr>
+            @php
+                $mmhStep3Saved = [];
+                if (!empty($assessment->mmh_step3_items)) {
+                    $mmhStep3Saved = is_array($assessment->mmh_step3_items) ? $assessment->mmh_step3_items : json_decode($assessment->mmh_step3_items, true);
+                }
+                $mmhTitles = [
+                    34 => 'Batang tubuh memuntir saat mengangkat',
+                    35 => 'Mengangkat dengan satu tangan',
+                    36 => 'Mengangkat beban tidak terduga/tidak diprediksi',
+                    37 => 'Mengangkat 1-5 kali per menit',
+                    38 => 'Mengangkat lebih dari 5 kali per menit',
+                    39 => 'Posisi benda yang diangkat di atas bahu',
+                    40 => 'Posisi benda yang diangkat di bawah siku',
+                    41 => 'Membawa benda dengan jarak 3-9 meter',
+                    42 => 'Membawa benda dengan jarak > 9 meter',
+                    43 => 'Mengangkat saat duduk / bertumpu pada lutut',
+                ];
+                $hasStep3Exposures = false;
+            @endphp
             <tr>
-                <td>Pengangkatan beban atau membawa benda berulang</td>
-                <td class="center">Sesekali</td>
-                <td class="center">{{ $assessment->mmh_score ?? 0 }}</td>
+                <td>32 &amp; 33. Berat beban dan jarak angkut/bawa (Langkah ke-2)</td>
+                <td class="center">Terpapar</td>
+                <td class="center">{{ $assessment->mmh_step2_score ?? ($assessment->mmh_score ?? 0) }}</td>
             </tr>
+            @if(!empty($mmhStep3Saved))
+                @foreach($mmhStep3Saved as $itNo => $itScore)
+                    @if((float)$itScore > 0)
+                        @php $hasStep3Exposures = true; @endphp
+                        <tr>
+                            <td>{{ $itNo }}. {{ $mmhTitles[$itNo] ?? 'Faktor risiko langkah ke-3' }}</td>
+                            <td class="center">{{ ((int)$itScore >= 2 && in_array((int)$itNo, [35,36,39,40,41,43])) || ((int)$itScore >= 3 && in_array((int)$itNo, [38,42])) ? 'Sering' : 'Sesekali' }}</td>
+                            <td class="center">{{ $itScore }}</td>
+                        </tr>
+                    @endif
+                @endforeach
+            @endif
+            @if(!$hasStep3Exposures && empty($assessment->mmh_step3_score))
+                <tr>
+                    <td>34 - 43. Faktor risiko tambahan (Langkah ke-3)</td>
+                    <td class="center">Tidak Terpapar</td>
+                    <td class="center">0</td>
+                </tr>
+            @endif
             <tr class="bold">
-                <td colspan="2" style="text-align: right; padding-right: 8px;">Total</td>
-                <td class="center">{{ $assessment->mmh_score ?? 0 }}</td>
+                <td colspan="2" style="text-align: right; padding-right: 8px;">Total Pengangkatan Beban Manual (MMH)</td>
+                <td class="center">{{ $assessment->mmh_total_score ?? ($assessment->mmh_score ?? 0) }}</td>
             </tr>
 
             <tr class="bold" style="background-color: #f5f5f5;">

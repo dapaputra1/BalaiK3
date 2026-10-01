@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\ErgoDocxService;
 
 class ErgoAssessmentController extends Controller
 {
@@ -67,22 +68,34 @@ class ErgoAssessmentController extends Controller
             $ergoItems = $request->input('ergo_items', []);
             foreach ($ergoItems as $no => $score) {
                 if (intval($no) <= 16) {
-                    $scoreUpper += intval($score);
+                    $scoreUpper += floatval($score);
                 }
             }
 
             $scoreLower = 0;
             foreach ($ergoItems as $no => $score) {
                 if (intval($no) > 16) {
-                    $scoreLower += intval($score);
+                    $scoreLower += floatval($score);
                 }
             }
 
-            $mmhWeight = intval($request->input('mmh_weight_score', 0));
-            $mmhDist   = intval($request->input('mmh_distance_score', 0));
-            $scoreMMH  = $mmhWeight + $mmhDist;
+            $mmhWeight = floatval($request->input('mmh_weight_score', 0));
+            $mmhDist   = floatval($request->input('mmh_distance_score', 0));
+            $scoreMmhStep2 = $mmhWeight + $mmhDist;
 
-            $totalScore = $scoreUpper + $scoreLower + $scoreMMH + $overtimeBonus;
+            // MMH Langkah 3 (Butir 34 s/d 43)
+            $mmhStep3Inputs = $request->input('mmh_step3', []);
+            $scoreMmhStep3 = 0;
+            if (is_array($mmhStep3Inputs)) {
+                foreach ($mmhStep3Inputs as $val) {
+                    $scoreMmhStep3 += floatval($val);
+                }
+            }
+
+            // Total MMH (Langkah 2 + Langkah 3)
+            $scoreMMH = $scoreMmhStep2 + $scoreMmhStep3;
+
+            $totalScore = round($scoreUpper + $scoreLower + $scoreMMH + $overtimeBonus, 1);
 
             $riskLevel = 'Aman';
             if ($totalScore >= 2 && $totalScore <= 6) {
@@ -112,6 +125,9 @@ class ErgoAssessmentController extends Controller
                 'existing_control' => $request->input('existing_control'),
                 'surveyor_id'      => auth()->id() ?? 1,
                 'department'       => $request->input('position', 'Operasional'),
+                'assessor_role'    => $request->input('assessor_role'),
+                'assessor_name'    => $request->input('assessor_name'),
+                'assessor_nip'     => $request->input('assessor_nip'),
                 'status'           => 'submitted',
                 'created_at'       => now(),
                 'updated_at'       => now(),
@@ -137,6 +153,10 @@ class ErgoAssessmentController extends Controller
                 'upper_body_score'  => $scoreUpper,
                 'lower_body_score'  => $scoreLower,
                 'mmh_score'         => $scoreMMH,
+                'mmh_step2_score'   => $scoreMmhStep2,
+                'mmh_step3_score'   => $scoreMmhStep3,
+                'mmh_total_score'   => $scoreMMH,
+                'mmh_step3_items'   => json_encode($mmhStep3Inputs),
                 'final_score'       => $totalScore,
                 'risk_level'        => $riskLevel,
                 'notes'             => $request->input('existing_control'),
@@ -166,6 +186,84 @@ class ErgoAssessmentController extends Controller
                     }
                 }
             }
+
+            // Simpan Data Kuesioner Evaluasi Keluhan GOTRAK (SNI 9011:2021 Tabel 1)
+            $gotrakInput = $request->input('gotrak', []);
+            $bodyPartTitles = [
+                'leher'          => 'Leher',
+                'siku'           => 'Siku',
+                'lengan'         => 'Lengan',
+                'tangan'         => 'Tangan / Pergelangan',
+                'paha'           => 'Paha',
+                'betis'          => 'Betis',
+                'bahu'           => 'Bahu',
+                'punggung_atas'  => 'Punggung Atas',
+                'punggung_bawah' => 'Punggung Bawah',
+                'pinggul'        => 'Pinggul',
+                'lutut'          => 'Lutut',
+                'kaki'           => 'Kaki',
+            ];
+
+            $complaintNarratives = [];
+            if ($request->input('has_pain_last_year', 0) == 1 && is_array($gotrakInput)) {
+                foreach ($bodyPartTitles as $partKey => $partTitle) {
+                    $item = $gotrakInput[$partKey] ?? null;
+                    if ($item) {
+                        $f = intval($item['freq'] ?? 1);
+                        $s = intval($item['severity'] ?? 1);
+                        $score = $f * $s;
+                        
+                        $risk = 'Risiko Rendah';
+                        if ($score === 6) {
+                            $risk = 'Risiko Sedang';
+                        } elseif ($score >= 8) {
+                            $risk = 'Risiko Tinggi';
+                        }
+
+                        $side = null;
+                        if (!empty($item['side']) && is_array($item['side'])) {
+                            $side = implode(',', $item['side']);
+                        }
+
+                        $cause = !empty($item['cause']) ? trim($item['cause']) : null;
+
+                        DB::table('ergo_gotrak_assessments')->insert([
+                            'assessment_id'     => $assessmentId,
+                            'worker_id'         => $workerId,
+                            'body_part_key'     => $partKey,
+                            'body_part_name'    => $partTitle,
+                            'side'              => $side,
+                            'frequency'         => $f,
+                            'severity'          => $s,
+                            'score'             => $score,
+                            'risk_category'     => $risk,
+                            'cause_description' => $cause,
+                            'created_at'        => now(),
+                            'updated_at'        => now(),
+                        ]);
+
+                        if ($score > 1) {
+                            $sevLabel = [1 => 'tidak ada masalah', 2 => 'tidak nyaman', 3 => 'sakit', 4 => 'sakit parah'][$s] ?? 'keluhan';
+                            $freqLabel = [1 => 'tidak pernah', 2 => 'terkadang', 3 => 'sering', 4 => 'selalu'][$f] ?? '';
+                            $partWithSide = $partTitle . ($side ? " ($side)" : "");
+                            $complaintNarratives[] = "keluhan {$sevLabel} pada {$partWithSide} dengan frekuensi {$freqLabel} ({$risk}, Skor: {$score})" . ($cause ? " akibat pekerjaan: {$cause}" : "");
+                        }
+                    }
+                }
+            }
+
+            // Susun narasi GOTRAK dan perbarui ke ergo_assessments
+            $gotrakNarrative = '';
+            if (!empty($complaintNarratives)) {
+                $gotrakNarrative = 'Dari hasil survei formulir keluhan Gangguan Otot Rangka Akibat Kerja (GOTRAK), pekerja mengalami ' . implode(', ', $complaintNarratives) . '.';
+            } else {
+                $gotrakNarrative = 'Dari hasil survei formulir keluhan Gangguan Otot Rangka Akibat Kerja (GOTRAK), pekerja tidak mengeluhkan adanya rasa sakit atau keluhan muskuloskeletal yang signifikan dalam 1 tahun terakhir (Risiko Rendah).';
+            }
+
+            DB::table('ergo_assessments')->where('id', $assessmentId)->update([
+                'gotrak_summary_narrative' => $gotrakNarrative,
+                'updated_at' => now(),
+            ]);
 
             DB::commit();
 
@@ -203,6 +301,10 @@ class ErgoAssessmentController extends Controller
                 'ergo_reba_scores.upper_body_score',
                 'ergo_reba_scores.lower_body_score',
                 'ergo_reba_scores.mmh_score',
+                'ergo_reba_scores.mmh_step2_score',
+                'ergo_reba_scores.mmh_step3_score',
+                'ergo_reba_scores.mmh_total_score',
+                'ergo_reba_scores.mmh_step3_items',
                 'ergo_reba_scores.final_score as total_score',
                 'ergo_reba_scores.risk_level',
                 'ergo_reba_scores.notes'
@@ -217,7 +319,11 @@ class ErgoAssessmentController extends Controller
             ->where('assessment_id', $id)
             ->get();
 
-        return view('ergo.result', compact('assessment', 'photos'));
+        $gotrakAssessments = DB::table('ergo_gotrak_assessments')
+            ->where('assessment_id', $id)
+            ->get();
+
+        return view('ergo.result', compact('assessment', 'photos', 'gotrakAssessments'));
     }
 
     /**
@@ -248,6 +354,10 @@ class ErgoAssessmentController extends Controller
                 'ergo_reba_scores.upper_body_score',
                 'ergo_reba_scores.lower_body_score',
                 'ergo_reba_scores.mmh_score',
+                'ergo_reba_scores.mmh_step2_score',
+                'ergo_reba_scores.mmh_step3_score',
+                'ergo_reba_scores.mmh_total_score',
+                'ergo_reba_scores.mmh_step3_items',
                 'ergo_reba_scores.final_score as total_score',
                 'ergo_reba_scores.risk_level'
             )
@@ -261,7 +371,11 @@ class ErgoAssessmentController extends Controller
             ->where('assessment_id', $id)
             ->get();
 
-        return view('ergo.edit', compact('assessment', 'photos'));
+        $gotrakAssessments = DB::table('ergo_gotrak_assessments')
+            ->where('assessment_id', $id)
+            ->get();
+
+        return view('ergo.edit', compact('assessment', 'photos', 'gotrakAssessments'));
     }
 
     /**
@@ -291,22 +405,34 @@ class ErgoAssessmentController extends Controller
             $ergoItems = $request->input('ergo_items', []);
             foreach ($ergoItems as $no => $score) {
                 if (intval($no) <= 16) {
-                    $scoreUpper += intval($score);
+                    $scoreUpper += floatval($score);
                 }
             }
 
             $scoreLower = 0;
             foreach ($ergoItems as $no => $score) {
                 if (intval($no) > 16) {
-                    $scoreLower += intval($score);
+                    $scoreLower += floatval($score);
                 }
             }
 
-            $mmhWeight = intval($request->input('mmh_weight_score', 0));
-            $mmhDist   = intval($request->input('mmh_distance_score', 0));
-            $scoreMMH  = $mmhWeight + $mmhDist;
+            $mmhWeight = floatval($request->input('mmh_weight_score', 0));
+            $mmhDist   = floatval($request->input('mmh_distance_score', 0));
+            $scoreMmhStep2 = $mmhWeight + $mmhDist;
 
-            $totalScore = $scoreUpper + $scoreLower + $scoreMMH + $overtimeBonus;
+            // MMH Langkah 3 (Butir 34 s/d 43)
+            $mmhStep3Inputs = $request->input('mmh_step3', []);
+            $scoreMmhStep3 = 0;
+            if (is_array($mmhStep3Inputs)) {
+                foreach ($mmhStep3Inputs as $val) {
+                    $scoreMmhStep3 += floatval($val);
+                }
+            }
+
+            // Total MMH (Langkah 2 + Langkah 3)
+            $scoreMMH = $scoreMmhStep2 + $scoreMmhStep3;
+
+            $totalScore = round($scoreUpper + $scoreLower + $scoreMMH + $overtimeBonus, 1);
 
             $riskLevel = 'Aman';
             if ($totalScore >= 2 && $totalScore <= 6) {
@@ -326,6 +452,9 @@ class ErgoAssessmentController extends Controller
                 'assessment_date'  => $request->input('assessment_date', date('Y-m-d')),
                 'shift_hours'      => $shiftHours,
                 'existing_control' => $request->input('existing_control'),
+                'assessor_role'    => $request->input('assessor_role'),
+                'assessor_name'    => $request->input('assessor_name'),
+                'assessor_nip'     => $request->input('assessor_nip'),
                 'updated_at'       => now(),
             ]);
 
@@ -348,6 +477,10 @@ class ErgoAssessmentController extends Controller
                     'upper_body_score' => $scoreUpper,
                     'lower_body_score' => $scoreLower,
                     'mmh_score'        => $scoreMMH,
+                    'mmh_step2_score'  => $scoreMmhStep2,
+                    'mmh_step3_score'  => $scoreMmhStep3,
+                    'mmh_total_score'  => $scoreMMH,
+                    'mmh_step3_items'  => json_encode($mmhStep3Inputs),
                     'final_score'      => $totalScore,
                     'risk_level'       => $riskLevel,
                     'notes'            => $request->input('existing_control'),
@@ -382,6 +515,87 @@ class ErgoAssessmentController extends Controller
                     }
                 }
             }
+
+            // Perbarui Data Kuesioner Evaluasi Keluhan GOTRAK (SNI 9011:2021 Tabel 1)
+            $gotrakInput = $request->input('gotrak', []);
+            $bodyPartTitles = [
+                'leher'          => 'Leher',
+                'siku'           => 'Siku',
+                'lengan'         => 'Lengan',
+                'tangan'         => 'Tangan / Pergelangan',
+                'paha'           => 'Paha',
+                'betis'          => 'Betis',
+                'bahu'           => 'Bahu',
+                'punggung_atas'  => 'Punggung Atas',
+                'punggung_bawah' => 'Punggung Bawah',
+                'pinggul'        => 'Pinggul',
+                'lutut'          => 'Lutut',
+                'kaki'           => 'Kaki',
+            ];
+
+            // Bersihkan data GOTRAK lama untuk assessment ini
+            DB::table('ergo_gotrak_assessments')->where('assessment_id', $id)->delete();
+
+            $complaintNarratives = [];
+            if ($request->input('has_pain_last_year', 0) == 1 && is_array($gotrakInput) && $worker) {
+                foreach ($bodyPartTitles as $partKey => $partTitle) {
+                    $item = $gotrakInput[$partKey] ?? null;
+                    if ($item) {
+                        $f = intval($item['freq'] ?? 1);
+                        $s = intval($item['severity'] ?? 1);
+                        $score = $f * $s;
+                        
+                        $risk = 'Risiko Rendah';
+                        if ($score === 6) {
+                            $risk = 'Risiko Sedang';
+                        } elseif ($score >= 8) {
+                            $risk = 'Risiko Tinggi';
+                        }
+
+                        $side = null;
+                        if (!empty($item['side']) && is_array($item['side'])) {
+                            $side = implode(',', $item['side']);
+                        }
+
+                        $cause = !empty($item['cause']) ? trim($item['cause']) : null;
+
+                        DB::table('ergo_gotrak_assessments')->insert([
+                            'assessment_id'     => $id,
+                            'worker_id'         => $worker->id,
+                            'body_part_key'     => $partKey,
+                            'body_part_name'    => $partTitle,
+                            'side'              => $side,
+                            'frequency'         => $f,
+                            'severity'          => $s,
+                            'score'             => $score,
+                            'risk_category'     => $risk,
+                            'cause_description' => $cause,
+                            'created_at'        => now(),
+                            'updated_at'        => now(),
+                        ]);
+
+                        if ($score > 1) {
+                            $sevLabel = [1 => 'tidak ada masalah', 2 => 'tidak nyaman', 3 => 'sakit', 4 => 'sakit parah'][$s] ?? 'keluhan';
+                            $freqLabel = [1 => 'tidak pernah', 2 => 'terkadang', 3 => 'sering', 4 => 'selalu'][$f] ?? '';
+                            $partWithSide = $partTitle . ($side ? " ($side)" : "");
+                            $complaintNarratives[] = "keluhan {$sevLabel} pada {$partWithSide} dengan frekuensi {$freqLabel} ({$risk}, Skor: {$score})" . ($cause ? " akibat pekerjaan: {$cause}" : "");
+                        }
+                    }
+                }
+            }
+
+            // Susun narasi GOTRAK dan perbarui ke ergo_assessments
+            $gotrakNarrative = '';
+            if (!empty($complaintNarratives)) {
+                $gotrakNarrative = 'Dari hasil survei formulir keluhan Gangguan Otot Rangka Akibat Kerja (GOTRAK), pekerja mengalami ' . implode(', ', $complaintNarratives) . '.';
+            } else {
+                $gotrakNarrative = 'Dari hasil survei formulir keluhan Gangguan Otot Rangka Akibat Kerja (GOTRAK), pekerja tidak mengeluhkan adanya rasa sakit atau keluhan muskuloskeletal yang signifikan dalam 1 tahun terakhir (Risiko Rendah).';
+            }
+
+            DB::table('ergo_assessments')->where('id', $id)->update([
+                'gotrak_summary_narrative' => $gotrakNarrative,
+                'updated_at' => now(),
+            ]);
 
             DB::commit();
             return redirect()->route('ergo.result', $id)->with('success', 'Data pengujian berhasil diperbarui!');
@@ -451,6 +665,10 @@ class ErgoAssessmentController extends Controller
                 'ergo_reba_scores.upper_body_score',
                 'ergo_reba_scores.lower_body_score',
                 'ergo_reba_scores.mmh_score',
+                'ergo_reba_scores.mmh_step2_score',
+                'ergo_reba_scores.mmh_step3_score',
+                'ergo_reba_scores.mmh_total_score',
+                'ergo_reba_scores.mmh_step3_items',
                 'ergo_reba_scores.final_score as total_score',
                 'ergo_reba_scores.risk_level',
                 'ergo_reba_scores.notes'
@@ -481,7 +699,11 @@ class ErgoAssessmentController extends Controller
             ];
         }
 
-        $pdf = Pdf::loadView('ergo.pdf', compact('assessment', 'photos'));
+        $gotrakAssessments = DB::table('ergo_gotrak_assessments')
+            ->where('assessment_id', $id)
+            ->get();
+
+        $pdf = Pdf::loadView('ergo.pdf', compact('assessment', 'photos', 'gotrakAssessments'));
         $pdf->setPaper('a4', 'portrait');
         $pdf->setOption([
             'isRemoteEnabled'      => true,
@@ -491,6 +713,61 @@ class ErgoAssessmentController extends Controller
         $fileName = 'LHU-ERGONOMI-' . Str::slug($assessment->company_name) . '-' . Str::slug($assessment->worker_name) . '.pdf';
 
         return $pdf->stream($fileName);
+    }
+
+    /**
+     * Mengekspor dokumen LHU resmi berstandar Balai K3 Surabaya dalam format Word (.docx).
+     */
+    public function exportDocx($id, ErgoDocxService $docxService)
+    {
+        $assessment = DB::table('ergo_assessments')
+            ->join('ergo_companies', 'ergo_assessments.company_id', '=', 'ergo_companies.id')
+            ->leftJoin('ergo_workers', 'ergo_workers.assessment_id', '=', 'ergo_assessments.id')
+            ->leftJoin('ergo_reba_scores', 'ergo_reba_scores.worker_id', '=', 'ergo_workers.id')
+            ->where('ergo_assessments.id', $id)
+            ->select(
+                'ergo_assessments.*',
+                'ergo_companies.name as company_name',
+                'ergo_companies.address as company_address',
+                'ergo_companies.sector as company_sector',
+                'ergo_workers.name as worker_name',
+                'ergo_workers.position',
+                'ergo_workers.job_tasks',
+                'ergo_workers.job_duration',
+                'ergo_workers.dominant_hand',
+                'ergo_workers.work_duration_level',
+                'ergo_workers.mental_fatigue',
+                'ergo_workers.physical_fatigue',
+                'ergo_workers.has_pain_last_year',
+                'ergo_reba_scores.upper_body_score',
+                'ergo_reba_scores.lower_body_score',
+                'ergo_reba_scores.mmh_score',
+                'ergo_reba_scores.mmh_step2_score',
+                'ergo_reba_scores.mmh_step3_score',
+                'ergo_reba_scores.mmh_total_score',
+                'ergo_reba_scores.mmh_step3_items',
+                'ergo_reba_scores.final_score as total_score',
+                'ergo_reba_scores.risk_level',
+                'ergo_reba_scores.notes'
+            )
+            ->first();
+
+        if (!$assessment) {
+            return redirect()->route('ergo.index')->with('error', 'Data pengujian tidak ditemukan.');
+        }
+
+        $gotrakAssessments = DB::table('ergo_gotrak_assessments')
+            ->where('assessment_id', $id)
+            ->get();
+
+        $docxBinary = $docxService->generateDocx($assessment, $gotrakAssessments);
+        $fileName = 'LHU-ERGONOMI-' . Str::slug($assessment->company_name) . '-' . Str::slug($assessment->worker_name) . '.docx';
+
+        return response($docxBinary, 200, [
+            'Content-Type'        => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition' => 'attachment; filename="' . $fileName . '"',
+            'Cache-Control'       => 'max-age=0',
+        ]);
     }
 
     /**
@@ -513,6 +790,10 @@ class ErgoAssessmentController extends Controller
                 'ergo_reba_scores.upper_body_score',
                 'ergo_reba_scores.lower_body_score',
                 'ergo_reba_scores.mmh_score',
+                'ergo_reba_scores.mmh_step2_score',
+                'ergo_reba_scores.mmh_step3_score',
+                'ergo_reba_scores.mmh_total_score',
+                'ergo_reba_scores.mmh_step3_items',
                 'ergo_reba_scores.final_score as total_score',
                 'ergo_reba_scores.risk_level'
             )
@@ -522,7 +803,11 @@ class ErgoAssessmentController extends Controller
             return redirect()->route('ergo.index')->with('error', 'Data pengujian tidak ditemukan.');
         }
 
-        return view('ergo.lhu-editor', compact('assessment'));
+        $gotrakAssessments = DB::table('ergo_gotrak_assessments')
+            ->where('assessment_id', $id)
+            ->get();
+
+        return view('ergo.lhu-editor', compact('assessment', 'gotrakAssessments'));
     }
 
     /**

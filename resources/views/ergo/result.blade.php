@@ -69,9 +69,9 @@
                 <i class="bi bi-file-earmark-text"></i>
                 <span>Edit Draf LHU</span>
             </a>
-            <a href="{{ route('ergo.pdf', $assessment->id) }}" target="_blank" class="btn btn-danger btn-sm rounded-3 d-flex align-items-center gap-1.5">
-                <i class="bi bi-file-earmark-pdf"></i>
-                <span>Unduh LHU (PDF)</span>
+            <a href="{{ route('ergo.docx', $assessment->id) }}" class="btn btn-primary btn-sm rounded-3 d-flex align-items-center gap-1.5 text-white">
+                <i class="bi bi-file-earmark-word"></i>
+                <span>Unduh LHU (Word / DOCX)</span>
             </a>
         </div>
     </div>
@@ -131,6 +131,25 @@
                         <div class="mb-1"><strong class="text-dark">Posisi / Jabatan:</strong> {{ $assessment->position ?? '-' }}</div>
                         <div class="mb-1"><strong class="text-dark">Durasi Shift:</strong> {{ $assessment->shift_hours }} jam / hari</div>
                         <div class="mb-1"><strong class="text-dark">Tangan Dominan:</strong> {{ $assessment->dominant_hand ?? 'Kanan' }}</div>
+                        @if(!empty($assessment->job_tasks))
+                            <div class="mb-1"><strong class="text-dark">Deskripsi Tugas:</strong> {{ $assessment->job_tasks }}</div>
+                        @endif
+                        @if(!empty($assessment->job_duration))
+                            <div class="mb-1 p-2 bg-white rounded border border-slate-200 mt-2">
+                                <strong class="text-dark d-block mb-0.5"><i class="bi bi-clock-history text-primary me-1"></i> Alokasi Waktu & Aktivitas:</strong>
+                                <span class="text-muted">{{ $assessment->job_duration }}</span>
+                            </div>
+                        @endif
+                        @if(!empty($assessment->assessor_name))
+                            <div class="mb-1 p-2 bg-light rounded border mt-2">
+                                <strong class="text-dark d-block mb-0.5"><i class="bi bi-pen text-primary me-1"></i> Penilai (SNI 9011:2021):</strong>
+                                <div class="text-secondary small">{{ $assessment->assessor_role ?? 'Penguji K3' }}</div>
+                                <div class="fw-bold text-dark">{{ $assessment->assessor_name }}</div>
+                                @if(!empty($assessment->assessor_nip))
+                                    <div class="text-muted" style="font-size: 11px;">NIP/REG: {{ $assessment->assessor_nip }}</div>
+                                @endif
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>
@@ -157,17 +176,98 @@
                 <div class="col-6 col-md-3">
                     <div class="score-box bg-light border">
                         <span class="text-muted small d-block">Beban Manual (MMH)</span>
-                        <span class="fs-4 fw-bold text-dark">{{ $assessment->mmh_score ?? 0 }}</span>
+                        <span class="fs-4 fw-bold text-dark">{{ $assessment->mmh_total_score ?? ($assessment->mmh_score ?? 0) }}</span>
+                        @if(isset($assessment->mmh_step3_score))
+                            <span class="text-muted d-block" style="font-size: 10px;">(Lgkh 2: {{ $assessment->mmh_step2_score ?? 0 }} | Lgkh 3: {{ $assessment->mmh_step3_score }})</span>
+                        @endif
                     </div>
                 </div>
                 <div class="col-6 col-md-3">
                     <div class="score-box bg-primary-subtle border border-primary-subtle">
                         <span class="text-navy fw-semibold small d-block">Total Skor Akhir</span>
                         <span class="fs-4 fw-bold text-navy">{{ $assessment->total_score }}</span>
+                        @if(isset($assessment->shift_hours) && (float)$assessment->shift_hours > 8)
+                            @php
+                                $otHours = (float)$assessment->shift_hours - 8;
+                                $otBonus = $otHours * 0.5;
+                            @endphp
+                            <span class="text-primary d-block fw-semibold" style="font-size: 10px;">(Termasuk Lembur +{{ $otBonus }} skor dari {{ $otHours }} jam kelebihan)</span>
+                        @endif
                     </div>
                 </div>
             </div>
         </div>
+
+        {{-- Hasil Evaluasi Keluhan GOTRAK (SNI 9011:2021) --}}
+        @if(isset($gotrakAssessments) && count($gotrakAssessments) > 0)
+            @php
+                $freqLabels = [1 => 'Tidak pernah', 2 => 'Terkadang (1-3x/th)', 3 => 'Sering (1-3x/bln)', 4 => 'Selalu (tiap hari)'];
+                $sevLabels = [1 => 'Tidak ada masalah', 2 => 'Tidak nyaman', 3 => 'Sakit', 4 => 'Sakit parah'];
+                $activeGotrak = $gotrakAssessments->filter(function($item) {
+                    return (int)$item->score > 1;
+                });
+            @endphp
+            <div class="pt-3 border-top mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold text-navy mb-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-person-lines-fill"></i> Hasil Evaluasi Keluhan Otot Rangka (GOTRAK / SNI 9011:2021)
+                    </h6>
+                    <span class="badge bg-light text-secondary border fw-normal">{{ $activeGotrak->count() }} Keluhan Aktif</span>
+                </div>
+
+                @if(!empty($assessment->gotrak_summary_narrative))
+                    <div class="p-3 bg-light rounded-3 border small text-secondary mb-3">
+                        <strong class="d-block text-dark mb-1"><i class="bi bi-info-circle me-1"></i> Ringkasan Analisis GOTRAK:</strong>
+                        {{ $assessment->gotrak_summary_narrative }}
+                    </div>
+                @endif
+
+                <div class="table-responsive rounded-3 border">
+                    <table class="table table-sm table-hover align-middle mb-0 small">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-center" style="width: 40px;">No.</th>
+                                <th>Bagian Tubuh</th>
+                                <th class="text-center">Sisi</th>
+                                <th>Frekuensi</th>
+                                <th>Keparahan</th>
+                                <th class="text-center">Skor</th>
+                                <th class="text-center">Kategori Risiko</th>
+                                <th>Pekerjaan Penyebab</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($activeGotrak as $g)
+                                <tr>
+                                    <td class="text-center fw-semibold text-secondary">{{ $loop->iteration }}</td>
+                                    <td class="fw-bold text-dark">{{ $g->body_part_name }}</td>
+                                    <td class="text-center">{{ $g->side ?? '-' }}</td>
+                                    <td>{{ $freqLabels[$g->frequency] ?? $g->frequency }}</td>
+                                    <td>{{ $sevLabels[$g->severity] ?? $g->severity }}</td>
+                                    <td class="text-center fw-bold">{{ $g->score }}</td>
+                                    <td class="text-center">
+                                        @if($g->risk_category === 'Risiko Rendah')
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded-pill">Rendah</span>
+                                        @elseif($g->risk_category === 'Risiko Sedang')
+                                            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-0.5 rounded-pill">Sedang</span>
+                                        @else
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5 rounded-pill">Tinggi</span>
+                                        @endif
+                                    </td>
+                                    <td>{{ $g->cause_description ?? '-' }}</td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="8" class="text-center text-muted py-3 italic">
+                                        Tidak ada keluhan rasa sakit yang dialami pekerja (Semua bagian tubuh berada pada Risiko Rendah).
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
 
         {{-- Lampiran Foto Dokumentasi --}}
         <div class="pt-3 border-top mb-4">

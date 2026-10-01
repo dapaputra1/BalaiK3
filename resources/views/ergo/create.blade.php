@@ -167,10 +167,16 @@
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
                     <label class="font-semibold text-slate-700">5. Durasi Shift Kerja Harian</label>
-                    <div class="md:col-span-2 flex items-center gap-2">
-                        <input type="number" id="shift_hours" name="shift_hours" value="8" min="1" max="24" step="0.5" 
-                               class="w-24 border border-slate-300 rounded-lg p-2 text-xs font-bold text-[#153e67] outline-none text-center">
-                        <span class="text-xs text-slate-500">Jam/hari (Otomatis menambah +0.5 per jam jika &gt; 8 jam)</span>
+                    <div class="md:col-span-2 space-y-1">
+                        <div class="flex items-center gap-2">
+                            <input type="number" id="shift_hours" name="shift_hours" value="8" min="1" max="24" step="0.5" 
+                                   class="w-24 border border-slate-300 rounded-lg p-2 text-xs font-bold text-[#153e67] outline-none text-center">
+                            <span class="text-xs text-slate-500 font-medium">Jam/hari</span>
+                            <span id="overtimeNotice" class="hidden text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded">
+                                Lembur: +<span id="overtimeBonusDisplay">0</span> skor (+0.5 / 1 jam kelebihan)
+                            </span>
+                        </div>
+                        <p class="text-[11px] text-slate-500">Standar kerja normal adalah 8 jam/hari (100% waktu kerja). Kelebihan di atas 8 jam (&gt; 100%) otomatis menambahkan poin +0.5 per 1 jam kelebihan.</p>
                     </div>
                 </div>
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-2 items-center">
@@ -180,10 +186,82 @@
             </div>
         </div>
 
-        <!-- ================= BAGIAN 2: PROFIL PEKERJA & URAIAN TUGAS ================= -->
+        <!-- ================= BAGIAN 2: DOKUMENTASI FOTO, KAMERA & EDIT SUDUT INTERAKTIF ================= -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 bg-[#fbfcfd] flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-6 h-6 rounded bg-[#153e67] text-white flex items-center justify-center text-xs font-bold">2</span>
+                    <h2 class="text-sm font-bold text-slate-900">Dokumentasi Foto, Kamera Langsung & Edit Sudut Interaktif</h2>
+                </div>
+                <span class="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">Multi-Upload + Webcam + Drag</span>
+            </div>
+
+            <div class="p-6 space-y-6 text-xs">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="relative border-2 border-dashed border-slate-300 rounded-xl p-5 text-center bg-slate-50 hover:bg-slate-100 transition flex flex-col justify-center items-center">
+                        <input type="file" id="multiImageUploader" name="ergo_photos[]" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleMultipleImages(event)">
+                        <i class="ph-bold ph-upload-simple text-2xl text-[#153e67] mb-1"></i>
+                        <p class="font-bold text-slate-800 text-xs">Unggah Berkas Foto (Bisa Banyak)</p>
+                        <p class="text-slate-500 text-[10px]">Pilih file dari perangkat Anda</p>
+                    </div>
+
+                    <button type="button" onclick="openWebcamModal()" class="border-2 border-dashed border-[#153e67] rounded-xl p-5 text-center bg-blue-50/50 hover:bg-blue-50 transition flex flex-col justify-center items-center cursor-pointer">
+                        <i class="ph-bold ph-camera text-2xl text-[#153e67] mb-1"></i>
+                        <p class="font-bold text-[#153e67] text-xs">Ambil Foto Langsung dari Kamera</p>
+                        <p class="text-blue-500 text-[10px]">Gunakan kamera perangkat (Webcam)</p>
+                    </button>
+                </div>
+
+                <!-- Input Tersembunyi untuk JSON Sudut -->
+                <input type="hidden" name="annotated_photos_json" id="annotatedPhotosJson">
+
+                <!-- Daftar Thumbnail Foto -->
+                <div id="thumbnailContainer" class="hidden space-y-2">
+                    <span class="font-bold text-slate-700 block">Daftar Foto Dokumentasi (Klik untuk edit sudut / hapus):</span>
+                    <div id="thumbnailList" class="flex flex-wrap gap-3"></div>
+                </div>
+
+                <!-- Area Kanvas Interaktif untuk Foto Aktif -->
+                <div id="activeCanvasWrapper" class="hidden space-y-3 p-4 border border-slate-200 rounded-xl bg-slate-50">
+                    <div class="flex justify-between items-center flex-wrap gap-3">
+                        <span id="activePhotoTitle" class="font-bold text-slate-800">Sedang Mengedit Foto: -</span>
+                        <div class="flex items-center flex-wrap gap-2">
+                            <!-- Pemilih Warna Garis Ukur -->
+                            <div class="flex items-center gap-1.5 bg-white border border-slate-300 px-2.5 py-1 rounded shadow-xs">
+                                <label for="lineColorPicker" class="text-[11px] font-semibold text-slate-700 flex items-center gap-1 cursor-pointer">
+                                    <i class="ph-bold ph-palette text-sm text-[#153e67]"></i> Warna Garis:
+                                </label>
+                                <input type="color" id="lineColorPicker" value="#facc15" onchange="changeLineColor(this.value)" class="w-6 h-6 p-0 border-0 rounded cursor-pointer bg-transparent">
+                                <div class="flex items-center gap-1 ml-1">
+                                    <button type="button" title="Kuning" onclick="changeLineColor('#facc15')" class="w-4 h-4 rounded-full border border-slate-300" style="background-color: #facc15;"></button>
+                                    <button type="button" title="Merah" onclick="changeLineColor('#ef4444')" class="w-4 h-4 rounded-full border border-slate-300" style="background-color: #ef4444;"></button>
+                                    <button type="button" title="Hijau Neon" onclick="changeLineColor('#22c55e')" class="w-4 h-4 rounded-full border border-slate-300" style="background-color: #22c55e;"></button>
+                                    <button type="button" title="Cyan / Biru Terang" onclick="changeLineColor('#06b6d4')" class="w-4 h-4 rounded-full border border-slate-300" style="background-color: #06b6d4;"></button>
+                                    <button type="button" title="Putih" onclick="changeLineColor('#ffffff')" class="w-4 h-4 rounded-full border border-slate-300" style="background-color: #ffffff;"></button>
+                                    <button type="button" title="Oranye" onclick="changeLineColor('#f97316')" class="w-4 h-4 rounded-full border border-slate-300" style="background-color: #f97316;"></button>
+                                </div>
+                            </div>
+                            <label class="px-3 py-1 bg-white border border-slate-300 rounded cursor-pointer hover:bg-slate-50 text-[11px] font-semibold text-slate-700">
+                                <i class="ph-bold ph-arrow-counter-clockwise"></i> Ganti Foto Ini
+                                <input type="file" accept="image/*" class="hidden" onchange="replaceActivePhoto(event)">
+                            </label>
+                            <button type="button" onclick="deleteActivePhoto()" class="px-3 py-1 bg-rose-50 border border-rose-200 text-rose-700 rounded hover:bg-rose-100 text-[11px] font-semibold">
+                                <i class="ph-bold ph-trash"></i> Hapus Foto
+                            </button>
+                        </div>
+                    </div>
+                    <div class="relative overflow-hidden flex justify-center bg-black/5 rounded-lg border border-slate-300 p-2">
+                        <canvas id="interactivePoseCanvas" class="max-h-[450px] object-contain cursor-crosshair"></canvas>
+                    </div>
+                    <p class="text-[10px] text-amber-700 italic text-center">💡 Klik & seret lingkaran pada sendi di gambar untuk menggeser garis sudut secara manual.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= BAGIAN 3: PROFIL PEKERJA & URAIAN TUGAS ================= -->
         <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-200 bg-[#fbfcfd] flex items-center gap-2.5">
-                <span class="w-6 h-6 rounded bg-[#153e67] text-white flex items-center justify-center text-xs font-bold">2</span>
+                <span class="w-6 h-6 rounded bg-[#153e67] text-white flex items-center justify-center text-xs font-bold">3</span>
                 <h2 class="text-sm font-bold text-slate-900">Profil Tenaga Kerja & Pola Tugas</h2>
             </div>
 
@@ -199,16 +277,89 @@
                     </div>
                 </div>
 
-                <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-3">
-                    <span class="font-bold text-slate-800 block">Deskripsikan tugas yang dilakukan dan durasi waktu per shift:</span>
-                    <div class="space-y-2">
+                <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-4">
+                    <span class="font-bold text-slate-800 block border-b border-slate-200 pb-2">
+                        Deskripsi Pekerjaan, Alokasi Waktu & Rincian Aktivitas per Shift:
+                    </span>
+                    
+                    <div class="space-y-3">
+                        <!-- a. Deskripsi Tugas Pokok -->
                         <div>
-                            <span class="text-slate-600 block mb-1">a. Deskripsi Tugas:</span>
-                            <textarea name="job_tasks" rows="2" placeholder="Uraikan tugas operasional yang dilaksanakan..." class="w-full border border-slate-300 rounded-lg p-2.5 text-xs bg-white outline-none focus:border-[#153e67]"></textarea>
+                            <span class="text-slate-700 font-semibold block mb-1">a. Deskripsi Tugas Pokok:</span>
+                            <textarea id="jobTasksInput" name="job_tasks" rows="2" placeholder="Uraikan tugas operasional utama pekerja (contoh: Melakukan perakitan komponen, pemeriksaan visual, dan pencatatan laporan)..." class="w-full border border-slate-300 rounded-lg p-2.5 text-xs bg-white outline-none focus:border-[#153e67]"></textarea>
                         </div>
+
+                        <!-- b. Alokasi Waktu (PILIHAN DROPDOWN) -->
                         <div>
-                            <span class="text-slate-600 block mb-1">b. Alokasi Waktu:</span>
-                            <input type="text" name="job_duration" placeholder="Contoh: Dalam 1 hari kerja melakukan analisa dengan durasi 2-3 jam" class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white outline-none focus:border-[#153e67]">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="text-slate-700 font-semibold block">b. Alokasi Waktu Kerja:</span>
+                                <span class="text-[10px] text-blue-700 font-medium">Pilih rentang alokasi waktu kerja</span>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                <select id="jobDurationSelect" onchange="handleDurationSelectChange(this.value)" class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white font-medium text-slate-800 outline-none focus:border-[#153e67]">
+                                    <option value="">-- Pilih Alokasi Waktu --</option>
+                                    <option value="Dalam 1 hari kerja berdurasi 1 - 2 jam/shift">1 – 2 jam per shift (Pekerjaan Ringan/Insidental)</option>
+                                    <option value="Dalam 1 hari kerja berdurasi 2 - 4 jam/shift">2 – 4 jam per shift (Pekerjaan Berselang / Separuh Shift)</option>
+                                    <option value="Dalam 1 hari kerja berdurasi 4 - 6 jam/shift">4 – 6 jam per shift (Sebagian Besar Jam Kerja)</option>
+                                    <option value="Dalam 1 hari kerja berdurasi 7 - 8 jam/shift (Full Shift)">7 – 8 jam per shift (Penuh / Full Shift Normal)</option>
+                                    <option value="Dalam 1 hari kerja berdurasi > 8 jam/shift (Termasuk Lembur)">> 8 jam per shift (Shift Penuh + Lembur/Overtime)</option>
+                                    <option value="custom">-- Tulis Pilihan Kustom Lainnya --</option>
+                                </select>
+                                <input type="text" id="jobDurationInput" name="job_duration" placeholder="Hasil pilihan alokasi waktu akan terisi di sini..." class="w-full border border-slate-300 rounded-lg p-2 text-xs bg-white text-slate-800 font-medium outline-none focus:border-[#153e67]">
+                            </div>
+                        </div>
+
+                        <!-- c. Selama Waktu Tersebut Ngapain Aja (Pilihan Aktivitas Kerja) -->
+                        <div class="p-3.5 bg-white rounded-lg border border-slate-200 space-y-2.5">
+                            <div class="flex items-center justify-between flex-wrap gap-2">
+                                <span class="font-bold text-[#153e67] block text-xs flex items-center gap-1.5">
+                                    <i class="ph-bold ph-list-checks text-base"></i> Selama Waktu Tersebut Melakukan Apa Saja (Pilih Aktivitas):
+                                </span>
+                                <span class="text-[10px] text-slate-500 italic">Centang aktivitas yang dilakukan, kalimat alokasi waktu akan langsung terangkai</span>
+                            </div>
+
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pt-1 text-[11px]" id="activityOptionsGrid">
+                                <label class="flex items-start gap-2 p-2 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                                    <input type="checkbox" class="activity-checkbox mt-0.5 accent-[#153e67]" value="Mengoperasikan komputer, monitor & mengetik keyboard" onchange="syncDurationAndActivities()">
+                                    <span>Mengoperasikan komputer, monitor & input data</span>
+                                </label>
+                                <label class="flex items-start gap-2 p-2 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                                    <input type="checkbox" class="activity-checkbox mt-0.5 accent-[#153e67]" value="Memeriksa berkas/dokumen & administrasi pelaporan" onchange="syncDurationAndActivities()">
+                                    <span>Memeriksa berkas/dokumen & administrasi</span>
+                                </label>
+                                <label class="flex items-start gap-2 p-2 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                                    <input type="checkbox" class="activity-checkbox mt-0.5 accent-[#153e67]" value="Duduk bekerja di meja kerja/stasiun kerja" onchange="syncDurationAndActivities()">
+                                    <span>Duduk bekerja di meja/stasiun kerja</span>
+                                </label>
+                                <label class="flex items-start gap-2 p-2 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                                    <input type="checkbox" class="activity-checkbox mt-0.5 accent-[#153e67]" value="Berdiri memantau mesin/proses produksi" onchange="syncDurationAndActivities()">
+                                    <span>Berdiri memantau mesin/proses produksi</span>
+                                </label>
+                                <label class="flex items-start gap-2 p-2 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                                    <input type="checkbox" class="activity-checkbox mt-0.5 accent-[#153e67]" value="Merakit, memilah & memasang komponen kerja" onchange="syncDurationAndActivities()">
+                                    <span>Merakit, memilah & memasang komponen</span>
+                                </label>
+                                <label class="flex items-start gap-2 p-2 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                                    <input type="checkbox" class="activity-checkbox mt-0.5 accent-[#153e67]" value="Mengangkat, memindahkan & menurunkan beban barang" onchange="syncDurationAndActivities()">
+                                    <span>Mengangkat, memindahkan & menurunkan beban</span>
+                                </label>
+                                <label class="flex items-start gap-2 p-2 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                                    <input type="checkbox" class="activity-checkbox mt-0.5 accent-[#153e67]" value="Mendorong & menarik troli/material kerja" onchange="syncDurationAndActivities()">
+                                    <span>Mendorong & menarik troli/material kerja</span>
+                                </label>
+                                <label class="flex items-start gap-2 p-2 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                                    <input type="checkbox" class="activity-checkbox mt-0.5 accent-[#153e67]" value="Mengoperasikan perkakas tangan & alat kerja bergetar" onchange="syncDurationAndActivities()">
+                                    <span>Mengoperasikan perkakas tangan / alat kerja</span>
+                                </label>
+                                <label class="flex items-start gap-2 p-2 rounded border border-slate-200 hover:bg-slate-50 cursor-pointer transition">
+                                    <input type="checkbox" class="activity-checkbox mt-0.5 accent-[#153e67]" value="Pemeriksaan visual/inspeksi mutu dengan posisi menunduk/jongkok" onchange="syncDurationAndActivities()">
+                                    <span>Inspeksi mutu/visual dengan posisi menunduk/jongkok</span>
+                                </label>
+                            </div>
+
+                            <div class="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                                <span>💡 Centang satu atau beberapa aktivitas di atas untuk menambahkan deskripsi kegiatan kerja harian.</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -286,11 +437,11 @@
             </div>
         </div>
 
-        <!-- ================= BAGIAN 3: NORDIC BODY MAP (GOTRAK) ================= -->
+        <!-- ================= BAGIAN 4: NORDIC BODY MAP (GOTRAK) ================= -->
         <div id="gotrak_section" class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden transition-all duration-300 opacity-40 pointer-events-none">
             <div class="px-6 py-4 border-b border-slate-200 bg-[#fbfcfd] flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
-                    <span class="w-6 h-6 rounded bg-[#153e67] text-white flex items-center justify-center text-xs font-bold">3</span>
+                    <span class="w-6 h-6 rounded bg-[#153e67] text-white flex items-center justify-center text-xs font-bold">4</span>
                     <h2 class="text-sm font-bold text-slate-900">Pemetaan Keluhan Bagian Tubuh (Nordic Body Map / Gotrak)</h2>
                 </div>
                 <span class="text-[11px] font-bold text-rose-600 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded">
@@ -302,6 +453,15 @@
                 <p class="text-slate-600 text-xs font-medium">
                     Catatan: 'sakit' dapat berupa nyeri, kaku, mati rasa, kesemutan, atau rasa terbakar. Setiap kotak dihubungkan langsung dengan garis penunjuk ke bagian tubuh terkait:
                 </p>
+
+                <!-- ALERT RESIKO TINGGI GOTRAK -->
+                <div id="gotrakHighRiskAlert" class="hidden p-3 bg-rose-50 border border-rose-300 rounded-lg text-xs text-rose-800 flex items-start gap-2.5">
+                    <i class="ph-fill ph-warning-circle text-rose-600 text-lg shrink-0 mt-0.5"></i>
+                    <div>
+                        <span class="font-bold text-rose-900 block mb-0.5">Peringatan Keluhan Risiko Tinggi (Skor &ge; 8) Terdeteksi!</span>
+                        <p class="text-rose-700">Terdapat keluhan berisiko tinggi pada bagian tubuh: <strong id="highRiskJointsList" class="font-bold text-rose-900 underline"></strong>. Mohon lengkapi catatan uraian aktivitas/pekerjaan penyebab keluhan pada bagian tubuh terkait.</p>
+                    </div>
+                </div>
 
                 <div class="border-2 border-black p-4 sm:p-6 bg-white overflow-x-auto">
                     <div id="gotrakArea" class="min-w-[1020px] grid grid-cols-11 gap-4 items-stretch relative">
@@ -333,16 +493,31 @@
                                 'lutut' => ['title' => 'LUTUT', 'has_side' => true, 'id' => 'box_lutut'],
                                 'kaki' => ['title' => 'KAKI', 'has_side' => true, 'id' => 'box_kaki'],
                             ];
-                            $freqOptions = [1 => 'Tidak pernah', 2 => 'Terkadang', 3 => 'Sering', 4 => 'Selalu'];
-                            $sevOptions = [1 => 'Tidak ada masalah', 2 => 'Tidak nyaman', 3 => 'Sakit', 4 => 'Sakit parah'];
+                            $freqOptions = [
+                                1 => 'Tidak pernah (1)', 
+                                2 => 'Terkadang (1-3x/th) (2)', 
+                                3 => 'Sering (1-3x/bln) (3)', 
+                                4 => 'Selalu (hampir tiap hari) (4)'
+                            ];
+                            $sevOptions = [
+                                1 => 'Tidak ada masalah (1)', 
+                                2 => 'Tidak nyaman (2)', 
+                                3 => 'Sakit (3)', 
+                                4 => 'Sakit parah (4)'
+                            ];
                         @endphp
 
                         <!-- KOLOM SISI KIRI -->
                         <div class="col-span-4 flex flex-col justify-between py-1 pr-2 space-y-4">
                             @foreach($leftBoxes as $key => $box)
-                                <div id="{{ $box['id'] }}" class="gotrak-panel">
+                                <div id="{{ $box['id'] }}" class="gotrak-panel rounded-lg" data-gotrak-key="{{ $key }}">
                                     <div class="gotrak-title-bar">
-                                        <span>{{ $box['title'] }}</span>
+                                        <div class="flex items-center gap-1.5">
+                                            <span>{{ $box['title'] }}</span>
+                                            <span id="badge_gotrak_{{ $key }}" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                                Skor: <span id="score_gotrak_{{ $key }}">1</span> (Risiko Rendah)
+                                            </span>
+                                        </div>
                                         @if($box['has_side'])
                                             <div class="flex gap-2 text-[10px] font-normal normal-case">
                                                 <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" name="gotrak[{{ $key }}][side][]" value="Kanan"> Kanan</label>
@@ -352,21 +527,28 @@
                                     </div>
                                     <div class="grid grid-cols-2 gap-2 text-[10px]">
                                         <div>
-                                            <span class="font-bold block mb-1 text-slate-900">Seberapa sering?</span>
+                                            <span class="font-bold block mb-1 text-slate-900">Frekuensi:</span>
                                             @foreach($freqOptions as $val => $f)
                                                 <label class="gotrak-check-label">
-                                                    <input type="radio" name="gotrak[{{ $key }}][freq]" value="{{ $val }}" {{ $val === 1 ? 'checked' : '' }}> {{ $f }}
+                                                    <input type="radio" name="gotrak[{{ $key }}][freq]" value="{{ $val }}" {{ $val === 1 ? 'checked' : '' }} onchange="calculateGotrakItem('{{ $key }}')"> {{ $f }}
                                                 </label>
                                             @endforeach
                                         </div>
                                         <div>
-                                            <span class="font-bold block mb-1 text-slate-900">Seberapa parah?</span>
+                                            <span class="font-bold block mb-1 text-slate-900">Keparahan:</span>
                                             @foreach($sevOptions as $val => $s)
                                                 <label class="gotrak-check-label">
-                                                    <input type="radio" name="gotrak[{{ $key }}][severity]" value="{{ $val }}" {{ $val === 1 ? 'checked' : '' }}> {{ $s }}
+                                                    <input type="radio" name="gotrak[{{ $key }}][severity]" value="{{ $val }}" {{ $val === 1 ? 'checked' : '' }} onchange="calculateGotrakItem('{{ $key }}')"> {{ $s }}
                                                 </label>
                                             @endforeach
                                         </div>
+                                    </div>
+                                    <!-- Input Wajib jika Risiko Tinggi (Skor >= 8) -->
+                                    <div id="cause_wrap_gotrak_{{ $key }}" class="hidden mt-2 pt-2 border-t border-rose-200 bg-rose-50/80 p-2 rounded text-[10px]">
+                                        <label class="font-bold text-rose-900 block mb-1">
+                                            <i class="ph-bold ph-warning text-rose-600"></i> Catatan: bagian pekerjaan mana yang menyebabkan keluhan GOTRAK dialami? <span class="text-rose-600">*</span>
+                                        </label>
+                                        <input type="text" name="gotrak[{{ $key }}][cause]" placeholder="Uraikan aktivitas/posisi penyebab keluhan..." class="w-full border border-rose-300 rounded p-1.5 bg-white text-[10px] outline-none focus:border-rose-600">
                                     </div>
                                 </div>
                             @endforeach
@@ -394,9 +576,14 @@
                         <!-- KOLOM SISI KANAN -->
                         <div class="col-span-4 flex flex-col justify-between py-1 pl-2 space-y-4">
                             @foreach($rightBoxes as $key => $box)
-                                <div id="{{ $box['id'] }}" class="gotrak-panel">
+                                <div id="{{ $box['id'] }}" class="gotrak-panel rounded-lg" data-gotrak-key="{{ $key }}">
                                     <div class="gotrak-title-bar">
-                                        <span>{{ $box['title'] }}</span>
+                                        <div class="flex items-center gap-1.5">
+                                            <span>{{ $box['title'] }}</span>
+                                            <span id="badge_gotrak_{{ $key }}" class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                                                Skor: <span id="score_gotrak_{{ $key }}">1</span> (Risiko Rendah)
+                                            </span>
+                                        </div>
                                         @if($box['has_side'])
                                             <div class="flex gap-2 text-[10px] font-normal normal-case">
                                                 <label class="flex items-center gap-1 cursor-pointer"><input type="checkbox" name="gotrak[{{ $key }}][side][]" value="Kanan"> Kanan</label>
@@ -406,21 +593,28 @@
                                     </div>
                                     <div class="grid grid-cols-2 gap-2 text-[10px]">
                                         <div>
-                                            <span class="font-bold block mb-1 text-slate-900">Seberapa sering?</span>
+                                            <span class="font-bold block mb-1 text-slate-900">Frekuensi:</span>
                                             @foreach($freqOptions as $val => $f)
                                                 <label class="gotrak-check-label">
-                                                    <input type="radio" name="gotrak[{{ $key }}][freq]" value="{{ $val }}" {{ $val === 1 ? 'checked' : '' }}> {{ $f }}
+                                                    <input type="radio" name="gotrak[{{ $key }}][freq]" value="{{ $val }}" {{ $val === 1 ? 'checked' : '' }} onchange="calculateGotrakItem('{{ $key }}')"> {{ $f }}
                                                 </label>
                                             @endforeach
                                         </div>
                                         <div>
-                                            <span class="font-bold block mb-1 text-slate-900">Seberapa parah?</span>
+                                            <span class="font-bold block mb-1 text-slate-900">Keparahan:</span>
                                             @foreach($sevOptions as $val => $s)
                                                 <label class="gotrak-check-label">
-                                                    <input type="radio" name="gotrak[{{ $key }}][severity]" value="{{ $val }}" {{ $val === 1 ? 'checked' : '' }}> {{ $s }}
+                                                    <input type="radio" name="gotrak[{{ $key }}][severity]" value="{{ $val }}" {{ $val === 1 ? 'checked' : '' }} onchange="calculateGotrakItem('{{ $key }}')"> {{ $s }}
                                                 </label>
                                             @endforeach
                                         </div>
+                                    </div>
+                                    <!-- Input Wajib jika Risiko Tinggi (Skor >= 8) -->
+                                    <div id="cause_wrap_gotrak_{{ $key }}" class="hidden mt-2 pt-2 border-t border-rose-200 bg-rose-50/80 p-2 rounded text-[10px]">
+                                        <label class="font-bold text-rose-900 block mb-1">
+                                            <i class="ph-bold ph-warning text-rose-600"></i> Catatan: bagian pekerjaan mana yang menyebabkan keluhan GOTRAK dialami? <span class="text-rose-600">*</span>
+                                        </label>
+                                        <input type="text" name="gotrak[{{ $key }}][cause]" placeholder="Uraikan aktivitas/posisi penyebab keluhan..." class="w-full border border-rose-300 rounded p-1.5 bg-white text-[10px] outline-none focus:border-rose-600">
                                     </div>
                                 </div>
                             @endforeach
@@ -468,11 +662,11 @@
             </div>
         </div>
 
-        <!-- ================= BAGIAN 4: DAFTAR PERIKSA 31 BUTIR SNI 9011:2021 ================= -->
+        <!-- ================= BAGIAN 5: DAFTAR PERIKSA 31 BUTIR SNI 9011:2021 ================= -->
         <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
             <div class="px-6 py-4 border-b border-slate-200 bg-[#fbfcfd] flex items-center justify-between">
                 <div class="flex items-center gap-2.5">
-                    <span class="w-6 h-6 rounded bg-[#153e67] text-white flex items-center justify-center text-xs font-bold">4</span>
+                    <span class="w-6 h-6 rounded bg-[#153e67] text-white flex items-center justify-center text-xs font-bold">5</span>
                     <h2 class="text-sm font-bold text-slate-900">Daftar Periksa Potensi Bahaya Faktor Ergonomi (Lengkap 31 Butir)</h2>
                 </div>
                 <span class="text-[11px] font-semibold text-slate-500">SNI 9011:2021</span>
@@ -541,7 +735,12 @@
                                     <option value="0">0% – 25% Waktu (Skor 0)</option>
                                     <option value="1">25% – 50% Waktu (Skor 1)</option>
                                     <option value="2">50% – 100% Waktu (Skor 2)</option>
-                                    <option value="3">&gt; 100% / Sangat Parah (Skor 3)</option>
+                                    <optgroup label="Paparan > 100% Waktu (Kelebihan Jam Kerja / Lembur)">
+                                        <option value="2.5">&gt; 100% Waktu (Lebih 1 Jam / Skor 2.5)</option>
+                                        <option value="3">&gt; 100% Waktu (Lebih 2 Jam / Skor 3.0)</option>
+                                        <option value="3.5">&gt; 100% Waktu (Lebih 3 Jam / Skor 3.5)</option>
+                                        <option value="4">&gt; 100% Waktu (Lebih &ge; 4 Jam / Skor 4.0)</option>
+                                    </optgroup>
                                 </select>
                             </div>
                         </div>
@@ -571,113 +770,201 @@
                                     <option value="0">0% – 25% Waktu (Skor 0)</option>
                                     <option value="1">25% – 50% Waktu (Skor 1)</option>
                                     <option value="2">50% – 100% Waktu (Skor 2)</option>
-                                    <option value="3">&gt; 100% / Sangat Parah (Skor 3)</option>
+                                    <optgroup label="Paparan > 100% Waktu (Kelebihan Jam Kerja / Lembur)">
+                                        <option value="2.5">&gt; 100% Waktu (Lebih 1 Jam / Skor 2.5)</option>
+                                        <option value="3">&gt; 100% Waktu (Lebih 2 Jam / Skor 3.0)</option>
+                                        <option value="3.5">&gt; 100% Waktu (Lebih 3 Jam / Skor 3.5)</option>
+                                        <option value="4">&gt; 100% Waktu (Lebih &ge; 4 Jam / Skor 4.0)</option>
+                                    </optgroup>
                                 </select>
                             </div>
                         </div>
                     @endforeach
                 </div>
 
-                <!-- SUB C: MMH -->
-                <div class="space-y-3 pt-4 border-t border-slate-200">
-                    <span class="font-bold text-[#153e67] uppercase tracking-wider block bg-slate-100 p-2 rounded">
-                        C. Pengangkatan Beban Manual (MMH)
+                <!-- SUB C: PENGANGKATAN BEBAN MANUAL (MMH) -->
+                <div class="space-y-4 pt-4 border-t border-slate-200">
+                    <span class="font-bold text-[#153e67] uppercase tracking-wider block bg-slate-100 p-2 rounded flex items-center justify-between">
+                        <span>C. Pengangkatan Beban Manual (MMH - SNI 9011:2021)</span>
+                        <span class="text-[11px] font-semibold text-slate-500 lowercase">Langkah ke-2 & Langkah ke-3</span>
                     </span>
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="p-3 border border-slate-200 rounded-lg bg-slate-50">
-                            <label class="font-bold text-slate-800 block mb-1">Berat Beban & Jarak Angkat</label>
-                            <select name="mmh_weight_score" class="w-full border border-slate-300 rounded p-2 text-xs bg-white outline-none">
-                                <option value="0">&lt; 7 kg dengan jarak dekat (Skor 0)</option>
-                                <option value="1">7 – 13 kg jarak dekat (Skor 1)</option>
-                                <option value="2">14 – 23 kg jarak dekat (Skor 2)</option>
-                                <option value="3">&gt; 23 kg jarak dekat / rotasi (Skor 3)</option>
-                            </select>
+
+                    <!-- Langkah ke-2: Berat & Jarak Angkat -->
+                    <div class="space-y-2">
+                        <span class="font-bold text-slate-800 block text-xs">
+                            32 & 33 (a-b). Langkah ke-2: Menentukan poin untuk berat beban dan jarak angkut:
+                        </span>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div class="p-3 border border-slate-200 rounded-lg bg-slate-50">
+                                <label class="font-bold text-slate-800 block mb-1">32. Berat Beban & Jarak Angkat</label>
+                                <select name="mmh_weight_score" class="w-full border border-slate-300 rounded p-2 text-xs bg-white outline-none">
+                                    <option value="0">&lt; 7 kg dengan jarak dekat (Skor 0)</option>
+                                    <option value="1">7 – 13 kg jarak dekat (Skor 1)</option>
+                                    <option value="2">14 – 23 kg jarak dekat (Skor 2)</option>
+                                    <option value="3">&gt; 23 kg jarak dekat / rotasi (Skor 3)</option>
+                                </select>
+                            </div>
+                            <div class="p-3 border border-slate-200 rounded-lg bg-slate-50">
+                                <label class="font-bold text-slate-800 block mb-1">33. Jarak Angkut / Membawa Benda</label>
+                                <select name="mmh_distance_score" class="w-full border border-slate-300 rounded p-2 text-xs bg-white outline-none">
+                                    <option value="0">Tidak membawa beban / &lt; 3 meter (Skor 0)</option>
+                                    <option value="1">Membawa beban 3 – 9 meter (Skor 1)</option>
+                                    <option value="2">Membawa beban &gt; 9 meter (Skor 2)</option>
+                                </select>
+                            </div>
                         </div>
-                        <div class="p-3 border border-slate-200 rounded-lg bg-slate-50">
-                            <label class="font-bold text-slate-800 block mb-1">Jarak Angkut / Membawa Benda</label>
-                            <select name="mmh_distance_score" class="w-full border border-slate-300 rounded p-2 text-xs bg-white outline-none">
-                                <option value="0">Tidak membawa beban / &lt; 3 meter (Skor 0)</option>
-                                <option value="1">Membawa beban 3 – 9 meter (Skor 1)</option>
-                                <option value="2">Membawa beban &gt; 9 meter (Skor 2)</option>
-                            </select>
+                    </div>
+
+                    <!-- Langkah ke-3: Tabel Butir 34 s/d 43 (Faktor Risiko Lainnya) -->
+                    <div class="space-y-2 pt-2">
+                        <div class="border border-slate-300 rounded-xl overflow-hidden shadow-xs">
+                            <table class="w-full text-left border-collapse text-xs">
+                                <thead class="bg-[#153e67] text-white">
+                                    <tr>
+                                        <th class="p-3 font-bold w-1/3 border-r border-blue-900/40">Panduan & Keterangan</th>
+                                        <th class="p-3 font-bold w-2/5 border-r border-blue-900/40">Faktor Risiko Pengangkatan Beban</th>
+                                        <th class="p-3 font-bold text-center">Pilihan Tingkat Paparan</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-200 bg-white">
+                                    @php
+                                        $mmhStep3List = [
+                                            34 => ['title' => 'Batang tubuh memuntir saat mengangkat', 'occ' => 1, 'freq' => 1],
+                                            35 => ['title' => 'Mengangkat dengan satu tangan', 'occ' => 1, 'freq' => 2],
+                                            36 => ['title' => 'Mengangkat dengan beban yang tidak terduga/tidak diprediksi', 'occ' => 1, 'freq' => 2],
+                                            37 => ['title' => 'Mengangkat 1-5 kali per menit', 'occ' => 1, 'freq' => 1],
+                                            38 => ['title' => 'Mengangkat lebih dari 5 kali per menit', 'occ' => 2, 'freq' => 3],
+                                            39 => ['title' => 'Posisi benda yang diangkat berada di atas bahu', 'occ' => 1, 'freq' => 2],
+                                            40 => ['title' => 'Posisi benda yang diangkat berada di bawah posisi siku', 'occ' => 1, 'freq' => 2],
+                                            41 => ['title' => 'Mengangkut (membawa) benda dengan jarak 3-9 meter', 'occ' => 1, 'freq' => 2],
+                                            42 => ['title' => 'Mengangkut (membawa) benda dengan jarak lebih dari 9 meter', 'occ' => 2, 'freq' => 3],
+                                            43 => ['title' => 'Mengangkat benda saat duduk atau bertumpu pada lutut', 'occ' => 1, 'freq' => 2],
+                                        ];
+                                    @endphp
+
+                                    @foreach($mmhStep3List as $no => $item)
+                                        <tr class="hover:bg-slate-50 transition">
+                                            @if($loop->first)
+                                                <td rowspan="10" class="p-4 align-top border-r border-slate-200 bg-slate-50/70 text-slate-700">
+                                                    <span class="font-bold text-slate-900 block text-xs mb-2 text-[#153e67]">
+                                                        33 (c). Langkah ke-3: Menentukan poin untuk faktor risiko lainnya:
+                                                    </span>
+                                                    <p class="text-[11px] leading-relaxed text-slate-600 mb-2">
+                                                        <strong>Panduan Pengisian:</strong>
+                                                    </p>
+                                                    <ul class="text-[11px] space-y-2 list-disc pl-4 text-slate-600">
+                                                        <li>
+                                                            Isilah pada kolom <strong>"Pengangkatan sesekali"</strong> jika waktu antar pengangkatan lebih dari 10 menit.
+                                                        </li>
+                                                        <li>
+                                                            Isilah pada kolom <strong>"Pengangkatan sering"</strong> jika faktor risiko terjadi hampir selama proses pengangkatan berlangsung dan pengangkatan dilakukan lebih dari satu jam.
+                                                        </li>
+                                                    </ul>
+                                                </td>
+                                            @endif
+                                            <td class="p-3 border-r border-slate-200 align-middle">
+                                                <span class="font-bold text-slate-800">{{ $no }}.</span>
+                                                <span class="text-slate-700 font-medium">{{ $item['title'] }}</span>
+                                            </td>
+                                            <td class="p-3 align-middle">
+                                                <div class="flex flex-wrap items-center justify-start gap-4 text-[11px]">
+                                                    <label class="flex items-center gap-1.5 cursor-pointer text-slate-600 hover:text-slate-900">
+                                                        <input type="radio" name="mmh_step3[{{ $no }}]" value="0" checked class="accent-[#153e67]">
+                                                        <span>Tidak Terpapar (0)</span>
+                                                    </label>
+                                                    <label class="flex items-center gap-1.5 cursor-pointer text-amber-700 font-medium hover:text-amber-900">
+                                                        <input type="radio" name="mmh_step3[{{ $no }}]" value="{{ $item['occ'] }}" class="accent-[#153e67]">
+                                                        <span>Pengangkatan Sesekali ({{ $item['occ'] }} Poin)</span>
+                                                    </label>
+                                                    <label class="flex items-center gap-1.5 cursor-pointer text-rose-700 font-bold hover:text-rose-900">
+                                                        <input type="radio" name="mmh_step3[{{ $no }}]" value="{{ $item['freq'] }}" class="accent-[#153e67]">
+                                                        <span>Pengangkatan Sering ({{ $item['freq'] }} Poin)</span>
+                                                    </label>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Baris Rekapitulasi & Total Skor MMH Otomatis -->
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3">
+                            <div class="p-3 bg-amber-50/70 border border-amber-200 rounded-xl flex items-center justify-between">
+                                <div>
+                                    <span class="text-[10px] font-bold text-amber-900 uppercase block">1. Total Skor Langkah ke-3:</span>
+                                    <span class="text-[11px] text-amber-700">Akumulasi butir 34 s/d 43</span>
+                                </div>
+                                <span id="recapMmhStep3" class="text-lg font-black text-amber-900">0</span>
+                            </div>
+                            <div class="p-3 bg-blue-50/70 border border-blue-200 rounded-xl flex items-center justify-between">
+                                <div>
+                                    <span class="text-[10px] font-bold text-blue-900 uppercase block">2. Total Skor Postur Tubuh:</span>
+                                    <span class="text-[11px] text-blue-700">Akumulasi butir 1 s/d 31</span>
+                                </div>
+                                <span id="recapPostureScore" class="text-lg font-black text-blue-900">0</span>
+                            </div>
+                            <div class="p-3 bg-[#e8f1f9] border border-[#bcd7ef] rounded-xl flex items-center justify-between">
+                                <div>
+                                    <span class="text-[10px] font-bold text-[#153e67] uppercase block">3. Total Beban Manual (MMH):</span>
+                                    <span class="text-[11px] text-slate-600">Langkah 2 + Langkah 3</span>
+                                </div>
+                                <span id="recapMmhTotal" class="text-xl font-black text-[#153e67]">0</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- ================= BAGIAN 5: MULTI-UPLOAD, WEBCAM & INTERACTIVE CANVAS ================= -->
-        <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-            <div class="px-6 py-4 border-b border-slate-200 bg-[#fbfcfd] flex items-center justify-between">
-                <div class="flex items-center gap-2.5">
-                    <span class="w-6 h-6 rounded bg-[#153e67] text-white flex items-center justify-center text-xs font-bold">5</span>
-                    <h2 class="text-sm font-bold text-slate-900">Dokumentasi Foto, Kamera Langsung & Edit Sudut Interaktif</h2>
+        <!-- ================= INFORMASI PETUGAS & PENGENDALIAN ================= -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-xs p-6 space-y-4 text-xs">
+            <h2 class="text-sm font-bold text-slate-900 border-b border-slate-200 pb-2">Informasi Petugas Penguji & Pengendalian</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="font-bold text-slate-700 block mb-1">Pengambil Contoh Uji (Surveyor K3)</label>
+                    <input type="text" name="sampler_name" placeholder="Nama lengkap petugas penguji..." class="w-full border border-slate-300 rounded-lg p-2.5 text-xs outline-none focus:border-[#153e67]">
                 </div>
-                <span class="text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">Multi-Upload + Webcam + Drag</span>
+                <div>
+                    <label class="font-bold text-slate-700 block mb-1">Metode Pengendalian yang Sudah Ada</label>
+                    <input type="text" name="existing_control" value="Adanya waktu istirahat/peregangan" class="w-full border border-slate-300 rounded-lg p-2 text-xs outline-none focus:border-[#153e67]">
+                </div>
             </div>
 
-            <div class="p-6 space-y-6 text-xs">
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div class="relative border-2 border-dashed border-slate-300 rounded-xl p-5 text-center bg-slate-50 hover:bg-slate-100 transition flex flex-col justify-center items-center">
-                        <input type="file" id="multiImageUploader" name="ergo_photos[]" accept="image/*" multiple class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" onchange="handleMultipleImages(event)">
-                        <i class="ph-bold ph-upload-simple text-2xl text-[#153e67] mb-1"></i>
-                        <p class="font-bold text-slate-800 text-xs">Unggah Berkas Foto (Bisa Banyak)</p>
-                        <p class="text-slate-500 text-[10px]">Pilih file dari perangkat Anda</p>
-                    </div>
-
-                    <button type="button" onclick="openWebcamModal()" class="border-2 border-dashed border-[#153e67] rounded-xl p-5 text-center bg-blue-50/50 hover:bg-blue-50 transition flex flex-col justify-center items-center cursor-pointer">
-                        <i class="ph-bold ph-camera text-2xl text-[#153e67] mb-1"></i>
-                        <p class="font-bold text-[#153e67] text-xs">Ambil Foto Langsung dari Kamera</p>
-                        <p class="text-blue-500 text-[10px]">Gunakan kamera perangkat (Webcam)</p>
-                    </button>
-                </div>
-
-                <!-- Input Tersembunyi untuk JSON Sudut -->
-                <input type="hidden" name="annotated_photos_json" id="annotatedPhotosJson">
-
-                <!-- Daftar Thumbnail Foto -->
-                <div id="thumbnailContainer" class="hidden space-y-2">
-                    <span class="font-bold text-slate-700 block">Daftar Foto Dokumentasi (Klik untuk edit sudut / hapus):</span>
-                    <div id="thumbnailList" class="flex flex-wrap gap-3"></div>
-                </div>
-
-                <!-- Area Kanvas Interaktif untuk Foto Aktif -->
-                <div id="activeCanvasWrapper" class="hidden space-y-3 p-4 border border-slate-200 rounded-xl bg-slate-50">
-                    <div class="flex justify-between items-center flex-wrap gap-2">
-                        <span id="activePhotoTitle" class="font-bold text-slate-800">Sedang Mengedit Foto: -</span>
-                        <div class="flex items-center gap-2">
-                            <label class="px-3 py-1 bg-white border border-slate-300 rounded cursor-pointer hover:bg-slate-50 text-[11px] font-semibold text-slate-700">
-                                <i class="ph-bold ph-arrow-counter-clockwise"></i> Ganti Foto Ini
-                                <input type="file" accept="image/*" class="hidden" onchange="replaceActivePhoto(event)">
-                            </label>
-                            <button type="button" onclick="deleteActivePhoto()" class="px-3 py-1 bg-rose-50 border border-rose-200 text-rose-700 rounded hover:bg-rose-100 text-[11px] font-semibold">
-                                <i class="ph-bold ph-trash"></i> Hapus Foto
-                            </button>
+            <!-- Tanda Tangan Penilai (SNI 9011:2021) -->
+            <div class="mt-4 pt-4 border-t border-slate-200">
+                <div class="flex justify-end">
+                    <div class="w-full md:w-72 bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
+                        <div class="text-center">
+                            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Tanda Tangan Penilai</span>
+                            <select name="assessor_role" class="w-full text-center font-bold text-[11px] text-slate-800 bg-white border border-slate-300 rounded-lg p-1.5 focus:border-[#153e67] outline-none">
+                                <option value="Penguji K3/Ahli K3 Lingkungan Kerja Muda">Penguji K3/Ahli K3 Lingkungan Kerja Muda</option>
+                                <option value="Penguji K3/Ahli K3 Lingkungan Kerja Madya">Penguji K3/Ahli K3 Lingkungan Kerja Madya</option>
+                                <option value="Penguji K3/Ahli K3 Lingkungan Kerja Utama">Penguji K3/Ahli K3 Lingkungan Kerja Utama</option>
+                            </select>
+                        </div>
+                        <div class="h-16 border-b border-dashed border-slate-300 flex items-center justify-center text-slate-300 italic text-[11px]">
+                            (Tanda Tangan Digital / Manual)
+                        </div>
+                        <div class="space-y-1.5">
+                            <div>
+                                <label class="text-[10px] text-slate-500 block font-semibold">Nama Lengkap Penilai:</label>
+                                <input type="text" name="assessor_name" placeholder="Nama Lengkap Penilai..." class="w-full text-center font-semibold text-xs border border-slate-300 rounded-lg p-1.5 bg-white outline-none focus:border-[#153e67]">
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-500 block font-semibold">NIP / No. REG:</label>
+                                <input type="text" name="assessor_nip" placeholder="NIP / No. REG..." class="w-full text-center text-xs border border-slate-300 rounded-lg p-1.5 bg-white outline-none focus:border-[#153e67]">
+                            </div>
                         </div>
                     </div>
-                    <div class="relative overflow-hidden flex justify-center bg-black/5 rounded-lg border border-slate-300 p-2">
-                        <canvas id="interactivePoseCanvas" class="max-h-[450px] object-contain cursor-crosshair"></canvas>
-                    </div>
-                    <p class="text-[10px] text-amber-700 italic text-center">💡 Klik & seret lingkaran kuning pada sendi di gambar untuk menggeser garis sudut secara manual.</p>
                 </div>
+            </div>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-200">
-                    <div>
-                        <label class="font-bold text-slate-700 block mb-1">Pengambil Contoh Uji (Surveyor K3)</label>
-                        <input type="text" name="sampler_name" placeholder="Nama lengkap petugas penguji..." class="w-full border border-slate-300 rounded-lg p-2.5 text-xs outline-none focus:border-[#153e67]">
-                    </div>
-                    <div>
-                        <label class="font-bold text-slate-700 block mb-1">Metode Pengendalian yang Sudah Ada</label>
-                        <input type="text" name="existing_control" value="Adanya waktu istirahat/peregangan" class="w-full border border-slate-300 rounded-lg p-2 text-xs outline-none focus:border-[#153e67]">
-                    </div>
-                </div>
-
-                <div class="pt-4 flex justify-end gap-2 border-t border-slate-200">
-                    <a href="{{ route('ergo.index') }}" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 font-semibold">Batal</a>
-                    <button type="submit" id="btnBottomSubmit" class="px-5 py-2 bg-[#153e67] hover:bg-[#0f2e4d] text-white rounded-lg font-bold shadow-sm transition flex items-center gap-1.5">
-                        <i class="ph-bold ph-floppy-disk"></i> Simpan Data Pengujian
-                    </button>
-                </div>
+            <div class="pt-4 flex justify-end gap-2 border-t border-slate-200">
+                <a href="{{ route('ergo.index') }}" class="px-4 py-2 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 font-semibold">Batal</a>
+                <button type="submit" id="btnBottomSubmit" class="px-5 py-2 bg-[#153e67] hover:bg-[#0f2e4d] text-white rounded-lg font-bold shadow-sm transition flex items-center gap-1.5">
+                    <i class="ph-bold ph-floppy-disk"></i> Simpan Data Pengujian
+                </button>
             </div>
         </div>
 
@@ -750,27 +1037,60 @@
         const totalHours = hoursInput ? parseFloat(hoursInput.value) || 8 : 8;
         const overtimeBonus = totalHours > 8 ? (totalHours - 8) * 0.5 : 0;
 
+        const noticeEl = document.getElementById('overtimeNotice');
+        const bonusDispEl = document.getElementById('overtimeBonusDisplay');
+        if (noticeEl && bonusDispEl) {
+            if (overtimeBonus > 0) {
+                bonusDispEl.innerText = (overtimeBonus % 1 === 0) ? overtimeBonus : overtimeBonus.toFixed(1);
+                noticeEl.classList.remove('hidden');
+            } else {
+                noticeEl.classList.add('hidden');
+            }
+        }
+
         let scoreUpper = 0;
         for (let i = 1; i <= 16; i++) {
             const sel = document.querySelector(`select[name="ergo_items[${i}]"]`);
-            if (sel) scoreUpper += parseInt(sel.value) || 0;
+            if (sel) scoreUpper += parseFloat(sel.value) || 0;
         }
 
         let scoreLower = 0;
         for (let i = 17; i <= 31; i++) {
             const sel = document.querySelector(`select[name="ergo_items[${i}]"]`);
-            if (sel) scoreLower += parseInt(sel.value) || 0;
+            if (sel) scoreLower += parseFloat(sel.value) || 0;
         }
 
+        // Posture Score (1 - 31)
+        const totalPosture = scoreUpper + scoreLower;
+
+        // MMH Langkah 2
         const mmhWeight = document.querySelector('select[name="mmh_weight_score"]');
         const mmhDist = document.querySelector('select[name="mmh_distance_score"]');
-        const scoreMMH = (mmhWeight ? parseInt(mmhWeight.value) || 0 : 0) + (mmhDist ? parseInt(mmhDist.value) || 0 : 0);
-        const totalScore = scoreUpper + scoreLower + scoreMMH + overtimeBonus;
+        const scoreMmhStep2 = (mmhWeight ? parseFloat(mmhWeight.value) || 0 : 0) + (mmhDist ? parseFloat(mmhDist.value) || 0 : 0);
 
-        document.getElementById('scoreUpper').innerText = scoreUpper;
-        document.getElementById('scoreLower').innerText = scoreLower;
-        document.getElementById('scoreMMH').innerText = scoreMMH;
-        document.getElementById('scoreTotal').innerText = totalScore.toFixed(1);
+        // MMH Langkah 3 (Butir 34 s/d 43)
+        let scoreMmhStep3 = 0;
+        document.querySelectorAll('input[name^="mmh_step3"]:checked').forEach(r => {
+            scoreMmhStep3 += parseFloat(r.value) || 0;
+        });
+
+        // Total MMH (Langkah 2 + Langkah 3)
+        const scoreMMH = scoreMmhStep2 + scoreMmhStep3;
+        const totalScore = totalPosture + scoreMMH + overtimeBonus;
+
+        // Update Header Summary Cards
+        document.getElementById('scoreUpper').innerText = (scoreUpper % 1 === 0) ? scoreUpper : scoreUpper.toFixed(1);
+        document.getElementById('scoreLower').innerText = (scoreLower % 1 === 0) ? scoreLower : scoreLower.toFixed(1);
+        document.getElementById('scoreMMH').innerText = (scoreMMH % 1 === 0) ? scoreMMH : scoreMMH.toFixed(1);
+        document.getElementById('scoreTotal').innerText = (totalScore % 1 === 0) ? totalScore : totalScore.toFixed(1);
+
+        // Update Bottom Real-Time Recap Rows
+        const elRecapStep3 = document.getElementById('recapMmhStep3');
+        const elRecapPosture = document.getElementById('recapPostureScore');
+        const elRecapTotal = document.getElementById('recapMmhTotal');
+        if (elRecapStep3) elRecapStep3.innerText = (scoreMmhStep3 % 1 === 0) ? scoreMmhStep3 : scoreMmhStep3.toFixed(1);
+        if (elRecapPosture) elRecapPosture.innerText = (totalPosture % 1 === 0) ? totalPosture : totalPosture.toFixed(1);
+        if (elRecapTotal) elRecapTotal.innerText = (scoreMMH % 1 === 0) ? scoreMMH : scoreMMH.toFixed(1);
 
         const badge = document.getElementById('riskBadge');
         const label = document.getElementById('riskLabel');
@@ -787,27 +1107,117 @@
                 label.innerText = "Kondisi Berbahaya (Skor >= 7)";
             }
         }
-        evaluateGotrakComplaints();
     }
 
-    function evaluateGotrakComplaints() {
-        const jointKeys = ['leher', 'siku', 'lengan', 'tangan', 'paha', 'betis', 'bahu', 'punggung_atas', 'punggung_bawah', 'pinggul', 'lutut', 'kaki'];
-        const highRiskJoints = [];
-        jointKeys.forEach(joint => {
-            const freq = document.querySelector(`input[name="gotrak[${joint}][freq]"]:checked`);
-            const sev = document.querySelector(`input[name="gotrak[${joint}][severity]"]:checked`);
-            if (freq && sev) {
-                if ((parseInt(freq.value) * parseInt(sev.value)) >= 8) {
-                    highRiskJoints.push(joint.replace('_', ' ').toUpperCase());
-                }
+    // =========================================================================
+    // LOGIKA PILIHAN ALOKASI WAKTU & AKTIVITAS KERJA ("SELAMA ITU NGAPAIN AJA")
+    // =========================================================================
+    function handleDurationSelectChange(val) {
+        const durInput = document.getElementById('jobDurationInput');
+        if (val === 'custom') {
+            durInput.value = '';
+            durInput.placeholder = 'Tuliskan alokasi waktu kustom...';
+            durInput.focus();
+        } else if (val) {
+            syncDurationAndActivities();
+        }
+    }
+
+    function syncDurationAndActivities() {
+        const sel = document.getElementById('jobDurationSelect');
+        const durInput = document.getElementById('jobDurationInput');
+        if (!durInput) return;
+
+        let baseDuration = (sel && sel.value && sel.value !== 'custom') ? sel.value : '';
+        if (!baseDuration) {
+            const currentParts = durInput.value.split(' | Aktivitas: ');
+            baseDuration = currentParts[0] || '';
+        }
+
+        const checkedBoxes = document.querySelectorAll('.activity-checkbox:checked');
+        const activities = Array.from(checkedBoxes).map(cb => cb.value);
+
+        if (activities.length > 0) {
+            durInput.value = (baseDuration ? baseDuration + ' | Aktivitas: ' : 'Aktivitas: ') + activities.join(', ');
+        } else if (baseDuration) {
+            durInput.value = baseDuration;
+        }
+    }
+
+    // =========================================================================
+    // PERHITUNGAN EVALUASI KELUHAN GOTRAK (SNI 9011:2021 TABEL 1)
+    // =========================================================================
+    const gotrakPartKeys = [
+        'leher', 'siku', 'lengan', 'tangan', 'paha', 'betis',
+        'bahu', 'punggung_atas', 'punggung_bawah', 'pinggul', 'lutut', 'kaki'
+    ];
+
+    function calculateGotrakItem(key) {
+        const freqInput = document.querySelector(`input[name="gotrak[${key}][freq]"]:checked`);
+        const sevInput = document.querySelector(`input[name="gotrak[${key}][severity]"]:checked`);
+        const fVal = freqInput ? parseInt(freqInput.value) || 1 : 1;
+        const sVal = sevInput ? parseInt(sevInput.value) || 1 : 1;
+        const score = fVal * sVal;
+
+        const scoreEl = document.getElementById(`score_gotrak_${key}`);
+        const badgeEl = document.getElementById(`badge_gotrak_${key}`);
+        const causeWrap = document.getElementById(`cause_wrap_gotrak_${key}`);
+        const causeInput = causeWrap ? causeWrap.querySelector('input') : null;
+
+        if (scoreEl) scoreEl.innerText = score;
+
+        if (badgeEl) {
+            badgeEl.className = "px-1.5 py-0.5 rounded text-[9px] font-bold border ";
+            if (score <= 4) {
+                badgeEl.classList.add("bg-emerald-100", "text-emerald-800", "border-emerald-300");
+                badgeEl.innerHTML = `Skor: <span id="score_gotrak_${key}">${score}</span> (Risiko Rendah)`;
+            } else if (score === 6) {
+                badgeEl.classList.add("bg-amber-100", "text-amber-800", "border-amber-300");
+                badgeEl.innerHTML = `Skor: <span id="score_gotrak_${key}">${score}</span> (Risiko Sedang)`;
+            } else {
+                badgeEl.classList.add("bg-rose-100", "text-rose-800", "border-rose-300");
+                badgeEl.innerHTML = `Skor: <span id="score_gotrak_${key}">${score}</span> (Risiko Tinggi)`;
+            }
+        }
+
+        // Tampilkan field wajib catatan penyebab jika skor >= 8
+        if (causeWrap) {
+            if (score >= 8) {
+                causeWrap.classList.remove('hidden');
+                if (causeInput) causeInput.required = true;
+            } else {
+                causeWrap.classList.add('hidden');
+                if (causeInput) causeInput.required = false;
+            }
+        }
+
+        updateGotrakGlobalAlert();
+    }
+
+    function calculateAllGotrak() {
+        gotrakPartKeys.forEach(k => calculateGotrakItem(k));
+    }
+
+    function updateGotrakGlobalAlert() {
+        const highRiskNames = [];
+        gotrakPartKeys.forEach(k => {
+            const freqInput = document.querySelector(`input[name="gotrak[${k}][freq]"]:checked`);
+            const sevInput = document.querySelector(`input[name="gotrak[${k}][severity]"]:checked`);
+            const fVal = freqInput ? parseInt(freqInput.value) || 1 : 1;
+            const sVal = sevInput ? parseInt(sevInput.value) || 1 : 1;
+            if ((fVal * sVal) >= 8) {
+                const panel = document.getElementById(`box_${k}`);
+                const title = panel ? panel.querySelector('.gotrak-title-bar span').innerText : k;
+                highRiskNames.push(title);
             }
         });
+
         const alertBox = document.getElementById('gotrakHighRiskAlert');
         const listSpan = document.getElementById('highRiskJointsList');
         if (alertBox && listSpan) {
-            if (highRiskJoints.length > 0) {
+            if (highRiskNames.length > 0) {
                 alertBox.classList.remove('hidden');
-                listSpan.innerText = highRiskJoints.join(', ');
+                listSpan.innerText = highRiskNames.join(', ');
             } else {
                 alertBox.classList.add('hidden');
             }
@@ -817,6 +1227,7 @@
     window.addEventListener('load', () => {
         setTimeout(drawDynamicPointers, 200);
         calculateErgoAssessment();
+        calculateAllGotrak();
     });
 
     window.addEventListener('resize', () => {
@@ -828,7 +1239,7 @@
         const form = document.getElementById('ergoForm');
         if (form) {
             form.addEventListener('change', (e) => {
-                if (e.target.matches('select[name^="ergo_items"], select[name^="mmh"], input[name^="gotrak"], #shift_hours')) {
+                if (e.target.matches('select[name^="ergo_items"], select[name^="mmh"], input[name^="mmh_step3"], input[name^="gotrak"], #shift_hours')) {
                     calculateErgoAssessment();
                 }
             });
@@ -1023,6 +1434,14 @@
     // ================= INTERACTIVE CANVAS RENDER & DRAG =================
     const canvas = document.getElementById('interactivePoseCanvas');
     const ctx = canvas.getContext('2d');
+    let currentLineColor = '#facc15';
+
+    function changeLineColor(colorHex) {
+        currentLineColor = colorHex;
+        const picker = document.getElementById('lineColorPicker');
+        if (picker) picker.value = colorHex;
+        redrawActiveCanvas();
+    }
 
     function redrawActiveCanvas() {
         if (activePhotoIndex === null || !uploadedPhotos[activePhotoIndex]) return;
@@ -1042,7 +1461,7 @@
             const elbowAng = findAngle(lm.shoulder, lm.elbow, lm.wrist);
             const kneeAng = findAngle(lm.hip, lm.knee, lm.ankle);
 
-            ctx.strokeStyle = '#facc15'; ctx.fillStyle = '#facc15';
+            ctx.strokeStyle = currentLineColor; ctx.fillStyle = currentLineColor;
             ctx.lineWidth = Math.max(4, Math.round(W / 200));
             ctx.font = `bold ${Math.max(18, Math.round(W / 30))}px Arial`;
 
@@ -1058,14 +1477,14 @@
                 const p = lm[key];
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, Math.max(8, Math.round(W / 100)), 0, 2 * Math.PI);
-                ctx.fillStyle = (draggedJointKey === key) ? '#ef4444' : '#facc15';
+                ctx.fillStyle = (draggedJointKey === key) ? '#ef4444' : currentLineColor;
                 ctx.fill();
                 ctx.lineWidth = 2; ctx.strokeStyle = '#000000'; ctx.stroke();
             });
 
             const drawTxt = (txt, p) => {
                 ctx.shadowColor = 'black'; ctx.shadowBlur = 6;
-                ctx.fillStyle = '#facc15';
+                ctx.fillStyle = currentLineColor;
                 ctx.fillText(txt + '°', p.x + 15, p.y - 10);
                 ctx.shadowBlur = 0;
             };
@@ -1145,8 +1564,8 @@
                 const elbowAng = findAngle(lm.shoulder, lm.elbow, lm.wrist);
                 const kneeAng = findAngle(lm.hip, lm.knee, lm.ankle);
 
-                eCtx.strokeStyle = '#facc15';
-                eCtx.fillStyle = '#facc15';
+                eCtx.strokeStyle = currentLineColor;
+                eCtx.fillStyle = currentLineColor;
                 eCtx.lineWidth = Math.max(4, Math.round(W / 200));
                 eCtx.font = `bold ${Math.max(18, Math.round(W / 30))}px Arial`;
 
@@ -1168,7 +1587,7 @@
                     const p = lm[key];
                     eCtx.beginPath();
                     eCtx.arc(p.x, p.y, Math.max(7, Math.round(W / 100)), 0, 2 * Math.PI);
-                    eCtx.fillStyle = '#facc15';
+                    eCtx.fillStyle = currentLineColor;
                     eCtx.fill();
                     eCtx.lineWidth = 2;
                     eCtx.strokeStyle = '#000000';
@@ -1178,7 +1597,7 @@
                 const drawTxt = (txt, p) => {
                     eCtx.shadowColor = 'black';
                     eCtx.shadowBlur = 6;
-                    eCtx.fillStyle = '#facc15';
+                    eCtx.fillStyle = currentLineColor;
                     eCtx.fillText(txt + '°', p.x + 15, p.y - 10);
                     eCtx.shadowBlur = 0;
                 };
