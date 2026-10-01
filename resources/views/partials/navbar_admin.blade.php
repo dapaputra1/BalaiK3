@@ -525,6 +525,7 @@
         'pcu' => [
             ['type' => 'link', 'label' => 'Dashboard', 'icon' => 'bi bi-grid', 'route' => 'pcu.dashboard'],
             ['type' => 'link', 'label' => 'Permohonan', 'icon' => 'bi bi-file-earmark-text', 'route' => 'superadmin.permohonan.index'],
+            ['type' => 'link', 'label' => 'Pengujian Ergonomi (SNI 9011)', 'icon' => 'bi bi-activity', 'route' => 'ergo.index'],
             [
                 'type' => 'section',
                 'label' => 'Alur Kerja',

@@ -529,7 +529,7 @@ Route::middleware(['auth', 'role:qc'])
         Route::get('/qc-lhu/{permohonan}/revision', [QcLhuController::class, 'showRevision'])->name('qc-lhu.revision.show');
     });
 
-    Route::middleware(['auth', 'role:superadmin,admin'])
+    Route::middleware(['auth', 'role:superadmin,pcu'])
     ->prefix('layanan/pengujian-ergonomi')
     ->name('ergo.')
     ->group(function () {
@@ -541,6 +541,7 @@ Route::middleware(['auth', 'role:qc'])
         Route::put('/update/{id}', [ErgoAssessmentController::class, 'update'])->name('update');
         Route::delete('/hapus/{id}', [ErgoAssessmentController::class, 'destroy'])->name('destroy');
         Route::get('/cetak-lhu/{id}', [ErgoAssessmentController::class, 'exportPdf'])->name('pdf');
+        Route::get('/unduh-lhu-word/{id}', [ErgoAssessmentController::class, 'exportDocx'])->name('docx');
         Route::get('/edit-lhu/{id}', [ErgoAssessmentController::class, 'editLhu'])->name('lhu.edit');
         Route::put('/update-lhu/{id}', [ErgoAssessmentController::class, 'updateLhu'])->name('lhu.update');
     });
